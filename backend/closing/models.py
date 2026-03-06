@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 from users.models import Organization, UserProfile
 from decimal import Decimal
 
@@ -8,6 +9,13 @@ CLOSING_STATUS_CHOICES = (
     ('SUBMITTED', 'Submitted'),
     ('APPROVED', 'Approved'),
     ('REJECTED', 'Rejected'),
+)
+
+# Expense Category Choices
+EXPENSE_CATEGORY_CHOICES = (
+    ('SUPPLIES', '소비재'),
+    ('MAINTENANCE', '유지보수'),
+    ('OTHER', '기타'),
 )
 
 
@@ -110,3 +118,51 @@ class ClosingSupplierCost(models.Model):
 
     def __str__(self):
         return f"{self.closing} - {self.supplier.name}: {self.amount}"
+
+
+class ClosingHRCash(models.Model):
+    """클로징 시 HR 현금 입력 (스토어별로 활성화/비활성화 가능)"""
+    daily_closing = models.ForeignKey(DailyClosing, on_delete=models.CASCADE, related_name='hr_cash_entries')
+    amount = models.DecimalField(max_digits=12, decimal_places=2, help_text="HR 현금 금액")
+    notes = models.TextField(null=True, blank=True, help_text="HR 현금 비고")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='hr_cash_entries_created')
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Closing HR Cash"
+        verbose_name_plural = "Closing HR Cashes"
+
+    def __str__(self):
+        return f"{self.daily_closing} - HR Cash: {self.amount}"
+
+
+class ClosingCashExpense(models.Model):
+    """클로징 시 현금 지출 기록 (영수증/파일 첨부 포함)"""
+    daily_closing = models.ForeignKey(DailyClosing, on_delete=models.CASCADE, related_name='cash_expenses')
+    category = models.CharField(max_length=20, choices=EXPENSE_CATEGORY_CHOICES, help_text="지출 카테고리")
+    reason = models.CharField(max_length=200, help_text="지출 사유")
+    amount = models.DecimalField(max_digits=12, decimal_places=2, help_text="지출 금액")
+    attachment = models.FileField(
+        upload_to='closing/expenses/%Y/%m/%d/',
+        blank=True,
+        null=True,
+        help_text="영수증 또는 증빙 파일 (PDF, JPG, PNG 최대 5MB)"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='cash_expenses_created')
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['daily_closing', 'category']),
+        ]
+        verbose_name = "Closing Cash Expense"
+        verbose_name_plural = "Closing Cash Expenses"
+
+    def __str__(self):
+        return f"{self.daily_closing} - {self.reason}: {self.amount}"

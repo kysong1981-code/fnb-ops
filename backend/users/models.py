@@ -43,6 +43,9 @@ class Organization(models.Model):
     opening_time = models.TimeField(null=True, blank=True)
     closing_time = models.TimeField(null=True, blank=True)
 
+    # Store settings
+    hr_cash_enabled = models.BooleanField(default=True, help_text="HR 현금 입력 활성화 여부")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
