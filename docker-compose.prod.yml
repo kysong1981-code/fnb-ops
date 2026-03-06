@@ -1,0 +1,149 @@
+version: '3.8'
+
+# ============================================================================
+# Production Docker Compose Configuration for fnb-ops
+# ============================================================================
+# Usage:
+#   docker-compose -f docker-compose.prod.yml up -d
+#   docker-compose -f docker-compose.prod.yml logs -f
+#   docker-compose -f docker-compose.prod.yml down
+# ============================================================================
+
+services:
+  # ========================================================================
+  # MySQL Database Service
+  # ========================================================================
+  mysql:
+    image: mysql:8.0
+    container_name: fnb-ops-mysql-prod
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_HOST: '%'
+      TZ: 'UTC'
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_prod_data:/var/lib/mysql
+      - ./backend/scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+      interval: 10s
+    networks:
+      - fnb-ops-network
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --sql-mode=STRICT_TRANS_TABLES
+      --max_connections=1000
+      --max_allowed_packet=256M
+
+  # ========================================================================
+  # Django Backend Service
+  # ========================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: fnb-ops-backend-prod
+    restart: unless-stopped
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings_production
+      - DB_ENGINE=django.db.backends.mysql
+      - DB_NAME=${DB_NAME}
+      - DB_USER=root
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=False
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - SECURE_SSL_REDIRECT=${SECURE_SSL_REDIRECT:-True}
+      - SECURE_HSTS_SECONDS=${SECURE_HSTS_SECONDS:-31536000}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - JWT_ACCESS_LIFETIME=${JWT_ACCESS_LIFETIME:-5}
+      - JWT_REFRESH_LIFETIME=${JWT_REFRESH_LIFETIME:-7}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SENTRY_ENABLED=${SENTRY_ENABLED:-False}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_SAMPLE_RATE=${SENTRY_SAMPLE_RATE:-0.1}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./backend/logs:/app/logs
+      - ./backend/staticfiles:/app/staticfiles
+      - ./backend/media:/app/media
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - fnb-ops-network
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             gunicorn core.wsgi:application
+             --bind 0.0.0.0:8000
+             --workers 4
+             --worker-class sync
+             --timeout 120
+             --access-logfile -
+             --error-logfile -
+             --log-level info"
+
+  # ========================================================================
+  # React Frontend Service
+  # ========================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_URL: ${FRONTEND_API_URL:-https://api.yourdomain.com}
+    container_name: fnb-ops-frontend-prod
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=${FRONTEND_API_URL:-https://api.yourdomain.com}
+      - VITE_ENV=production
+      - VITE_LOG_LEVEL=error
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - fnb-ops-network
+
+# ============================================================================
+# Volumes - Persistent storage
+# ============================================================================
+volumes:
+  mysql_prod_data:
+    driver: local
+
+# ============================================================================
+# Networks - Service communication
+# ============================================================================
+networks:
+  fnb-ops-network:
+    driver: bridge
