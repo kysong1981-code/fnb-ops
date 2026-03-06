@@ -21,6 +21,10 @@ import TemperatureAlert from './components/safety/TemperatureLog/TemperatureAler
 import IncidentList from './components/safety/Incidents/IncidentList'
 import IncidentForm from './components/safety/Incidents/IncidentForm'
 import IncidentDetail from './components/safety/Incidents/IncidentDetail'
+import CleaningForm from './components/safety/CleaningManagement/CleaningForm'
+import TrainingForm from './components/safety/TrainingManagement/TrainingForm'
+import TrainingList from './components/safety/TrainingManagement/TrainingList'
+import VerificationForm from './components/safety/SelfVerification/VerificationForm'
 
 function App() {
   return (
@@ -236,6 +240,46 @@ function App() {
             element={
               <ProtectedRoute>
                 <IncidentForm />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 청소 기록 (보호됨) */}
+          <Route
+            path="/safety/cleaning"
+            element={
+              <ProtectedRoute>
+                <CleaningForm />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 교육 목록 (보호됨) */}
+          <Route
+            path="/safety/training"
+            element={
+              <ProtectedRoute>
+                <TrainingList />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 새 교육 (보호됨) */}
+          <Route
+            path="/safety/training/new"
+            element={
+              <ProtectedRoute>
+                <TrainingForm />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 검증 작성 (보호됨) */}
+          <Route
+            path="/safety/verifications"
+            element={
+              <ProtectedRoute>
+                <VerificationForm />
               </ProtectedRoute>
             }
           />
