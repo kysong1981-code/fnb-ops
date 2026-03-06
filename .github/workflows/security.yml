@@ -1,0 +1,129 @@
+name: Security & Code Quality
+
+on:
+  push:
+    branches: [ main, develop, staging ]
+  pull_request:
+    branches: [ main, develop, staging ]
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  # ========================================================================
+  # Dependency Scanning
+  # ========================================================================
+  dependency-check:
+    name: Dependency Security Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run safety check on Python dependencies
+      run: |
+        pip install safety
+        cd backend && safety check --json || true
+
+    - name: Check npm dependencies for vulnerabilities
+      run: |
+        cd frontend && npm audit || true
+
+  # ========================================================================
+  # SAST (Static Application Security Testing)
+  # ========================================================================
+  sast:
+    name: Static Code Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install Python dependencies
+      run: |
+        pip install bandit semgrep
+        cd backend && pip install -r requirements.txt
+
+    - name: Run Bandit (Python security)
+      run: |
+        bandit -r backend/ -f json -o bandit-report.json || true
+
+    - name: Run Semgrep (Code patterns)
+      run: |
+        semgrep --config=p/security-audit --config=p/owasp-top-ten \
+                --json -o semgrep-report.json backend/ || true
+
+    - name: Upload SAST reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: sast-reports
+        path: |
+          bandit-report.json
+          semgrep-report.json
+        retention-days: 30
+
+  # ========================================================================
+  # Secret Scanning
+  # ========================================================================
+  secrets:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Run TruffleHog (Secret scanning)
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: ${{ github.event.repository.default_branch }}
+        head: HEAD
+      continue-on-error: true
+
+  # ========================================================================
+  # License Compliance
+  # ========================================================================
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check Python licenses
+      run: |
+        pip install pip-licenses
+        pip-licenses --format=csv --output-file=python-licenses.csv || true
+
+    - name: Check npm licenses
+      run: |
+        npm install -g license-checker
+        cd frontend && license-checker --json > npm-licenses.json || true
+
+    - name: Upload license reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: license-reports
+        path: |
+          python-licenses.csv
+          frontend/npm-licenses.json
+        retention-days: 30

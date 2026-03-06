@@ -1,0 +1,93 @@
+# Pre-commit hooks configuration for fnb-ops
+# Install: pip install pre-commit
+# Setup: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # ========================================================================
+  # Code Formatting
+  # ========================================================================
+  - repo: https://github.com/psf/black
+    rev: 23.12.0
+    hooks:
+      - id: black
+        language_version: python3.11
+        args: [--line-length=100]
+
+  # ========================================================================
+  # Import Sorting
+  # ========================================================================
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: [--profile, black]
+
+  # ========================================================================
+  # Linting
+  # ========================================================================
+  - repo: https://github.com/PyCQA/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+        args: [--max-line-length=100, --extend-ignore=E203,W503]
+        additional_dependencies: [flake8-docstrings, flake8-bugbear]
+
+  # ========================================================================
+  # Security
+  # ========================================================================
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        args: [-ll, -r, backend/]
+        exclude: tests
+
+  # ========================================================================
+  # YAML Validation
+  # ========================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-yaml
+      - id: check-added-large-files
+        args: [--maxkb=10000]
+      - id: check-case-conflict
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: debug-statements
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: trailing-whitespace
+
+  # ========================================================================
+  # Frontend (JavaScript/React)
+  # ========================================================================
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v8.56.0
+    hooks:
+      - id: eslint
+        types: [javascript, jsx]
+        files: frontend/src
+        args: [--fix]
+        additional_dependencies:
+          - eslint
+          - eslint-config-prettier
+          - eslint-plugin-react
+          - eslint-plugin-react-hooks
+
+# ============================================================================
+# Configuration
+# ============================================================================
+default_language_version:
+  python: python3.11
+
+exclude: |
+  (?x)^(
+    frontend/(dist|node_modules|coverage)|
+    backend/(venv|env|build|dist|.*\.egg-info|staticfiles|media|\.pytest_cache)
+  )

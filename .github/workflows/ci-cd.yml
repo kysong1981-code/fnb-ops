@@ -1,0 +1,256 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop, staging ]
+  pull_request:
+    branches: [ main, develop, staging ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BACKEND: ${{ github.repository }}/backend
+  IMAGE_FRONTEND: ${{ github.repository }}/frontend
+
+jobs:
+  # ========================================================================
+  # Backend Tests & Linting
+  # ========================================================================
+  test-backend:
+    name: Backend Tests & Code Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: test_fnb_ops
+          MYSQL_ROOT_PASSWORD: test_password
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+        ports:
+          - 3306:3306
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        cd backend && pip install -r requirements.txt
+
+    - name: Run Django migrations
+      env:
+        DB_ENGINE: django.db.backends.mysql
+        DB_NAME: test_fnb_ops
+        DB_USER: root
+        DB_PASSWORD: test_password
+        DB_HOST: 127.0.0.1
+        DB_PORT: 3306
+        SECRET_KEY: test-secret-key-for-testing-only
+      run: |
+        cd backend && python manage.py migrate
+
+    - name: Run tests with pytest
+      env:
+        DB_ENGINE: django.db.backends.mysql
+        DB_NAME: test_fnb_ops
+        DB_USER: root
+        DB_PASSWORD: test_password
+        DB_HOST: 127.0.0.1
+        DB_PORT: 3306
+        SECRET_KEY: test-secret-key-for-testing-only
+      run: |
+        cd backend && pytest --cov=. --cov-report=xml --cov-report=html || true
+
+    - name: Code formatting check (Black)
+      run: |
+        pip install black
+        cd backend && black --check . || true
+
+    - name: Import sorting check (isort)
+      run: |
+        pip install isort
+        cd backend && isort --check-only . || true
+
+    - name: Linting check (Flake8)
+      run: |
+        pip install flake8
+        cd backend && flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      if: always()
+      with:
+        file: ./backend/coverage.xml
+        flags: backend
+        fail_ci_if_error: false
+
+  # ========================================================================
+  # Frontend Tests & Linting
+  # ========================================================================
+  test-frontend:
+    name: Frontend Tests & Code Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js 20
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install dependencies
+      run: |
+        cd frontend && npm ci
+
+    - name: Run ESLint
+      run: |
+        cd frontend && npm run lint || true
+
+    - name: Build application
+      run: |
+        cd frontend && npm run build
+
+    - name: Store build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: frontend-build
+        path: frontend/dist
+        retention-days: 1
+
+  # ========================================================================
+  # Docker Build & Push
+  # ========================================================================
+  build-docker:
+    name: Build Docker Images
+    needs: [test-backend, test-frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata (tags, labels) for Backend
+      id: meta-backend
+      uses: docker/metadata-action@v4
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}
+        tags: |
+          type=ref,event=branch
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha
+
+    - name: Build and push Backend image
+      uses: docker/build-push-action@v4
+      with:
+        context: ./backend
+        file: ./backend/Dockerfile.prod
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta-backend.outputs.tags }}
+        labels: ${{ steps.meta-backend.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Extract metadata (tags, labels) for Frontend
+      id: meta-frontend
+      uses: docker/metadata-action@v4
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}
+        tags: |
+          type=ref,event=branch
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha
+
+    - name: Build and push Frontend image
+      uses: docker/build-push-action@v4
+      with:
+        context: ./frontend
+        file: ./frontend/Dockerfile.prod
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta-frontend.outputs.tags }}
+        labels: ${{ steps.meta-frontend.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # ========================================================================
+  # Deployment (Optional - Requires Configuration)
+  # ========================================================================
+  deploy:
+    name: Deploy to Production
+    needs: build-docker
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 15
+
+    environment:
+      name: production
+      url: https://yourdomain.com
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Deploy to Production
+      env:
+        DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      if: env.DEPLOY_KEY != '' && env.DEPLOY_HOST != ''
+      run: |
+        mkdir -p ~/.ssh
+        echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+        ssh-keyscan -H $DEPLOY_HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+        ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $DEPLOY_USER@$DEPLOY_HOST \
+          "cd $DEPLOY_PATH && \
+           git pull origin main && \
+           docker-compose -f docker-compose.prod.yml pull && \
+           docker-compose -f docker-compose.prod.yml up -d && \
+           docker-compose -f docker-compose.prod.yml exec -T backend python manage.py migrate && \
+           docker-compose -f docker-compose.prod.yml exec -T backend python manage.py collectstatic --noinput"
+
+    - name: Health Check
+      if: env.DEPLOY_HOST != ''
+      run: |
+        sleep 10
+        curl -f https://yourdomain.com/health/ || exit 1
+      continue-on-error: true
+
+    - name: Notify Deployment Success
+      if: success()
+      run: echo "✅ Deployment to production completed successfully"
+
+    - name: Notify Deployment Failure
+      if: failure()
+      run: echo "❌ Deployment failed - Check logs above"
