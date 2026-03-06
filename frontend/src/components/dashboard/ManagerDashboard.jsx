@@ -16,7 +16,7 @@ export default function ManagerDashboard() {
       </div>
 
       {/* 매니저용 주요 지표 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {/* 클로징 상태 */}
         <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-indigo-500">
           <p className="text-sm text-gray-600 mb-2">오늘 클로징</p>
@@ -49,6 +49,23 @@ export default function ManagerDashboard() {
           <p className="text-sm text-gray-600 mb-2">매장 리포트</p>
           <p className="text-3xl font-bold text-gray-900">📈</p>
           <p className="text-xs text-gray-500 mt-2">리포트 보기</p>
+        </div>
+
+        {/* HR/온보딩 */}
+        <div
+          onClick={() => navigate('/hr')}
+          className="bg-white rounded-lg shadow-md p-6 border-l-4 border-pink-500 cursor-pointer hover:shadow-lg transition"
+        >
+          <p className="text-sm text-gray-600 mb-2">HR 관리</p>
+          <p className="text-3xl font-bold text-gray-900">👤</p>
+          <p className="text-xs text-gray-500 mt-2">온보딩 보기</p>
+        </div>
+
+        {/* 할일 */}
+        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-500">
+          <p className="text-sm text-gray-600 mb-2">할일</p>
+          <p className="text-3xl font-bold text-gray-900">-</p>
+          <p className="text-xs text-gray-500 mt-2">준비 중</p>
         </div>
       </div>
 

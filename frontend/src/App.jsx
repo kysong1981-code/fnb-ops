@@ -7,6 +7,8 @@ import DailyClosingForm from './components/closing/DailyClosingForm'
 import ClosingList from './components/closing/ClosingList'
 import SalesAnalysis from './components/sales/SalesAnalysis'
 import StoreReport from './components/reports/StoreReport'
+import OnboardingList from './components/hr/OnboardingList'
+import OnboardingDetail from './components/hr/OnboardingDetail'
 
 function App() {
   return (
@@ -62,6 +64,26 @@ function App() {
             element={
               <ProtectedRoute>
                 <StoreReport />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* HR/온보딩 목록 (보호됨) */}
+          <Route
+            path="/hr"
+            element={
+              <ProtectedRoute>
+                <OnboardingList />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* HR/온보딩 상세 (보호됨) */}
+          <Route
+            path="/hr/:id"
+            element={
+              <ProtectedRoute>
+                <OnboardingDetail />
               </ProtectedRoute>
             }
           />
