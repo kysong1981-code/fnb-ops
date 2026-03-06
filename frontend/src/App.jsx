@@ -6,6 +6,7 @@ import Dashboard from './components/dashboard/Dashboard'
 import DailyClosingForm from './components/closing/DailyClosingForm'
 import ClosingList from './components/closing/ClosingList'
 import SalesAnalysis from './components/sales/SalesAnalysis'
+import StoreReport from './components/reports/StoreReport'
 
 function App() {
   return (
@@ -51,6 +52,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <SalesAnalysis />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 매장 리포트 (보호됨) */}
+          <Route
+            path="/reports"
+            element={
+              <ProtectedRoute>
+                <StoreReport />
               </ProtectedRoute>
             }
           />

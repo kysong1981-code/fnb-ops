@@ -41,11 +41,14 @@ export default function ManagerDashboard() {
           <p className="text-xs text-gray-500 mt-2">분석 보기</p>
         </div>
 
-        {/* 할일 */}
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-500">
-          <p className="text-sm text-gray-600 mb-2">할일</p>
-          <p className="text-3xl font-bold text-gray-900">-</p>
-          <p className="text-xs text-gray-500 mt-2">준비 중</p>
+        {/* 매장 리포트 */}
+        <div
+          onClick={() => navigate('/reports')}
+          className="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500 cursor-pointer hover:shadow-lg transition"
+        >
+          <p className="text-sm text-gray-600 mb-2">매장 리포트</p>
+          <p className="text-3xl font-bold text-gray-900">📈</p>
+          <p className="text-xs text-gray-500 mt-2">리포트 보기</p>
         </div>
       </div>
 
