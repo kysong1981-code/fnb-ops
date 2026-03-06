@@ -11,6 +11,7 @@ import OnboardingList from './components/hr/OnboardingList'
 import OnboardingDetail from './components/hr/OnboardingDetail'
 import MyPayslips from './components/payroll/MyPayslips'
 import PayslipDetail from './components/payroll/PayslipDetail'
+import SafetyDashboard from './components/safety/SafetyDashboard'
 
 function App() {
   return (
@@ -106,6 +107,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <PayslipDetail />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 (보호됨) */}
+          <Route
+            path="/safety"
+            element={
+              <ProtectedRoute>
+                <SafetyDashboard />
               </ProtectedRoute>
             }
           />

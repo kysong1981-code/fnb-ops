@@ -61,8 +61,18 @@ export default function ManagerDashboard() {
           <p className="text-xs text-gray-500 mt-2">온보딩 보기</p>
         </div>
 
+        {/* Food Safety */}
+        <div
+          onClick={() => navigate('/safety')}
+          className="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-500 cursor-pointer hover:shadow-lg transition"
+        >
+          <p className="text-sm text-gray-600 mb-2">Food Safety</p>
+          <p className="text-3xl font-bold text-gray-900">🔒</p>
+          <p className="text-xs text-gray-500 mt-2">안전 관리</p>
+        </div>
+
         {/* 할일 */}
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-500">
+        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-500">
           <p className="text-sm text-gray-600 mb-2">할일</p>
           <p className="text-3xl font-bold text-gray-900">-</p>
           <p className="text-xs text-gray-500 mt-2">준비 중</p>
