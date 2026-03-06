@@ -9,6 +9,8 @@ import SalesAnalysis from './components/sales/SalesAnalysis'
 import StoreReport from './components/reports/StoreReport'
 import OnboardingList from './components/hr/OnboardingList'
 import OnboardingDetail from './components/hr/OnboardingDetail'
+import MyPayslips from './components/payroll/MyPayslips'
+import PayslipDetail from './components/payroll/PayslipDetail'
 
 function App() {
   return (
@@ -84,6 +86,26 @@ function App() {
             element={
               <ProtectedRoute>
                 <OnboardingDetail />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 급여명세서 목록 (보호됨) */}
+          <Route
+            path="/payroll"
+            element={
+              <ProtectedRoute>
+                <MyPayslips />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 급여명세서 상세 (보호됨) */}
+          <Route
+            path="/payroll/:id"
+            element={
+              <ProtectedRoute>
+                <PayslipDetail />
               </ProtectedRoute>
             }
           />

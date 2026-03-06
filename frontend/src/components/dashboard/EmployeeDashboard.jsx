@@ -1,6 +1,8 @@
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 export default function EmployeeDashboard() {
+  const navigate = useNavigate()
   const { user } = useAuth()
 
   return (
@@ -14,7 +16,7 @@ export default function EmployeeDashboard() {
       </div>
 
       {/* 기본 정보 카드들 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* 내 정보 */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">내 정보</h3>
@@ -43,6 +45,21 @@ export default function EmployeeDashboard() {
             <div className="p-3 bg-blue-50 rounded-lg text-center">
               <p className="text-sm text-gray-600">이번주</p>
               <p className="text-lg font-bold text-blue-600">준비 중</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 급여명세서 */}
+        <div
+          onClick={() => navigate('/payroll')}
+          className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500 cursor-pointer hover:shadow-lg transition"
+        >
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">급여명세서</h3>
+          <div className="space-y-3">
+            <div className="p-3 bg-green-50 rounded-lg text-center">
+              <p className="text-sm text-gray-600">NZ법 준수</p>
+              <p className="text-lg font-bold text-green-600">📄</p>
+              <p className="text-xs text-green-700 mt-1">보기</p>
             </div>
           </div>
         </div>
