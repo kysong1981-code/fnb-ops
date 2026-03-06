@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db.models import Q
@@ -29,7 +29,7 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
     queryset = DailyClosing.objects.all()
     permission_classes = [IsAuthenticated, IsManager]
     filter_backends = [OrganizationFilterBackend]
-    parser_classes = (MultiPartParser, FormParser)
+    parser_classes = (JSONParser, MultiPartParser, FormParser)
 
     def get_serializer_class(self):
         """액션에 따라 다른 시리얼라이저 사용"""
