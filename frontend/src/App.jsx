@@ -5,6 +5,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute'
 import Dashboard from './components/dashboard/Dashboard'
 import DailyClosingForm from './components/closing/DailyClosingForm'
 import ClosingList from './components/closing/ClosingList'
+import SalesAnalysis from './components/sales/SalesAnalysis'
 
 function App() {
   return (
@@ -40,6 +41,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <DailyClosingForm />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 매출 분석 (보호됨) */}
+          <Route
+            path="/sales"
+            element={
+              <ProtectedRoute>
+                <SalesAnalysis />
               </ProtectedRoute>
             }
           />

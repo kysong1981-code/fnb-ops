@@ -31,11 +31,14 @@ export default function ManagerDashboard() {
           <p className="text-xs text-gray-500 mt-2">준비 중</p>
         </div>
 
-        {/* 평균 매출 */}
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-500">
-          <p className="text-sm text-gray-600 mb-2">평균 매출</p>
-          <p className="text-3xl font-bold text-gray-900">-</p>
-          <p className="text-xs text-gray-500 mt-2">준비 중</p>
+        {/* 매출 분석 */}
+        <div
+          onClick={() => navigate('/sales')}
+          className="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-500 cursor-pointer hover:shadow-lg transition"
+        >
+          <p className="text-sm text-gray-600 mb-2">매출 분석</p>
+          <p className="text-3xl font-bold text-gray-900">📊</p>
+          <p className="text-xs text-gray-500 mt-2">분석 보기</p>
         </div>
 
         {/* 할일 */}
