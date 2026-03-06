@@ -5,6 +5,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db.models import Q
+from django.http import FileResponse
 
 from .models import DailyClosing, ClosingHRCash, ClosingCashExpense
 from .serializers import (
@@ -13,6 +14,7 @@ from .serializers import (
 )
 from users.permissions import IsManager, IsSeniorManager
 from users.filters import OrganizationFilterBackend
+from utils.pdf_generator import DailyClosingPDFGenerator
 
 
 class DailyClosingViewSet(viewsets.ModelViewSet):
@@ -123,6 +125,58 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
             {'detail': '클로징이 거부되었습니다.', 'reason': reason, **serializer.data},
             status=status.HTTP_200_OK
         )
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated, IsManager])
+    def generate_pdf(self, request, pk=None):
+        """클로징 PDF 보고서 생성"""
+        closing = self.get_object()
+
+        try:
+            # Prepare closing data
+            closing_data = {
+                'date': closing.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'pos_card': float(closing.pos_card or 0),
+                'pos_cash': float(closing.pos_cash or 0),
+                'actual_card': float(closing.actual_card or 0),
+                'actual_cash': float(closing.actual_cash or 0),
+                'status': closing.status,
+                'variance': float(closing.variance or 0),
+            }
+
+            # Add HR cash if available
+            hr_cash = closing.closinghrcash.first()
+            if hr_cash:
+                closing_data['hr_cash'] = float(hr_cash.amount)
+
+            # Add expenses
+            expenses = closing.closingcashexpense_set.all()
+            closing_data['expenses'] = [
+                {
+                    'category': exp.get_category_display(),
+                    'reason': exp.reason,
+                    'amount': float(exp.amount),
+                }
+                for exp in expenses
+            ]
+
+            # Generate PDF
+            pdf_generator = DailyClosingPDFGenerator()
+            company_name = closing.organization.name
+            pdf_buffer = pdf_generator.generate(closing_data, company_name)
+
+            # Return PDF file
+            filename = f"closing_{closing.id}_{closing.created_at.strftime('%Y%m%d')}.pdf"
+            return FileResponse(
+                pdf_buffer,
+                as_attachment=True,
+                filename=filename,
+                content_type='application/pdf'
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'PDF 생성 실패: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class ClosingHRCashViewSet(mixins.CreateModelMixin,
