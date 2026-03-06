@@ -22,9 +22,14 @@ import IncidentList from './components/safety/Incidents/IncidentList'
 import IncidentForm from './components/safety/Incidents/IncidentForm'
 import IncidentDetail from './components/safety/Incidents/IncidentDetail'
 import CleaningForm from './components/safety/CleaningManagement/CleaningForm'
+import CleaningSchedule from './components/safety/CleaningManagement/CleaningSchedule'
+import CleaningHistory from './components/safety/CleaningManagement/CleaningHistory'
 import TrainingForm from './components/safety/TrainingManagement/TrainingForm'
 import TrainingList from './components/safety/TrainingManagement/TrainingList'
+import TrainingStatus from './components/safety/TrainingManagement/TrainingStatus'
 import VerificationForm from './components/safety/SelfVerification/VerificationForm'
+import VerificationList from './components/safety/SelfVerification/VerificationList'
+import VerificationReport from './components/safety/SelfVerification/VerificationReport'
 
 function App() {
   return (
@@ -254,6 +259,26 @@ function App() {
             }
           />
 
+          {/* 음식 안전 관리 - 주간 청소 일정 (보호됨) */}
+          <Route
+            path="/safety/cleaning/schedule"
+            element={
+              <ProtectedRoute>
+                <CleaningSchedule />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 청소 이력 (보호됨) */}
+          <Route
+            path="/safety/cleaning/history"
+            element={
+              <ProtectedRoute>
+                <CleaningHistory />
+              </ProtectedRoute>
+            }
+          />
+
           {/* 음식 안전 관리 - 교육 목록 (보호됨) */}
           <Route
             path="/safety/training"
@@ -274,12 +299,42 @@ function App() {
             }
           />
 
+          {/* 음식 안전 관리 - 직원 교육 현황 (보호됨) */}
+          <Route
+            path="/safety/training/status"
+            element={
+              <ProtectedRoute>
+                <TrainingStatus />
+              </ProtectedRoute>
+            }
+          />
+
           {/* 음식 안전 관리 - 검증 작성 (보호됨) */}
           <Route
             path="/safety/verifications"
             element={
               <ProtectedRoute>
                 <VerificationForm />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 검증 기록 목록 (보호됨) */}
+          <Route
+            path="/safety/verifications/list"
+            element={
+              <ProtectedRoute>
+                <VerificationList />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 검증 보고서 (보호됨) */}
+          <Route
+            path="/safety/verifications/:id"
+            element={
+              <ProtectedRoute>
+                <VerificationReport />
               </ProtectedRoute>
             }
           />
