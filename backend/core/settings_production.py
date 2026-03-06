@@ -35,20 +35,26 @@ SECURE_HSTS_PRELOAD = True
 # ============================================================================
 # DATABASE CONFIGURATION - PRODUCTION
 # ============================================================================
+_DB_ENGINE = config('DB_ENGINE', default='django.db.backends.mysql')
+_DB_OPTIONS = {}
+
+if _DB_ENGINE == 'django.db.backends.mysql':
+    _DB_OPTIONS = {
+        'init_command': "SET sql_mode='STRICT_TRANS_TABLES',character_set_connection=utf8mb4",
+        'charset': 'utf8mb4',
+    }
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
+        'ENGINE': _DB_ENGINE,
         'NAME': config('DB_NAME', default='fnb_ops_db'),
         'USER': config('DB_USER', default='root'),
-        'PASSWORD': config('DB_PASSWORD'),
+        'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='3306'),
         'CONN_MAX_AGE': 600,  # 10 minutes connection pooling
         'CONN_HEALTH_CHECKS': True,
-        'OPTIONS': {
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES',character_set_connection=utf8mb4",
-            'charset': 'utf8mb4',
-        }
+        'OPTIONS': _DB_OPTIONS
     }
 }
 
