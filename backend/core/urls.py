@@ -22,10 +22,16 @@ from rest_framework import routers
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 from rest_framework_simplejwt.views import TokenRefreshView
 from auth_app.views import CustomTokenObtainPairView
+from core.health import health_check, readiness_check, liveness_check
 
 router = routers.DefaultRouter()
 
 urlpatterns = [
+    # Health Checks (used by load balancers and orchestration)
+    path('health/', health_check, name='health_check'),
+    path('ready/', readiness_check, name='readiness_check'),
+    path('alive/', liveness_check, name='liveness_check'),
+
     # Admin
     path('admin/', admin.site.urls),
 
