@@ -1,6 +1,8 @@
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 export default function ManagerDashboard() {
+  const navigate = useNavigate()
   const { user } = useAuth()
 
   return (
@@ -51,7 +53,7 @@ export default function ManagerDashboard() {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
             클로징 현황
           </h3>
-          <div className="space-y-3">
+          <div className="space-y-3 mb-4">
             <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
               <span className="text-sm text-gray-600">클로징 대기</span>
               <span className="font-semibold text-gray-900">0</span>
@@ -64,6 +66,20 @@ export default function ManagerDashboard() {
               <span className="text-sm text-gray-600">승인됨</span>
               <span className="font-semibold text-gray-900">0</span>
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => navigate('/closing/form')}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition"
+            >
+              새 클로징
+            </button>
+            <button
+              onClick={() => navigate('/closing')}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm font-medium transition"
+            >
+              현황 보기
+            </button>
           </div>
         </div>
 

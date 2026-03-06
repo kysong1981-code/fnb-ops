@@ -3,6 +3,8 @@ import { AuthProvider } from './context/AuthContext'
 import LoginPage from './components/auth/LoginPage'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import Dashboard from './components/dashboard/Dashboard'
+import DailyClosingForm from './components/closing/DailyClosingForm'
+import ClosingList from './components/closing/ClosingList'
 
 function App() {
   return (
@@ -18,6 +20,26 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 클로징 목록 (보호됨) */}
+          <Route
+            path="/closing"
+            element={
+              <ProtectedRoute>
+                <ClosingList />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 클로징 폼 (보호됨) */}
+          <Route
+            path="/closing/form"
+            element={
+              <ProtectedRoute>
+                <DailyClosingForm />
               </ProtectedRoute>
             }
           />
