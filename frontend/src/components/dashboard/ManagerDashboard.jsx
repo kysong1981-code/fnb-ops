@@ -1,0 +1,99 @@
+import { useAuth } from '../../context/AuthContext'
+
+export default function ManagerDashboard() {
+  const { user } = useAuth()
+
+  return (
+    <div className="space-y-6">
+      {/* 환영 메시지 */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-md p-6 text-white">
+        <h2 className="text-2xl font-bold mb-2">
+          {user?.user_first_name} {user?.user_last_name} 매니저님
+        </h2>
+        <p className="text-blue-100">매장 운영 현황을 확인하세요</p>
+      </div>
+
+      {/* 매니저용 주요 지표 */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* 클로징 상태 */}
+        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-indigo-500">
+          <p className="text-sm text-gray-600 mb-2">오늘 클로징</p>
+          <p className="text-3xl font-bold text-gray-900">-</p>
+          <p className="text-xs text-gray-500 mt-2">준비 중</p>
+        </div>
+
+        {/* 직원 현황 */}
+        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
+          <p className="text-sm text-gray-600 mb-2">직원 수</p>
+          <p className="text-3xl font-bold text-gray-900">-</p>
+          <p className="text-xs text-gray-500 mt-2">준비 중</p>
+        </div>
+
+        {/* 평균 매출 */}
+        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-500">
+          <p className="text-sm text-gray-600 mb-2">평균 매출</p>
+          <p className="text-3xl font-bold text-gray-900">-</p>
+          <p className="text-xs text-gray-500 mt-2">준비 중</p>
+        </div>
+
+        {/* 할일 */}
+        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-500">
+          <p className="text-sm text-gray-600 mb-2">할일</p>
+          <p className="text-3xl font-bold text-gray-900">-</p>
+          <p className="text-xs text-gray-500 mt-2">준비 중</p>
+        </div>
+      </div>
+
+      {/* 상세 정보 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* 클로징 상세 */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            클로징 현황
+          </h3>
+          <div className="space-y-3">
+            <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
+              <span className="text-sm text-gray-600">클로징 대기</span>
+              <span className="font-semibold text-gray-900">0</span>
+            </div>
+            <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
+              <span className="text-sm text-gray-600">제출됨</span>
+              <span className="font-semibold text-gray-900">0</span>
+            </div>
+            <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
+              <span className="text-sm text-gray-600">승인됨</span>
+              <span className="font-semibold text-gray-900">0</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 매장 정보 */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            매장 정보
+          </h3>
+          <div className="space-y-3 text-sm">
+            <div>
+              <p className="text-gray-600">매장명</p>
+              <p className="font-semibold text-gray-900">
+                {user?.organization_detail?.name || '미설정'}
+              </p>
+            </div>
+            <div>
+              <p className="text-gray-600">주소</p>
+              <p className="font-semibold text-gray-900">
+                {user?.organization_detail?.address || '미설정'}
+              </p>
+            </div>
+            <div>
+              <p className="text-gray-600">연락처</p>
+              <p className="font-semibold text-gray-900">
+                {user?.organization_detail?.phone || '미설정'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
