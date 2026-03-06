@@ -30,6 +30,10 @@ import TrainingStatus from './components/safety/TrainingManagement/TrainingStatu
 import VerificationForm from './components/safety/SelfVerification/VerificationForm'
 import VerificationList from './components/safety/SelfVerification/VerificationList'
 import VerificationReport from './components/safety/SelfVerification/VerificationReport'
+import DocumentLibrary from './components/documents/DocumentLibrary'
+import DocumentUpload from './components/documents/DocumentUpload'
+import DocumentDetail from './components/documents/DocumentDetail'
+import DocumentVersionHistory from './components/documents/DocumentVersionHistory'
 
 function App() {
   return (
@@ -335,6 +339,46 @@ function App() {
             element={
               <ProtectedRoute>
                 <VerificationReport />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 자료 라이브러리 (보호됨) */}
+          <Route
+            path="/documents"
+            element={
+              <ProtectedRoute>
+                <DocumentLibrary />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 문서 업로드 (보호됨) */}
+          <Route
+            path="/documents/upload"
+            element={
+              <ProtectedRoute>
+                <DocumentUpload />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 문서 상세 (보호됨) */}
+          <Route
+            path="/documents/:id"
+            element={
+              <ProtectedRoute>
+                <DocumentDetail />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 문서 버전 이력 (보호됨) */}
+          <Route
+            path="/documents/:id/versions"
+            element={
+              <ProtectedRoute>
+                <DocumentVersionHistory />
               </ProtectedRoute>
             }
           />
