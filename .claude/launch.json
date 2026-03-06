@@ -5,13 +5,15 @@
       "name": "frontend",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 5173
+      "port": 5173,
+      "cwd": "${workspaceFolder}/frontend"
     },
     {
       "name": "backend",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["backend/manage.py", "runserver"],
-      "port": 8000
+      "runtimeArgs": ["manage.py", "runserver"],
+      "port": 8000,
+      "cwd": "${workspaceFolder}/backend"
     }
   ]
 }
