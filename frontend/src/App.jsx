@@ -12,6 +12,15 @@ import OnboardingDetail from './components/hr/OnboardingDetail'
 import MyPayslips from './components/payroll/MyPayslips'
 import PayslipDetail from './components/payroll/PayslipDetail'
 import SafetyDashboard from './components/safety/SafetyDashboard'
+import ChecklistList from './components/safety/DailyChecklist/ChecklistList'
+import ChecklistForm from './components/safety/DailyChecklist/ChecklistForm'
+import ChecklistDetail from './components/safety/DailyChecklist/ChecklistDetail'
+import TemperatureForm from './components/safety/TemperatureLog/TemperatureForm'
+import TemperatureList from './components/safety/TemperatureLog/TemperatureList'
+import TemperatureAlert from './components/safety/TemperatureLog/TemperatureAlert'
+import IncidentList from './components/safety/Incidents/IncidentList'
+import IncidentForm from './components/safety/Incidents/IncidentForm'
+import IncidentDetail from './components/safety/Incidents/IncidentDetail'
 
 function App() {
   return (
@@ -111,12 +120,122 @@ function App() {
             }
           />
 
-          {/* 음식 안전 관리 (보호됨) */}
+          {/* 음식 안전 관리 - 메인 대시보드 (보호됨) */}
           <Route
             path="/safety"
             element={
               <ProtectedRoute>
                 <SafetyDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 체크리스트 목록 (보호됨) */}
+          <Route
+            path="/safety/checklists"
+            element={
+              <ProtectedRoute>
+                <ChecklistList />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 새 체크리스트 (보호됨) */}
+          <Route
+            path="/safety/checklists/new"
+            element={
+              <ProtectedRoute>
+                <ChecklistForm />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 체크리스트 상세 (보호됨) */}
+          <Route
+            path="/safety/checklists/:id"
+            element={
+              <ProtectedRoute>
+                <ChecklistDetail />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 체크리스트 편집 (보호됨) */}
+          <Route
+            path="/safety/checklists/:id/edit"
+            element={
+              <ProtectedRoute>
+                <ChecklistForm />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 온도 목록 (보호됨) */}
+          <Route
+            path="/safety/temperatures"
+            element={
+              <ProtectedRoute>
+                <TemperatureList />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 온도 입력 (보호됨) */}
+          <Route
+            path="/safety/temperatures/new"
+            element={
+              <ProtectedRoute>
+                <TemperatureForm />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 온도 경고 (보호됨) */}
+          <Route
+            path="/safety/temperature-alerts"
+            element={
+              <ProtectedRoute>
+                <TemperatureAlert />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 사건 목록 (보호됨) */}
+          <Route
+            path="/safety/incidents"
+            element={
+              <ProtectedRoute>
+                <IncidentList />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 새 사건 보고 (보호됨) */}
+          <Route
+            path="/safety/incidents/new"
+            element={
+              <ProtectedRoute>
+                <IncidentForm />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 사건 상세 (보호됨) */}
+          <Route
+            path="/safety/incidents/:id"
+            element={
+              <ProtectedRoute>
+                <IncidentDetail />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 음식 안전 관리 - 사건 편집 (보호됨) */}
+          <Route
+            path="/safety/incidents/:id/edit"
+            element={
+              <ProtectedRoute>
+                <IncidentForm />
               </ProtectedRoute>
             }
           />
