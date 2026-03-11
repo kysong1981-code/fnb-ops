@@ -19,7 +19,11 @@ logger = logging.getLogger(__name__)
 
 
 class StoreListView(generics.ListAPIView):
-    """CEO/HQ: 모든 스토어 목록, Manager: 자기 스토어만"""
+    """역할별 스토어 목록:
+    CEO/HQ: 모든 스토어
+    REGIONAL_MANAGER/SENIOR_MANAGER: managed_stores
+    MANAGER/EMPLOYEE: 자기 스토어만
+    """
     serializer_class = OrganizationSerializer
     permission_classes = [IsAuthenticated]
 
@@ -27,7 +31,63 @@ class StoreListView(generics.ListAPIView):
         profile = self.request.user.profile
         if profile.role in ('CEO', 'HQ', 'ADMIN'):
             return Organization.objects.filter(level='STORE').order_by('name')
+        if profile.role in ('REGIONAL_MANAGER', 'SENIOR_MANAGER'):
+            managed = profile.managed_stores.all()
+            if managed.exists():
+                return managed.order_by('name')
         return Organization.objects.filter(id=profile.organization_id)
+
+
+class AssignStoresView(APIView):
+    """CEO/HQ: 매니저에게 스토어 배정"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        profile = request.user.profile
+        if profile.role not in ('CEO', 'HQ', 'ADMIN'):
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        user_id = request.data.get('user_id')
+        store_ids = request.data.get('store_ids', [])
+
+        try:
+            target_profile = UserProfile.objects.get(id=user_id)
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if target_profile.role not in ('REGIONAL_MANAGER', 'SENIOR_MANAGER'):
+            return Response({'error': 'Can only assign stores to Enterprise/Area Managers'}, status=status.HTTP_400_BAD_REQUEST)
+
+        stores = Organization.objects.filter(id__in=store_ids, level='STORE')
+        target_profile.managed_stores.set(stores)
+
+        return Response({
+            'message': f'Assigned {stores.count()} stores to {target_profile.user.get_full_name() or target_profile.user.email}',
+            'managed_stores': OrganizationSerializer(stores, many=True).data
+        })
+
+    def get(self, request):
+        """Get managers and their assigned stores"""
+        profile = request.user.profile
+        if profile.role not in ('CEO', 'HQ', 'ADMIN'):
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        managers = UserProfile.objects.filter(
+            role__in=['REGIONAL_MANAGER', 'SENIOR_MANAGER']
+        ).select_related('user', 'organization')
+
+        result = []
+        for m in managers:
+            result.append({
+                'id': m.id,
+                'name': m.user.get_full_name() or m.user.email,
+                'role': m.role,
+                'role_display': m.get_role_display(),
+                'organization': m.organization.name if m.organization else None,
+                'managed_stores': OrganizationSerializer(m.managed_stores.all(), many=True).data
+            })
+
+        return Response(result)
 
 
 class OrganizationSettingsView(generics.RetrieveUpdateAPIView):

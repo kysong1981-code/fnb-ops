@@ -132,6 +132,9 @@ class UserProfile(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.SET_NULL, null=True, blank=True)
     manager = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='subordinates')
 
+    # Multi-store management (for Enterprise/Area Managers)
+    managed_stores = models.ManyToManyField(Organization, blank=True, related_name='managers', limit_choices_to={'level': 'STORE'})
+
     # Employment details
     date_of_joining = models.DateField()
     phone = models.CharField(max_length=20, null=True, blank=True)

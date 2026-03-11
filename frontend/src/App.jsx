@@ -56,6 +56,7 @@ import GetStartedPage from './components/auth/GetStartedPage'
 import ForgotPassword from './components/auth/ForgotPassword'
 import ResetPassword from './components/auth/ResetPassword'
 import StoreApplications from './components/admin/StoreApplications'
+import StoreAssignment from './components/admin/StoreAssignment'
 
 // Helper component to wrap protected routes with Layout
 function ProtectedWithLayout({ children }) {
@@ -331,6 +332,16 @@ function App() {
             element={
               <ProtectedWithLayout>
                 <StoreApplications />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Admin - Store Assignment */}
+          <Route
+            path="/admin/store-assignment"
+            element={
+              <ProtectedWithLayout>
+                <StoreAssignment />
               </ProtectedWithLayout>
             }
           />

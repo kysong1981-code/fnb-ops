@@ -536,12 +536,14 @@ export const monthlyCloseAPI = {
     api.post('/closing/monthly-close/reopen/', data),
 }
 
-// Admin API (CEO/HQ — Store Applications)
+// Admin API (CEO/HQ — Store Applications & Store Assignment)
 export const adminAPI = {
   getStoreApplications: (params) => api.get('/users/store-applications/', { params }),
   approveApplication: (id, data) => api.post(`/users/store-applications/${id}/approve/`, data || {}),
   rejectApplication: (id, data) => api.post(`/users/store-applications/${id}/reject/`, data || {}),
   submitStoreApplication: (data) => api.post('/auth/store-application/', data),
+  getManagerStores: () => api.get('/users/assign-stores/'),
+  assignStores: (userId, storeIds) => api.post('/users/assign-stores/', { user_id: userId, store_ids: storeIds }),
 }
 
 export const skyReportAPI = {

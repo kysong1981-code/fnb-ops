@@ -14,8 +14,8 @@ class OrganizationFilterBackend(BaseFilterBackend):
         """사용자의 역할에 따라 쿼리셋 필터링. CEO/HQ는 store_id로 전환 가능."""
         try:
             profile = request.user.profile
-            # CEO/HQ can filter by store_id query param
-            if profile.role in ['CEO', 'HQ']:
+            # CEO/HQ/Enterprise/Area can filter by store_id query param
+            if profile.role in ['CEO', 'HQ', 'REGIONAL_MANAGER', 'SENIOR_MANAGER']:
                 store_id = request.query_params.get('store_id')
                 if store_id:
                     model = queryset.model
@@ -49,15 +49,11 @@ class OrganizationFilterBackend(BaseFilterBackend):
             # MANAGER: 자신의 조직 데이터만
             return queryset.filter(organization=profile.organization)
 
-        elif profile.role == 'SENIOR_MANAGER':
-            # SENIOR_MANAGER: 자신의 조직(지역) + 그 하위 매장들
-            region = profile.organization
-            stores = region.children.all() if region else []
-            org_list = [region] + list(stores)
-            return queryset.filter(organization__in=org_list)
-
-        elif profile.role == 'REGIONAL_MANAGER':
-            # REGIONAL_MANAGER: 자신의 지역 + 그 하위 매장들
+        elif profile.role in ('SENIOR_MANAGER', 'REGIONAL_MANAGER'):
+            # managed_stores가 있으면 그것만, 없으면 자기 조직 + 하위
+            managed = profile.managed_stores.all()
+            if managed.exists():
+                return queryset.filter(organization__in=managed)
             region = profile.organization
             stores = region.children.all() if region else []
             org_list = [region] + list(stores)
@@ -119,15 +115,10 @@ class UserPermissionFilterBackend(BaseFilterBackend):
             # MANAGER: 자신의 조직의 모든 직원
             return queryset.filter(organization=profile.organization)
 
-        elif profile.role == 'SENIOR_MANAGER':
-            # SENIOR_MANAGER: 자신의 조직(지역) + 그 하위 매장의 모든 직원
-            region = profile.organization
-            stores = region.children.all() if region else []
-            org_list = [region] + list(stores)
-            return queryset.filter(organization__in=org_list)
-
-        elif profile.role == 'REGIONAL_MANAGER':
-            # REGIONAL_MANAGER: 자신의 지역 + 그 하위 매장의 모든 직원
+        elif profile.role in ('SENIOR_MANAGER', 'REGIONAL_MANAGER'):
+            managed = profile.managed_stores.all()
+            if managed.exists():
+                return queryset.filter(organization__in=managed)
             region = profile.organization
             stores = region.children.all() if region else []
             org_list = [region] + list(stores)
@@ -149,13 +140,10 @@ class UserPermissionFilterBackend(BaseFilterBackend):
         elif profile.role == 'MANAGER':
             return queryset.filter(profile__organization=profile.organization)
 
-        elif profile.role == 'SENIOR_MANAGER':
-            region = profile.organization
-            stores = region.children.all() if region else []
-            org_list = [region] + list(stores)
-            return queryset.filter(profile__organization__in=org_list)
-
-        elif profile.role == 'REGIONAL_MANAGER':
+        elif profile.role in ('SENIOR_MANAGER', 'REGIONAL_MANAGER'):
+            managed = profile.managed_stores.all()
+            if managed.exists():
+                return queryset.filter(profile__organization__in=managed)
             region = profile.organization
             stores = region.children.all() if region else []
             org_list = [region] + list(stores)

@@ -106,12 +106,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
     )
     work_type_display = serializers.CharField(source='get_work_type_display', read_only=True)
 
+    managed_stores_detail = OrganizationSerializer(source='managed_stores', many=True, read_only=True)
+
     class Meta:
         model = UserProfile
         fields = [
             'id', 'employee_id', 'role', 'role_display',
             'user', 'organization', 'organization_detail',
             'manager', 'manager_name',
+            'managed_stores', 'managed_stores_detail',
             'date_of_joining', 'phone', 'date_of_birth',
             'employment_status', 'employment_status_display',
             'tax_file_number', 'kiwisaver_status', 'kiwisaver_rate', 'bank_account',

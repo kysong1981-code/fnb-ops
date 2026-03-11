@@ -37,6 +37,7 @@ const menuSections = [
     roles: ['CEO', 'HQ'],
     items: [
       { label: 'Applications', path: '/admin/applications', icon: ClipboardIcon },
+      { label: 'Store Assignment', path: '/admin/store-assignment', icon: SettingsIcon },
     ]
   },
   {

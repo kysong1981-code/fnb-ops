@@ -1,7 +1,8 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    OrganizationSettingsView, StoreListView, IntegrationListView,
+    OrganizationSettingsView, StoreListView, AssignStoresView,
+    IntegrationListView,
     integration_connect, integration_disconnect, integration_test,
     integration_sync, integration_store_select,
     StoreApplicationAdminViewSet,
@@ -12,6 +13,7 @@ router.register(r'store-applications', StoreApplicationAdminViewSet, basename='s
 
 urlpatterns = [
     path('stores/', StoreListView.as_view(), name='store-list'),
+    path('assign-stores/', AssignStoresView.as_view(), name='assign-stores'),
     path('organization/settings/', OrganizationSettingsView.as_view(), name='organization-settings'),
     path('integrations/', IntegrationListView.as_view(), name='integration-list'),
     path('integrations/<str:service>/connect/', integration_connect, name='integration-connect'),
