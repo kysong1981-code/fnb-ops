@@ -4,11 +4,12 @@ version: '3.8'
 # AWS Deployment - Docker Compose
 # Uses external RDS MySQL (no local MySQL container)
 # Nginx serves React frontend + proxies API to Django backend
+# SSL via Let's Encrypt certbot
 # ============================================================================
 
 services:
   # ========================================================================
-  # Nginx - Reverse Proxy + React Frontend
+  # Nginx - Reverse Proxy + React Frontend + SSL
   # ========================================================================
   nginx:
     build:
@@ -18,11 +19,28 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/www/certbot
     depends_on:
       backend:
         condition: service_healthy
     networks:
       - fnb-ops-network
+
+  # ========================================================================
+  # Certbot - SSL Certificate Management
+  # ========================================================================
+  certbot:
+    image: certbot/certbot
+    container_name: fnb-ops-certbot
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/www/certbot
+    depends_on:
+      - nginx
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
   # ========================================================================
   # Django Backend (Gunicorn)
@@ -45,7 +63,7 @@ services:
       - DEBUG=False
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
+      - FRONTEND_URL=${FRONTEND_URL:-https://oneops.co.nz}
       - SECURE_SSL_REDIRECT=False
       - SECURE_HSTS_SECONDS=0
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
@@ -71,6 +89,8 @@ volumes:
   backend_logs:
   backend_static:
   backend_media:
+  certbot-etc:
+  certbot-var:
 
 networks:
   fnb-ops-network:
