@@ -69,6 +69,12 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - JWT_ACCESS_LIFETIME=${JWT_ACCESS_LIFETIME:-60}
       - JWT_REFRESH_LIFETIME=${JWT_REFRESH_LIFETIME:-7}
+      - EMAIL_HOST=${EMAIL_HOST:-localhost}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-noreply@oneops.co.nz}
     expose:
       - "8000"
     volumes:
