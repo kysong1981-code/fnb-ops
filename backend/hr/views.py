@@ -889,12 +889,26 @@ class TeamViewSet(viewsets.ViewSet):
         salary = Salary.objects.filter(user=profile, is_active=True).first()
         return salary.hourly_rate if salary else None
 
+    def _get_org(self, request):
+        """CEO/HQ는 store_id로 조직 전환 가능"""
+        profile = request.user.profile
+        if profile.role in ['CEO', 'HQ']:
+            store_id = request.query_params.get('store_id')
+            if store_id:
+                from users.models import Organization
+                try:
+                    return Organization.objects.get(id=store_id)
+                except Organization.DoesNotExist:
+                    pass
+        return profile.organization
+
     def list(self, request):
         profile = request.user.profile
+        org = self._get_org(request)
         status_filter = request.query_params.get('status', 'ACTIVE')
 
         team = UserProfile.objects.filter(
-            organization=profile.organization,
+            organization=org,
         ).select_related('user')
 
         if status_filter and status_filter != 'ALL':
@@ -922,10 +936,10 @@ class TeamViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
         """직원 상세 정보"""
-        profile = request.user.profile
+        org = self._get_org(request)
         try:
             member = UserProfile.objects.select_related('user').get(
-                id=pk, organization=profile.organization
+                id=pk, organization=org
             )
         except UserProfile.DoesNotExist:
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
