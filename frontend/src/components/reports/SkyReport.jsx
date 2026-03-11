@@ -66,6 +66,10 @@ export default function SkyReport() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  // Upload state
+  const [uploading, setUploading] = useState(false)
+  const [uploadResult, setUploadResult] = useState(null)
+
   // Custom view state
   const [summaryData, setSummaryData] = useState(null)
 
@@ -164,6 +168,41 @@ export default function SkyReport() {
     setForm(prev => ({ ...prev, [key]: value }))
   }
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const res = await skyReportAPI.downloadTemplate()
+      const url = window.URL.createObjectURL(new Blob([res.data]))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'sky_report_template.xlsx'
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch {
+      setError('Failed to download template')
+    }
+  }
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setError('')
+    setUploadResult(null)
+    try {
+      const res = await skyReportAPI.upload(file)
+      setUploadResult(res.data)
+      setSuccess(`Uploaded: ${res.data.created} created, ${res.data.updated} updated`)
+      loadReports()
+      loadSummary()
+      setTimeout(() => { setSuccess(''); setUploadResult(null) }, 5000)
+    } catch (err) {
+      setError(err.response?.data?.error || 'Upload failed')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
   const monthLabel = MONTHS.find(m => m.value === selectedMonth)?.full || ''
 
   return (
@@ -181,27 +220,48 @@ export default function SkyReport() {
         }
       />
 
-      {/* Tab Toggle */}
+      {/* Tab Toggle + Actions */}
       <Card className="p-4">
-        <div className="bg-gray-100 rounded-xl p-1 flex gap-1">
-          <button
-            onClick={() => { setTab('monthly'); setEditing(false) }}
-            className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-semibold transition ${
-              tab === 'monthly' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Monthly
+        <div className="flex items-center gap-3">
+          <div className="flex-1 bg-gray-100 rounded-xl p-1 flex gap-1">
+            <button
+              onClick={() => { setTab('monthly'); setEditing(false) }}
+              className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-semibold transition ${
+                tab === 'monthly' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => { setTab('custom'); setEditing(false) }}
+              className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-semibold transition ${
+                tab === 'custom' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Custom
+            </button>
+          </div>
+          <button onClick={handleDownloadTemplate}
+            className="px-3 py-2.5 text-xs font-semibold text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition whitespace-nowrap">
+            Template
           </button>
-          <button
-            onClick={() => { setTab('custom'); setEditing(false) }}
-            className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-semibold transition ${
-              tab === 'custom' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Custom
-          </button>
+          <label className={`px-3 py-2.5 text-xs font-semibold text-green-600 bg-green-50 rounded-xl hover:bg-green-100 transition cursor-pointer whitespace-nowrap ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+            {uploading ? 'Uploading...' : 'Upload'}
+            <input type="file" accept=".xlsx,.xls" onChange={handleUpload} className="hidden" />
+          </label>
         </div>
       </Card>
+
+      {/* Upload Result */}
+      {uploadResult && (
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700">
+          {uploadResult.created > 0 && <span>{uploadResult.created} new reports created. </span>}
+          {uploadResult.updated > 0 && <span>{uploadResult.updated} reports updated. </span>}
+          {uploadResult.errors?.length > 0 && (
+            <div className="mt-1 text-red-600">{uploadResult.errors.map((e, i) => <div key={i}>{e}</div>)}</div>
+          )}
+        </div>
+      )}
 
       {error && <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>}
       {success && <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">{success}</div>}

@@ -539,4 +539,12 @@ export const skyReportAPI = {
   patch: (id, data) => api.patch(`/reports/sky-reports/${id}/`, data),
   delete: (id) => api.delete(`/reports/sky-reports/${id}/`),
   summary: (year) => api.get('/reports/sky-reports/summary/', { params: { year } }),
+  downloadTemplate: () => api.get('/reports/sky-reports/template/', { responseType: 'blob' }),
+  upload: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/reports/sky-reports/upload/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 }

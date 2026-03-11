@@ -2,11 +2,14 @@ from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser
 from django.db.models import Sum, Avg, Count, F, DecimalField
+from django.http import HttpResponse
 from django.utils import timezone
 from datetime import timedelta, datetime
 from decimal import Decimal
 from collections import defaultdict
+import io
 
 from .models import Report, GeneratedReport, SkyReport
 from .serializers import ReportSerializer, GeneratedReportSerializer, SkyReportSerializer
@@ -1148,4 +1151,221 @@ class SkyReportViewSet(viewsets.ModelViewSet):
             'second_half_totals': compute_totals(second_half),
             'annual_totals': compute_totals(data),
         })
+
+    @action(detail=False, methods=['get'])
+    def template(self, request):
+        """Download an Excel template for bulk Sky Report data entry."""
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Sky Report Data'
+
+        # Styles
+        header_font = Font(bold=True, size=11, color='FFFFFF')
+        header_fill = PatternFill(start_color='2563EB', end_color='2563EB', fill_type='solid')
+        section_fill = PatternFill(start_color='DBEAFE', end_color='DBEAFE', fill_type='solid')
+        section_font = Font(bold=True, size=10, color='1E40AF')
+        thin_border = Border(
+            left=Side(style='thin', color='D1D5DB'),
+            right=Side(style='thin', color='D1D5DB'),
+            top=Side(style='thin', color='D1D5DB'),
+            bottom=Side(style='thin', color='D1D5DB'),
+        )
+
+        # Column headers: Year, Month, then all data fields
+        columns = [
+            ('Year', 10), ('Month (1-12)', 14),
+            # Main financial
+            ('Total Sales (GST incl.)', 22), ('HQ CASH', 14), ('Pos Sales', 14), ('Other Sales', 14),
+            ('COGS', 14), ('Operating Expenses', 20), ('Wages & Salaries', 18),
+            ('Sales per Hour', 16), ('Opening Sales/Hr', 18), ('Tab Allowance Sales', 20),
+            ('Payable GST', 14), ('Sub GST', 12), ('Operating Profit', 18),
+            # External
+            ('Total Sales (Garage)', 22), ('HQ CASH (Garage)', 18),
+            ('Total COGS (Xero)', 18), ('Total Expense (Xero)', 22),
+            ('Labour (Xero)', 16), ('Sub-contractor (Xero)', 22),
+            ('Number of Days', 16), ('Number of Payruns', 18),
+            # Goals
+            ('Sales Goal', 14), ('COGS Goal', 12), ('Wage Goal', 12),
+            ('Review Rating', 14), ('Review Goal', 14),
+            # Hygiene
+            ('Hygiene Grade', 14),
+            # Notes
+            ('Sales Notes', 20), ('COGS Notes', 20), ('Wage Notes', 20), ('Next Month Notes', 20),
+        ]
+
+        # Write header row
+        for col_idx, (name, width) in enumerate(columns, 1):
+            cell = ws.cell(row=1, column=col_idx, value=name)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center', wrap_text=True)
+            cell.border = thin_border
+            ws.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = width
+
+        # Add sample row
+        sample = [
+            2025, 4,
+            179317.90, 0, 179317.90, 0,
+            52962.28, 0, 37175.19,
+            0, 0, 0,
+            0, 0, 89180.43,
+            0, 0,
+            52962.28, 0,
+            37175.19, 0,
+            30, 2,
+            200000, 50000, 40000,
+            4.7, 4.8,
+            'A',
+            '', '', '', '',
+        ]
+        for col_idx, val in enumerate(sample, 1):
+            cell = ws.cell(row=2, column=col_idx, value=val)
+            cell.border = thin_border
+            if col_idx <= 2:
+                cell.fill = section_fill
+                cell.font = section_font
+
+        # Add empty rows for data entry (12 months)
+        for row_idx in range(3, 15):
+            for col_idx in range(1, len(columns) + 1):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.border = thin_border
+
+        # Instructions sheet
+        ws2 = wb.create_sheet('Instructions')
+        instructions = [
+            ['Sky Report Template — Instructions'],
+            [''],
+            ['1. Fill in data in the "Sky Report Data" sheet'],
+            ['2. Year: Enter the year (e.g., 2025)'],
+            ['3. Month: Enter 1-12 (1=January, 12=December)'],
+            ['4. All monetary values are in NZD'],
+            ['5. Hygiene Grade: A, B, C, D, or E'],
+            ['6. You can add as many rows as needed'],
+            ['7. The sample row (row 2) can be deleted or overwritten'],
+            ['8. Upload this file on the Sky Report page'],
+            [''],
+            ['Field Mapping (Korean):'],
+            ['Total Sales (GST incl.) = 총매출 (GST 포함)'],
+            ['HQ CASH = 현금'],
+            ['Pos Sales = 포스 매출'],
+            ['COGS = 매출원가'],
+            ['Operating Expenses = 운영비용'],
+            ['Wages & Salaries = 인건비'],
+            ['Operating Profit = 영업이익 (세전)'],
+        ]
+        for row_idx, row_data in enumerate(instructions, 1):
+            for col_idx, val in enumerate(row_data, 1):
+                cell = ws2.cell(row=row_idx, column=col_idx, value=val)
+                if row_idx == 1:
+                    cell.font = Font(bold=True, size=14)
+                elif row_idx >= 12:
+                    cell.font = Font(size=10, color='666666')
+        ws2.column_dimensions['A'].width = 50
+
+        # Write to response
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="sky_report_template.xlsx"'
+        return response
+
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser])
+    def upload(self, request):
+        """Upload an Excel file to bulk-create Sky Report entries."""
+        import openpyxl
+
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not file.name.endswith(('.xlsx', '.xls')):
+            return Response({'error': 'Only .xlsx files are supported'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            wb = openpyxl.load_workbook(file, data_only=True)
+            ws = wb.active
+
+            org = request.user.profile.organization
+            profile = request.user.profile
+
+            # Field mapping: column index (0-based after Year,Month) → model field
+            field_map = [
+                'total_sales_inc_gst', 'hq_cash', 'pos_sales', 'other_sales',
+                'cogs', 'operating_expenses', 'wages',
+                'sales_per_hour', 'opening_sales_per_hour', 'tab_allowance_sales',
+                'payable_gst', 'sub_gst', 'operating_profit',
+                'total_sales_garage', 'hq_cash_garage',
+                'total_cogs_xero', 'total_expense_xero',
+                'labour_xero', 'sub_contractor_xero',
+                'number_of_days', 'number_of_payruns',
+                'sales_goal', 'cogs_goal', 'wage_goal',
+                'review_rating', 'review_goal',
+                'hygiene_grade',
+                'sales_notes', 'cogs_notes', 'wage_notes', 'next_month_notes',
+            ]
+
+            created = 0
+            updated = 0
+            errors = []
+
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                if not row or not row[0] or not row[1]:
+                    continue
+
+                try:
+                    year = int(row[0])
+                    month = int(row[1])
+                    if month < 1 or month > 12:
+                        errors.append(f'Row {row_idx}: Invalid month {month}')
+                        continue
+                except (ValueError, TypeError):
+                    errors.append(f'Row {row_idx}: Invalid year/month')
+                    continue
+
+                data = {}
+                for i, field_name in enumerate(field_map):
+                    val = row[i + 2] if i + 2 < len(row) else None
+
+                    if field_name in ('hygiene_grade', 'sales_notes', 'cogs_notes', 'wage_notes', 'next_month_notes'):
+                        data[field_name] = str(val).strip() if val else ''
+                    elif field_name in ('number_of_days', 'number_of_payruns'):
+                        try:
+                            data[field_name] = int(val) if val else 0
+                        except (ValueError, TypeError):
+                            data[field_name] = 0
+                    else:
+                        try:
+                            data[field_name] = Decimal(str(val)) if val else Decimal('0')
+                        except Exception:
+                            data[field_name] = Decimal('0')
+
+                obj, was_created = SkyReport.objects.update_or_create(
+                    organization=org,
+                    year=year,
+                    month=month,
+                    defaults={**data, 'created_by': profile},
+                )
+                if was_created:
+                    created += 1
+                else:
+                    updated += 1
+
+            return Response({
+                'created': created,
+                'updated': updated,
+                'errors': errors,
+                'total': created + updated,
+            })
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
