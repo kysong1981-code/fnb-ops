@@ -2,11 +2,11 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useStore } from '../../context/StoreContext'
-import { BellIcon, SunIcon, UserIcon, SettingsIcon, ClipboardIcon, LogoutIcon, HomeIcon } from '../icons'
+import { BellIcon, SunIcon, UserIcon, SettingsIcon, ClipboardIcon, LogoutIcon, HomeIcon, BuildingIcon } from '../icons'
 
 export default function ManagerHeader() {
   const { user, logout } = useAuth()
-  const { stores, selectedStore, selectStore } = useStore()
+  const { stores, selectedStore, selectStore, allStoresOption } = useStore()
   const navigate = useNavigate()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
@@ -22,6 +22,7 @@ export default function ManagerHeader() {
   const initials = firstName.charAt(0).toUpperCase()
   const role = user?.role?.replace('_', ' ') || ''
   const isCeoOrHq = ['CEO', 'HQ'].includes(user?.role)
+  const isAllStores = selectedStore?.id === 'all'
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -60,9 +61,17 @@ export default function ManagerHeader() {
           </div>
           {/* Selected Store Name */}
           {selectedStore && (
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-lg">
-              <HomeIcon size={14} className="text-blue-500" />
-              <span className="text-sm font-medium text-blue-700">{selectedStore.name}</span>
+            <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${
+              isAllStores ? 'bg-purple-50' : 'bg-blue-50'
+            }`}>
+              {isAllStores ? (
+                <BuildingIcon size={14} className="text-purple-500" />
+              ) : (
+                <HomeIcon size={14} className="text-blue-500" />
+              )}
+              <span className={`text-sm font-medium ${isAllStores ? 'text-purple-700' : 'text-blue-700'}`}>
+                {selectedStore.name}
+              </span>
             </div>
           )}
         </div>
@@ -94,6 +103,23 @@ export default function ManagerHeader() {
                   <div className="border-b border-gray-100 py-2">
                     <p className="px-4 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Select Store</p>
                     <div className="max-h-40 overflow-y-auto">
+                      {/* All Stores option for CEO/HQ */}
+                      {allStoresOption && (
+                        <button
+                          onClick={() => handleStoreSelect(allStoresOption)}
+                          className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition ${
+                            isAllStores
+                              ? 'bg-purple-50 text-purple-700 font-medium'
+                              : 'text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <BuildingIcon size={14} />
+                          <span className="truncate">{allStoresOption.name}</span>
+                          {isAllStores && (
+                            <span className="ml-auto text-purple-500 text-xs">&#10003;</span>
+                          )}
+                        </button>
+                      )}
                       {stores.map((store) => (
                         <button
                           key={store.id}
