@@ -15,27 +15,28 @@ const DATE_MODES = [
   { key: 'custom', label: 'Custom' },
 ]
 
+function localDateStr(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function getWeekRange(dateStr) {
   const d = new Date(dateStr + 'T00:00:00')
   const day = d.getDay()
-  const sun = new Date(d)
-  sun.setDate(d.getDate() - day)
-  const sat = new Date(sun)
-  sat.setDate(sun.getDate() + 6)
-  return {
-    start: sun.toISOString().split('T')[0],
-    end: sat.toISOString().split('T')[0],
-  }
+  const mon = new Date(d)
+  mon.setDate(d.getDate() - ((day + 6) % 7))
+  const sun = new Date(mon)
+  sun.setDate(mon.getDate() + 6)
+  return { start: localDateStr(mon), end: localDateStr(sun) }
 }
 
 function getMonthRange(dateStr) {
   const d = new Date(dateStr + 'T00:00:00')
   const start = new Date(d.getFullYear(), d.getMonth(), 1)
   const end = new Date(d.getFullYear(), d.getMonth() + 1, 0)
-  return {
-    start: start.toISOString().split('T')[0],
-    end: end.toISOString().split('T')[0],
-  }
+  return { start: localDateStr(start), end: localDateStr(end) }
 }
 
 export default function CashReport() {
