@@ -65,16 +65,7 @@ services:
       start_period: 60s
     networks:
       - fnb-ops-network
-    command: >
-      sh -c "python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput &&
-             gunicorn core.wsgi:application
-             --bind 0.0.0.0:8000
-             --workers 3
-             --timeout 120
-             --access-logfile -
-             --error-logfile -
-             --log-level info"
+    command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120 --access-logfile - --error-logfile - --log-level info"]
 
 volumes:
   backend_logs:
