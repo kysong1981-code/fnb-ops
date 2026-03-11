@@ -89,8 +89,8 @@ export default function ManagerHeader() {
                   <p className="text-xs text-gray-400">{role}</p>
                 </div>
 
-                {/* Store Selector (CEO/HQ only, multiple stores) */}
-                {stores.length > 1 && (
+                {/* Store Selector */}
+                {stores.length >= 1 && (
                   <div className="border-b border-gray-100 py-2">
                     <p className="px-4 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Select Store</p>
                     <div className="max-h-40 overflow-y-auto">
