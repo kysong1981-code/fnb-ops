@@ -35,7 +35,8 @@ export function StoreProvider({ children }) {
     setLoading(true)
     try {
       const res = await api.get('/users/stores/')
-      setStores(res.data)
+      const data = res.data?.results || res.data
+      setStores(Array.isArray(data) ? data : [])
     } catch (err) {
       console.error('Failed to fetch stores:', err)
     } finally {
