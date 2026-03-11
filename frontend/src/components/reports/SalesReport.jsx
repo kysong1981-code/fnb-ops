@@ -16,13 +16,13 @@ const DATE_MODES = [
 function getWeekRange(dateStr) {
   const d = new Date(dateStr + 'T00:00:00')
   const day = d.getDay()
-  const mon = new Date(d)
-  mon.setDate(d.getDate() - ((day + 6) % 7))
-  const sun = new Date(mon)
-  sun.setDate(mon.getDate() + 6)
+  const sun = new Date(d)
+  sun.setDate(d.getDate() - day)
+  const sat = new Date(sun)
+  sat.setDate(sun.getDate() + 6)
   return {
-    start: mon.toISOString().split('T')[0],
-    end: sun.toISOString().split('T')[0],
+    start: sun.toISOString().split('T')[0],
+    end: sat.toISOString().split('T')[0],
   }
 }
 

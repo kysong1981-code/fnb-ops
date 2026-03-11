@@ -883,7 +883,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                 weeks_dict = {}
                 for item in daily_data:
                     d = datetime.strptime(item['date'], '%Y-%m-%d').date()
-                    week_start = d - timedelta(days=d.weekday())
+                    week_start = d - timedelta(days=(d.weekday() + 1) % 7)
                     week_key = str(week_start)
                     if week_key not in weeks_dict:
                         weeks_dict[week_key] = {
