@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
@@ -7,34 +7,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const autoLoginAttempted = useRef(false)
-
   const navigate = useNavigate()
   const { login, isAuthenticated } = useAuth()
 
-  // Auto-login: automatically log in with demo credentials in development
+  // Redirect to dashboard if already authenticated
   useEffect(() => {
-    if (autoLoginAttempted.current) return
     if (isAuthenticated) {
       navigate('/dashboard')
-      return
     }
-    autoLoginAttempted.current = true
-    const doAutoLogin = async () => {
-      setIsLoading(true)
-      try {
-        const result = await login('admin@test.com', 'admin123')
-        if (result.success) {
-          navigate('/dashboard')
-        }
-      } catch (err) {
-        console.error('Auto-login failed:', err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    doAutoLogin()
-  }, [isAuthenticated, login, navigate])
+  }, [isAuthenticated, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -122,12 +103,6 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <div className="mt-4 text-center text-sm text-gray-500">
-          <p>Demo account:</p>
-          <p className="font-mono text-xs mt-2 bg-gray-50 border border-gray-100 p-2 rounded-xl">
-            admin@test.com / admin123
-          </p>
-        </div>
       </div>
     </div>
   )
