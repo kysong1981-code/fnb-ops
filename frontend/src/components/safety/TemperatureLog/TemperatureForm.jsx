@@ -144,7 +144,7 @@ export default function TemperatureForm() {
       {/* 폼 */}
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 기본 정보 */}
-        <div className="bg-white rounded-lg shadow-md p-6 space-y-4">
+        <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">온도 정보</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

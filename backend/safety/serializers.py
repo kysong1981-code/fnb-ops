@@ -1,10 +1,20 @@
 from rest_framework import serializers
 from .models import (
+    TemperatureLocation,
     SafetyChecklistTemplate, DailyChecklistResponse,
     CleaningRecord, TemperatureRecord, TrainingRecord,
-    SelfVerificationRecord, Incident, AuditLog
+    SelfVerificationRecord, Incident, AuditLog,
+    SafetyRecordType, StoreRecordConfig, SafetyRecord
 )
 from users.models import UserProfile
+
+
+class TemperatureLocationSerializer(serializers.ModelSerializer):
+    """온도 체크 위치 Serializer"""
+    class Meta:
+        model = TemperatureLocation
+        fields = ['id', 'name', 'standard_min', 'standard_max', 'is_active', 'sort_order', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class SafetyChecklistTemplateSerializer(serializers.ModelSerializer):
@@ -188,3 +198,69 @@ class SafetyComplianceSummarySerializer(serializers.Serializer):
     latest_cleaning_records = CleaningRecordSerializer(many=True, read_only=True)
     overall_compliance_score = serializers.FloatField(read_only=True)
     alerts = serializers.ListField(child=serializers.DictField(), read_only=True)
+
+
+# ============================================================
+# MPI Food Safety Record System Serializers
+# ============================================================
+
+class SafetyRecordTypeSerializer(serializers.ModelSerializer):
+    """기록 유형 카탈로그 Serializer"""
+    class Meta:
+        model = SafetyRecordType
+        fields = [
+            'id', 'code', 'name', 'name_ko', 'description',
+            'category', 'frequency', 'default_fields',
+            'color_code', 'icon', 'sort_order',
+            'is_system', 'is_active', 'legacy_model',
+        ]
+        read_only_fields = ['id', 'is_system']
+
+
+class StoreRecordConfigSerializer(serializers.ModelSerializer):
+    """매장별 기록 설정 Serializer"""
+    record_type_detail = SafetyRecordTypeSerializer(source='record_type', read_only=True)
+
+    class Meta:
+        model = StoreRecordConfig
+        fields = [
+            'id', 'organization', 'record_type', 'record_type_detail',
+            'is_enabled', 'assigned_role', 'custom_fields',
+            'custom_schedule_time', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'organization', 'created_at', 'updated_at']
+
+
+class SafetyRecordSerializer(serializers.ModelSerializer):
+    """완료된 식품안전 기록 Serializer"""
+    completed_by_name = serializers.CharField(
+        source='completed_by.user.get_full_name', read_only=True)
+    reviewed_by_name = serializers.CharField(
+        source='reviewed_by.user.get_full_name', read_only=True,
+        allow_null=True, default=None)
+    record_type_detail = SafetyRecordTypeSerializer(
+        source='record_type', read_only=True)
+
+    class Meta:
+        model = SafetyRecord
+        fields = [
+            'id', 'organization', 'record_type', 'record_type_detail',
+            'date', 'time', 'completed_by', 'completed_by_name',
+            'data', 'status', 'notes',
+            'reviewed_by', 'reviewed_by_name', 'reviewed_at', 'review_notes',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'organization', 'completed_by', 'completed_by_name',
+            'reviewed_by_name', 'created_at', 'updated_at',
+        ]
+
+
+class SafetyRecordQuickCompleteSerializer(serializers.Serializer):
+    """원탭 완료용 Serializer"""
+    record_type = serializers.SlugRelatedField(
+        slug_field='code',
+        queryset=SafetyRecordType.objects.filter(is_active=True)
+    )
+    data = serializers.JSONField(default=dict)
+    notes = serializers.CharField(required=False, default='')

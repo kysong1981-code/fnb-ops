@@ -1,10 +1,12 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, serializers
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.models import User
+from django.contrib.auth import authenticate
 from django.db import transaction
 
 from users.models import UserProfile, Organization, Permission, AuditLog
@@ -15,30 +17,51 @@ from users.serializers import (
 )
 
 
-class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """JWT 토큰에 사용자 프로필 정보 추가"""
+class EmailTokenObtainPairSerializer(serializers.Serializer):
+    """이메일 기반 JWT 토큰 발급 Serializer"""
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
 
-    @classmethod
-    def get_token(cls, user):
-        token = super().get_token(user)
+    def validate(self, attrs):
+        email = attrs.get('email')
+        password = attrs.get('password')
 
-        # 토큰에 사용자 정보 추가
+        user = authenticate(
+            request=self.context.get('request'),
+            username=email,
+            password=password,
+        )
+
+        if not user:
+            raise serializers.ValidationError('Invalid email or password')
+
+        if not user.is_active:
+            raise serializers.ValidationError(
+                'Account not activated. Please check your email for the invite link.'
+            )
+
+        refresh = RefreshToken.for_user(user)
+
+        # 토큰에 프로필 정보 추가
         try:
             profile = user.profile
-            token['user_id'] = user.id
-            token['username'] = user.username
-            token['role'] = profile.role
-            token['organization_id'] = profile.organization_id
-            token['employee_id'] = profile.employee_id
+            refresh['user_id'] = user.id
+            refresh['email'] = user.email
+            refresh['role'] = profile.role
+            refresh['organization_id'] = profile.organization_id
+            refresh['employee_id'] = profile.employee_id
         except UserProfile.DoesNotExist:
             pass
 
-        return token
+        return {
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+        }
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
-    """로그인 (JWT 토큰 발급)"""
-    serializer_class = CustomTokenObtainPairSerializer
+    """로그인 (JWT 토큰 발급) — 이메일 기반"""
+    serializer_class = EmailTokenObtainPairSerializer
     permission_classes = [AllowAny]
 
 
@@ -140,32 +163,64 @@ class UserRegistrationView(APIView):
 
 
 class UserProfileView(APIView):
-    """내 프로필 조회"""
+    """내 프로필 조회 + 수정"""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        """
-        로그인한 사용자의 프로필 정보 조회
-
-        Authorization: Bearer <token>
-        """
+        """로그인한 사용자의 프로필 정보 조회"""
         try:
             profile = request.user.profile
             serializer = UserProfileSerializer(profile)
-
             return Response(
-                {
-                    'message': 'Profile retrieved successfully',
-                    'profile': serializer.data
-                },
-                status=status.HTTP_200_OK
+                {'message': 'Profile retrieved successfully', 'profile': serializer.data},
+                status=status.HTTP_200_OK,
             )
-
         except UserProfile.DoesNotExist:
+            return Response({'error': 'User profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    def patch(self, request):
+        """본인 프로필 일부 필드 수정 (phone, email, bank_account)"""
+        try:
+            profile = request.user.profile
+            user = request.user
+
+            profile_fields = ['phone', 'bank_account']
+            for field in profile_fields:
+                if field in request.data:
+                    setattr(profile, field, request.data[field])
+
+            if 'email' in request.data:
+                user.email = request.data['email']
+                user.save(update_fields=['email'])
+
+            profile.save()
+            serializer = UserProfileSerializer(profile)
             return Response(
-                {'error': 'User profile not found'},
-                status=status.HTTP_404_NOT_FOUND
+                {'message': 'Profile updated', 'profile': serializer.data},
+                status=status.HTTP_200_OK,
             )
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'User profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ChangePasswordView(APIView):
+    """비밀번호 변경"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        current_password = request.data.get('current_password', '')
+        new_password = request.data.get('new_password', '')
+
+        if not current_password or not new_password:
+            return Response({'error': 'Both current and new password are required'}, status=400)
+        if not request.user.check_password(current_password):
+            return Response({'error': 'Current password is incorrect'}, status=400)
+        if len(new_password) < 6:
+            return Response({'error': 'New password must be at least 6 characters'}, status=400)
+
+        request.user.set_password(new_password)
+        request.user.save()
+        return Response({'message': 'Password changed successfully'})
 
 
 class PermissionCheckView(APIView):

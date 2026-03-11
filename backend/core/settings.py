@@ -168,8 +168,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
-    'http://localhost:5173',
+    'http://localhost:4173',  # Frontend production serve
+    'http://localhost:5173',  # Frontend dev server
     'http://127.0.0.1:3000',
+    'http://127.0.0.1:4173',
     'http://127.0.0.1:5173',
 ]
 
@@ -185,6 +187,12 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
 }
+
+# Authentication Backends (email login first, username fallback for admin)
+AUTHENTICATION_BACKENDS = [
+    'auth_app.backends.EmailBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
 
 # JWT Configuration
 SIMPLE_JWT = {

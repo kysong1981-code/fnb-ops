@@ -114,11 +114,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        VITE_API_URL: ${FRONTEND_API_URL:-https://api.yourdomain.com}
+        VITE_API_URL: ${FRONTEND_API_URL:-https://api.oneops.co.nz}
     container_name: fnb-ops-frontend-prod
     restart: unless-stopped
     environment:
-      - VITE_API_URL=${FRONTEND_API_URL:-https://api.yourdomain.com}
+      - VITE_API_URL=${FRONTEND_API_URL:-https://api.oneops.co.nz}
       - VITE_ENV=production
       - VITE_LOG_LEVEL=error
     ports:

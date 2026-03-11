@@ -111,7 +111,7 @@ export default function CleaningHistory() {
       )}
 
       {/* 필터 */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">필터</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -162,7 +162,7 @@ export default function CleaningHistory() {
       </div>
 
       {/* 청소 기록 목록 */}
-      <div className="bg-white rounded-lg shadow-md divide-y">
+      <div className="bg-white rounded-lg shadow-sm divide-y">
         {records.length === 0 ? (
           <div className="p-12 text-center">
             <p className="text-gray-600">청소 기록이 없습니다.</p>

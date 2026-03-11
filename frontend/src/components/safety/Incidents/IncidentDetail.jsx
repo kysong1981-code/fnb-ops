@@ -146,7 +146,7 @@ export default function IncidentDetail() {
       )}
 
       {/* 상태 요약 */}
-      <div className={`rounded-lg shadow-md p-6 ${getStatusColor(incident.status)}`}>
+      <div className={`rounded-lg shadow-sm p-6 ${getStatusColor(incident.status)}`}>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <p className="text-sm font-medium opacity-75 mb-1">상태</p>
@@ -178,7 +178,7 @@ export default function IncidentDetail() {
       </div>
 
       {/* 설명 */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-3">상세 설명</h3>
         <p className="text-gray-700 whitespace-pre-wrap">{incident.description}</p>
       </div>
@@ -209,7 +209,7 @@ export default function IncidentDetail() {
 
       {/* 해결 폼 (미해결인 경우) */}
       {incident.status !== 'closed' && incident.status !== 'resolved' && (
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">사건 해결</h3>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">

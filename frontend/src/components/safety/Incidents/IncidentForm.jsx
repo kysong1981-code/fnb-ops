@@ -119,7 +119,7 @@ export default function IncidentForm() {
       {/* 폼 */}
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 기본 정보 */}
-        <div className="bg-white rounded-lg shadow-md p-6 space-y-4">
+        <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">사건 정보</h3>
 
           {/* 제목 */}

@@ -1,5 +1,4 @@
 import { useAuth } from '../../context/AuthContext'
-import Header from './Header'
 import EmployeeDashboard from './EmployeeDashboard'
 import ManagerDashboard from './ManagerDashboard'
 import RegionalDashboard from './RegionalDashboard'
@@ -20,14 +19,15 @@ export default function Dashboard() {
       case 'HQ':
       case 'CEO':
         return <RegionalDashboard />
+      case 'ADMIN':
+        return <ManagerDashboard />
       default:
         return <EmployeeDashboard />
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
+    <div className="w-full">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {renderDashboard()}
       </main>

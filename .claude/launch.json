@@ -10,7 +10,7 @@
     },
     {
       "name": "backend",
-      "runtimeExecutable": "python",
+      "runtimeExecutable": "python3",
       "runtimeArgs": ["manage.py", "runserver"],
       "port": 8000,
       "cwd": "${workspaceFolder}/backend"

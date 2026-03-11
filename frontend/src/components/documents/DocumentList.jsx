@@ -15,20 +15,21 @@ export default function DocumentList({ documentType = null, refreshTrigger = 0 }
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
 
-  // 카테고리 조회
+  // Fetch categories
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const response = await api.get('/documents/categories/')
-        setCategories(response.data || [])
+        const data = response.data
+        setCategories(Array.isArray(data) ? data : (data.results || []))
       } catch (err) {
-        console.error('카테고리 조회 실패:', err)
+        console.error('Failed to fetch categories:', err)
       }
     }
     fetchCategories()
   }, [])
 
-  // 문서 조회
+  // Fetch documents
   useEffect(() => {
     fetchDocuments()
   }, [documentType, filterCategory, sortBy, page, searchQuery, refreshTrigger])
@@ -67,20 +68,20 @@ export default function DocumentList({ documentType = null, refreshTrigger = 0 }
         setTotalPages(1)
       }
     } catch (err) {
-      setError(err.response?.data?.detail || '문서 조회 실패')
+      setError(err.response?.data?.detail || 'Failed to load documents')
     } finally {
       setLoading(false)
     }
   }
 
   const handleDelete = async (id) => {
-    if (!window.confirm('이 문서를 삭제하시겠습니까?')) return
+    if (!window.confirm('Are you sure you want to delete this document?')) return
 
     try {
       await api.delete(`/documents/documents/${id}/`)
       setDocuments(documents.filter(d => d.id !== id))
     } catch (err) {
-      alert('삭제 실패: ' + (err.response?.data?.detail || '오류가 발생했습니다'))
+      alert('Delete failed: ' + (err.response?.data?.detail || 'An error occurred'))
     }
   }
 
@@ -94,14 +95,14 @@ export default function DocumentList({ documentType = null, refreshTrigger = 0 }
 
   return (
     <div className="space-y-4">
-      {/* 검색 및 필터 */}
+      {/* Search & Filters */}
       <div className="bg-white rounded-lg shadow p-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* 검색 */}
+          {/* Search */}
           <div>
             <input
               type="text"
-              placeholder="제목 또는 설명 검색..."
+              placeholder="Search by title or description..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value)
@@ -111,7 +112,7 @@ export default function DocumentList({ documentType = null, refreshTrigger = 0 }
             />
           </div>
 
-          {/* 카테고리 필터 */}
+          {/* Category Filter */}
           <div>
             <select
               value={filterCategory}
@@ -121,7 +122,7 @@ export default function DocumentList({ documentType = null, refreshTrigger = 0 }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
             >
-              <option value="">모든 카테고리</option>
+              <option value="">All Categories</option>
               {categories.map(cat => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}
@@ -130,7 +131,7 @@ export default function DocumentList({ documentType = null, refreshTrigger = 0 }
             </select>
           </div>
 
-          {/* 정렬 */}
+          {/* Sort */}
           <div>
             <select
               value={sortBy}
@@ -140,13 +141,13 @@ export default function DocumentList({ documentType = null, refreshTrigger = 0 }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
             >
-              <option value="-created_at">최신순</option>
-              <option value="title">제목순</option>
-              <option value="-version">버전순</option>
+              <option value="-created_at">Newest First</option>
+              <option value="title">By Title</option>
+              <option value="-version">By Version</option>
             </select>
           </div>
 
-          {/* 초기화 */}
+          {/* Reset */}
           <button
             onClick={() => {
               setSearchQuery('')
@@ -156,22 +157,22 @@ export default function DocumentList({ documentType = null, refreshTrigger = 0 }
             }}
             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
           >
-            초기화
+            Reset
           </button>
         </div>
       </div>
 
-      {/* 에러 메시지 */}
+      {/* Error Message */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
           {error}
         </div>
       )}
 
-      {/* 문서 그리드 */}
+      {/* Document Grid */}
       {documents.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg">
-          <p className="text-gray-500 text-lg">문서가 없습니다</p>
+          <p className="text-gray-500 text-lg">No documents found</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -186,7 +187,7 @@ export default function DocumentList({ documentType = null, refreshTrigger = 0 }
         </div>
       )}
 
-      {/* 페이지네이션 */}
+      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center gap-2 mt-8">
           <button
@@ -194,7 +195,7 @@ export default function DocumentList({ documentType = null, refreshTrigger = 0 }
             disabled={page === 1}
             className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-50 transition"
           >
-            이전
+            Previous
           </button>
           <span className="px-4 py-2 text-gray-600">
             {page} / {totalPages}
@@ -204,7 +205,7 @@ export default function DocumentList({ documentType = null, refreshTrigger = 0 }
             disabled={page === totalPages}
             className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-50 transition"
           >
-            다음
+            Next
           </button>
         </div>
       )}

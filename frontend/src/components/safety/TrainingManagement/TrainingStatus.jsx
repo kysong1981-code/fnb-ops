@@ -118,7 +118,7 @@ export default function TrainingStatus() {
       )}
 
       {/* 교육 선택 및 통계 */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">교육 선택</label>
           <select
@@ -174,7 +174,7 @@ export default function TrainingStatus() {
       </div>
 
       {/* 직원별 현황 테이블 */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-100 border-b">

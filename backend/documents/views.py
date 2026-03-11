@@ -49,7 +49,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         if not hasattr(user, 'userprofile'):
             return Document.objects.none()
 
-        user_profile = user.userprofile
+        user_profile = user.profile
         organization = user_profile.organization
 
         # Employee: 공개 문서만 (is_public=True)
@@ -74,7 +74,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """문서 생성 시 organization과 created_by 자동 설정"""
-        user_profile = self.request.user.userprofile
+        user_profile = self.request.user.profile
         serializer.save(
             organization=user_profile.organization,
             created_by=user_profile
@@ -103,7 +103,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         document = self.get_object()
 
         # 권한 확인: is_public 또는 manager+
-        user_profile = request.user.userprofile
+        user_profile = request.user.profile
         if not document.is_public and user_profile.organization != document.organization:
             return Response(
                 {'detail': '이 문서에 접근할 수 없습니다.'},
@@ -160,7 +160,7 @@ class DocumentDownloadViewSet(viewsets.ReadOnlyModelViewSet):
         if not hasattr(user, 'userprofile'):
             return DocumentDownload.objects.none()
 
-        user_profile = user.userprofile
+        user_profile = user.profile
 
         # 자신의 조직 문서의 다운로드 이력만 조회 가능
         return DocumentDownload.objects.filter(

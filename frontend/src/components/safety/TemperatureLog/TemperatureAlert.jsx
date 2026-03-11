@@ -86,21 +86,21 @@ export default function TemperatureAlert() {
       {/* 요약 카드 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* 전체 경고 */}
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-500">
+        <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-orange-500">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">전체 경고</h3>
           <div className="text-3xl font-bold text-orange-600">{alerts.length}</div>
           <p className="text-sm text-gray-600 mt-2">비정상 온도 기록</p>
         </div>
 
         {/* 경고 */}
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-500">
+        <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-yellow-500">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">경고</h3>
           <div className="text-3xl font-bold text-yellow-600">{warningCount}</div>
           <p className="text-sm text-gray-600 mt-2">±2~4°C 편차</p>
         </div>
 
         {/* 위험 */}
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-500">
+        <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-red-500">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">위험</h3>
           <div className="text-3xl font-bold text-red-600">{criticalCount}</div>
           <p className="text-sm text-gray-600 mt-2">±4°C 이상 편차</p>
@@ -108,7 +108,7 @@ export default function TemperatureAlert() {
       </div>
 
       {/* 필터 */}
-      <div className="bg-white rounded-lg shadow-md p-4">
+      <div className="bg-white rounded-lg shadow-sm p-4">
         <div className="flex gap-2">
           <button
             onClick={() => setFilter('all')}
@@ -146,7 +146,7 @@ export default function TemperatureAlert() {
       {/* 경고 목록 */}
       <div className="space-y-4">
         {filteredAlerts.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-12 text-center">
+          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
             <p className="text-gray-600 text-lg">
               {filter === 'all'
                 ? '경고가 없습니다. 모든 온도가 정상 범위입니다!'
@@ -163,7 +163,7 @@ export default function TemperatureAlert() {
             return (
               <div
                 key={alert.id}
-                className={`bg-white rounded-lg shadow-md p-6 border-2 ${colors.bg}`}
+                className={`bg-white rounded-lg shadow-sm p-6 border-2 ${colors.bg}`}
               >
                 <div className="flex items-start gap-4">
                   {/* 아이콘 */}

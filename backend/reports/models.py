@@ -61,3 +61,92 @@ class GeneratedReport(models.Model):
 
     def __str__(self):
         return f"{self.report.title} - {self.report_date}"
+
+
+class SkyReport(models.Model):
+    """Monthly Sky Report — financial summary per store per month"""
+    MONTH_CHOICES = [
+        (1, 'January'), (2, 'February'), (3, 'March'), (4, 'April'),
+        (5, 'May'), (6, 'June'), (7, 'July'), (8, 'August'),
+        (9, 'September'), (10, 'October'), (11, 'November'), (12, 'December'),
+    ]
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='sky_reports')
+    year = models.IntegerField()
+    month = models.IntegerField(choices=MONTH_CHOICES)
+
+    # Main Financial Data
+    total_sales_inc_gst = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    hq_cash = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    pos_sales = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    other_sales = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cogs = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    operating_expenses = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    wages = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    sales_per_hour = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    opening_sales_per_hour = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    tab_allowance_sales = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payable_gst = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    sub_gst = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    operating_profit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Input Fields (from external systems: Xero / Garage)
+    total_sales_garage = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    hq_cash_garage = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_cogs_xero = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_expense_xero = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    labour_xero = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    sub_contractor_xero = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    number_of_days = models.IntegerField(default=0)
+    number_of_payruns = models.IntegerField(default=0)
+
+    # Goals (next month targets)
+    sales_goal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cogs_goal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    wage_goal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    review_rating = models.DecimalField(max_digits=3, decimal_places=1, default=0)
+    review_goal = models.DecimalField(max_digits=3, decimal_places=1, default=0)
+
+    # Hygiene
+    hygiene_grade = models.CharField(max_length=5, default='A')
+
+    # Notes
+    sales_notes = models.TextField(blank=True, default='')
+    cogs_notes = models.TextField(blank=True, default='')
+    wage_notes = models.TextField(blank=True, default='')
+    next_month_notes = models.TextField(blank=True, default='')
+
+    # Meta
+    created_by = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, related_name='sky_reports')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-year', '-month']
+        unique_together = ['organization', 'year', 'month']
+        indexes = [
+            models.Index(fields=['organization', 'year', 'month']),
+        ]
+
+    def __str__(self):
+        return f"Sky Report - {self.get_month_display()} {self.year}"
+
+    @property
+    def excl_gst_sales(self):
+        """Total sales excluding GST (GST = 15% in NZ)"""
+        from decimal import Decimal
+        return (self.total_sales_inc_gst / Decimal('1.15')).quantize(Decimal('0.01'))
+
+    @property
+    def cogs_ratio(self):
+        if self.total_sales_inc_gst == 0:
+            return 0
+        from decimal import Decimal
+        return (self.cogs / self.total_sales_inc_gst * 100).quantize(Decimal('0.1'))
+
+    @property
+    def wage_ratio(self):
+        if self.total_sales_inc_gst == 0:
+            return 0
+        from decimal import Decimal
+        return (self.wages / self.total_sales_inc_gst * 100).quantize(Decimal('0.1'))

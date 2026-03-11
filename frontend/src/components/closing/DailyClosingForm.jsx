@@ -1,452 +1,505 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import api from '../../services/api';
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
+import { closingAPI, storeAPI, supplierCostAPI, otherSalesAPI, hrCashAPI } from '../../services/api'
+import Card from '../ui/Card'
+import SectionLabel from '../ui/SectionLabel'
+import { PlusIcon, TrashIcon, CheckCircleIcon, ArrowRightIcon } from '../icons'
 
 export default function DailyClosingForm() {
-  const { user } = useAuth();
-  const [formData, setFormData] = useState({
-    organization: user?.organization_id || '',
-    closing_date: new Date().toISOString().split('T')[0],
-    pos_card: '',
-    pos_cash: '',
-    actual_card: '',
-    actual_cash: '',
-  });
+  const navigate = useNavigate()
+  const { user } = useAuth()
 
-  const [hrCash, setHrCash] = useState({
-    amount: '',
-    notes: '',
-  });
+  const [closingDate, setClosingDate] = useState(new Date().toISOString().split('T')[0])
+  const [closingId, setClosingId] = useState(null)
+  const [closingStatus, setClosingStatus] = useState('DRAFT')
 
-  const [expenses, setExpenses] = useState([]);
-  const [newExpense, setNewExpense] = useState({
-    category: 'SUPPLIES',
-    reason: '',
-    amount: '',
-    attachment: null,
-  });
+  // POS
+  const [posCard, setPosCard] = useState('')
+  const [posCash, setPosCash] = useState('')
+  const [tabCount, setTabCount] = useState('')
 
-  const [closingId, setClosingId] = useState(null);
-  const [status, setStatus] = useState('DRAFT');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  // Actual
+  const [actualCard, setActualCard] = useState('')
+  const [actualCash, setActualCash] = useState('')
 
-  // 클로징 생성
-  const handleCreateClosing = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+  // Cash Up
+  const [bankDeposit, setBankDeposit] = useState('')
+  const [hrCashAmount, setHrCashAmount] = useState('')
+  const [hrCashEntryId, setHrCashEntryId] = useState(null)
+  const [hrCashEnabled, setHrCashEnabled] = useState(false)
 
+  // Other Sales
+  const [salesCategories, setSalesCategories] = useState([])
+  const [otherSaleAmounts, setOtherSaleAmounts] = useState({})
+  const [existingOtherSales, setExistingOtherSales] = useState([])
+
+  // Supplier costs (Today's Invoices)
+  const [suppliers, setSuppliers] = useState([])
+  const [supplierCosts, setSupplierCosts] = useState([])
+  const [invoiceAmounts, setInvoiceAmounts] = useState({})
+
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  // Computed
+  const posTotal = (parseFloat(posCard) || 0) + (parseFloat(posCash) || 0)
+  const actualTotal = (parseFloat(actualCard) || 0) + (parseFloat(actualCash) || 0)
+  const cardVariance = (parseFloat(actualCard) || 0) - (parseFloat(posCard) || 0)
+  const cashVariance = (parseFloat(actualCash) || 0) - (parseFloat(posCash) || 0)
+  const totalVariance = cardVariance + cashVariance
+
+  const fmt = (v) => `$${parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const isReadOnly = closingStatus !== 'DRAFT'
+
+  // Load suppliers + sales categories
+  useEffect(() => {
+    storeAPI.getSuppliers().then(res => {
+      setSuppliers((res.data.results || res.data || []).filter(s => s.is_active))
+    }).catch(() => {})
+
+    storeAPI.getSalesCategories().then(res => {
+      setSalesCategories((res.data.results || res.data || []).filter(c => c.is_active))
+    }).catch(() => {})
+  }, [])
+
+  // Check if closing exists for selected date
+  useEffect(() => {
+    const checkExisting = async () => {
+      try {
+        const res = await closingAPI.getByDate(closingDate)
+        const data = res.data.results || res.data || []
+        if (data.length > 0) {
+          const c = data[0]
+          setClosingId(c.id)
+          setClosingStatus(c.status)
+          setPosCard(c.pos_card || '')
+          setPosCash(c.pos_cash || '')
+          setTabCount(c.tab_count || '')
+          setActualCard(c.actual_card || '')
+          setActualCash(c.actual_cash || '')
+          setBankDeposit(c.bank_deposit || '')
+          setHrCashEnabled(c.hr_cash_enabled || false)
+          // HR Cash entry
+          const hrEntries = c.hr_cash_entries || []
+          if (hrEntries.length > 0) {
+            setHrCashAmount(hrEntries[0].amount || '')
+            setHrCashEntryId(hrEntries[0].id)
+          } else {
+            setHrCashAmount('')
+            setHrCashEntryId(null)
+          }
+        } else {
+          setClosingId(null)
+          setClosingStatus('DRAFT')
+          setPosCard('')
+          setPosCash('')
+          setTabCount('')
+          setActualCard('')
+          setActualCash('')
+          setBankDeposit('')
+          setHrCashAmount('')
+          setHrCashEntryId(null)
+          setSupplierCosts([])
+          setExistingOtherSales([])
+          setOtherSaleAmounts({})
+        }
+      } catch {
+        // ignore
+      }
+    }
+    checkExisting()
+  }, [closingDate])
+
+  // Load supplier costs + other sales when closingId changes
+  useEffect(() => {
+    if (closingId) {
+      supplierCostAPI.list(closingId).then(res => {
+        setSupplierCosts(res.data.results || res.data || [])
+      }).catch(() => {})
+
+      otherSalesAPI.list(closingId).then(res => {
+        const items = res.data.results || res.data || []
+        setExistingOtherSales(items)
+        const amounts = {}
+        items.forEach(s => { amounts[s.name] = String(s.amount) })
+        setOtherSaleAmounts(amounts)
+      }).catch(() => {})
+    }
+  }, [closingId])
+
+  const showMsg = (msg) => {
+    setSuccess(msg)
+    setTimeout(() => setSuccess(''), 3000)
+  }
+
+  // Sync other sales
+  const syncOtherSales = async (cId) => {
+    for (const s of existingOtherSales) {
+      try { await otherSalesAPI.delete(s.id) } catch { /* ignore */ }
+    }
+    for (const [name, amount] of Object.entries(otherSaleAmounts)) {
+      const val = parseFloat(amount)
+      if (val && val > 0) {
+        try { await otherSalesAPI.create({ closing: cId, name, amount: val }) } catch { /* ignore */ }
+      }
+    }
     try {
-      const response = await api.post('/closing/closings/', {
-        organization: formData.organization,
-        closing_date: formData.closing_date,
-        pos_card: formData.pos_card,
-        pos_cash: formData.pos_cash,
-        actual_card: formData.actual_card,
-        actual_cash: formData.actual_cash,
-      });
+      const res = await otherSalesAPI.list(cId)
+      setExistingOtherSales(res.data.results || res.data || [])
+    } catch { /* ignore */ }
+  }
 
-      setClosingId(response.data.id);
-      setStatus(response.data.status);
-      setSuccess('클로징이 생성되었습니다.');
-      setTimeout(() => setSuccess(''), 3000);
+  // Sync HR Cash
+  const syncHrCash = async (cId) => {
+    const val = parseFloat(hrCashAmount)
+    if (val && val > 0) {
+      const formData = new FormData()
+      formData.append('daily_closing', cId)
+      formData.append('amount', val)
+      if (hrCashEntryId) {
+        await hrCashAPI.update(hrCashEntryId, formData)
+      } else {
+        const res = await hrCashAPI.create(formData)
+        setHrCashEntryId(res.data.id)
+      }
+    } else if (hrCashEntryId) {
+      // Amount cleared → delete entry
+      await hrCashAPI.delete(hrCashEntryId)
+      setHrCashEntryId(null)
+    }
+  }
+
+  // Ensure closing exists (auto-create for mid-shift invoice add)
+  const ensureClosing = async () => {
+    if (closingId) return closingId
+    try {
+      const res = await closingAPI.create({
+        organization: user?.organization,
+        closing_date: closingDate,
+        pos_card: posCard || 0,
+        pos_cash: posCash || 0,
+        tab_count: tabCount || 0,
+        actual_card: actualCard || 0,
+        actual_cash: actualCash || 0,
+        bank_deposit: bankDeposit || 0,
+      })
+      setClosingId(res.data.id)
+      setClosingStatus(res.data.status)
+      setHrCashEnabled(res.data.hr_cash_enabled || false)
+      return res.data.id
     } catch (err) {
-      setError(err.response?.data?.detail || '클로징 생성에 실패했습니다.');
-    } finally {
-      setLoading(false);
+      setError(err.response?.data?.detail || err.response?.data?.closing_date?.[0] || 'Failed to create closing')
+      return null
     }
-  };
+  }
 
-  // HR 현금 추가
-  const handleAddHRCash = async (e) => {
-    e.preventDefault();
-    if (!closingId) {
-      setError('먼저 클로징을 생성해주세요.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
+  // Save & Submit
+  const handleSaveAndSubmit = async () => {
+    setSaving(true)
+    setError('')
     try {
-      await api.post(`/closing/closings/${closingId}/hr-cash/`, {
-        daily_closing: closingId,
-        amount: hrCash.amount,
-        notes: hrCash.notes,
-      });
-
-      setHrCash({ amount: '', notes: '' });
-      setSuccess('HR 현금이 추가되었습니다.');
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      setError(err.response?.data?.detail || 'HR 현금 추가에 실패했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 지출 추가
-  const handleAddExpense = async (e) => {
-    e.preventDefault();
-    if (!closingId) {
-      setError('먼저 클로징을 생성해주세요.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('daily_closing', closingId);
-      formDataToSend.append('category', newExpense.category);
-      formDataToSend.append('reason', newExpense.reason);
-      formDataToSend.append('amount', newExpense.amount);
-      if (newExpense.attachment) {
-        formDataToSend.append('attachment', newExpense.attachment);
+      const payload = {
+        organization: user?.organization,
+        closing_date: closingDate,
+        pos_card: posCard || 0,
+        pos_cash: posCash || 0,
+        tab_count: tabCount || 0,
+        actual_card: actualCard || 0,
+        actual_cash: actualCash || 0,
+        bank_deposit: bankDeposit || 0,
       }
 
-      await api.post(
-        `/closing/closings/${closingId}/expenses/`,
-        formDataToSend,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      );
+      let cId = closingId
+      if (closingId) {
+        const res = await closingAPI.update(closingId, payload)
+        setClosingStatus(res.data.status)
+      } else {
+        const res = await closingAPI.create(payload)
+        cId = res.data.id
+        setClosingId(cId)
+        setClosingStatus(res.data.status)
+      }
 
-      setNewExpense({
-        category: 'SUPPLIES',
-        reason: '',
-        amount: '',
-        attachment: null,
-      });
-      setSuccess('지출이 추가되었습니다.');
-      setTimeout(() => setSuccess(''), 3000);
+      // Sync other sales + HR cash
+      await syncOtherSales(cId)
+      await syncHrCash(cId)
+
+      // Submit
+      const res = await closingAPI.submit(cId)
+      setClosingStatus(res.data.status)
+      showMsg('Saved & Submitted')
     } catch (err) {
-      setError(err.response?.data?.detail || '지출 추가에 실패했습니다.');
+      setError(err.response?.data?.detail || err.response?.data?.closing_date?.[0] || 'Failed to save')
     } finally {
-      setLoading(false);
+      setSaving(false)
     }
-  };
+  }
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+  // Add invoice for a supplier
+  const handleAddInvoice = async (supplierId) => {
+    const amount = invoiceAmounts[supplierId]
+    if (!amount) return
 
-  const handleHRCashChange = (e) => {
-    const { name, value } = e.target;
-    setHrCash((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+    setLoading(true)
+    setError('')
+    try {
+      const cId = await ensureClosing()
+      if (!cId) { setLoading(false); return }
 
-  const handleExpenseChange = (e) => {
-    const { name, value, files } = e.target;
-    if (name === 'attachment') {
-      setNewExpense((prev) => ({
-        ...prev,
-        attachment: files[0],
-      }));
-    } else {
-      setNewExpense((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
+      await supplierCostAPI.create({ closing: cId, supplier: supplierId, amount })
+      setInvoiceAmounts(prev => ({ ...prev, [supplierId]: '' }))
+      const res = await supplierCostAPI.list(cId)
+      setSupplierCosts(res.data.results || res.data || [])
+      showMsg('Invoice added')
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to add invoice')
+    } finally {
+      setLoading(false)
     }
-  };
+  }
 
-  const posTotal = (parseFloat(formData.pos_card) || 0) + (parseFloat(formData.pos_cash) || 0);
-  const actualTotal = (parseFloat(formData.actual_card) || 0) + (parseFloat(formData.actual_cash) || 0);
-  const variance = actualTotal - posTotal;
+  const handleDeleteCost = async (id) => {
+    try {
+      await supplierCostAPI.delete(id)
+      setSupplierCosts(prev => prev.filter(c => c.id !== id))
+    } catch { setError('Failed to delete') }
+  }
+
+  const statusBadge = {
+    DRAFT: 'bg-amber-100 text-amber-700',
+    SUBMITTED: 'bg-blue-100 text-blue-700',
+    APPROVED: 'bg-green-100 text-green-700',
+    REJECTED: 'bg-red-100 text-red-700',
+  }
+  const statusLabel = { DRAFT: 'Draft', SUBMITTED: 'Submitted', APPROVED: 'Approved', REJECTED: 'Rejected' }
+
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400'
+
+  const supplierCostTotal = supplierCosts.reduce((s, c) => s + parseFloat(c.amount || 0), 0)
+  const otherSaleTotal = Object.values(otherSaleAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0)
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-gray-50 min-h-screen">
-      <h1 className="text-3xl font-bold mb-8 text-gray-800">데일리 클로징</h1>
-
-      {error && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-          {error}
+    <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Daily Closing</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Record daily sales, invoices & cash up</p>
         </div>
-      )}
-
-      {success && (
-        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
-          {success}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 클로징 정보 */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4 text-gray-800">클로징 정보</h2>
-
-          <form onSubmit={handleCreateClosing} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                폐점 날짜
-              </label>
-              <input
-                type="date"
-                name="closing_date"
-                value={formData.closing_date}
-                onChange={handleInputChange}
-                disabled={closingId !== null}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || closingId !== null}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition"
-            >
-              {loading ? '생성 중...' : closingId ? '생성 완료' : '클로징 생성'}
-            </button>
-          </form>
-
-          {closingId && (
-            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
-              <p className="text-sm text-green-800">
-                ✓ 클로징 ID: <span className="font-semibold">{closingId}</span>
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* POS 데이터 입력 */}
         {closingId && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">POS 데이터</h2>
-
-            <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    카드 매출
-                  </label>
-                  <input
-                    type="number"
-                    name="pos_card"
-                    value={formData.pos_card}
-                    onChange={handleInputChange}
-                    placeholder="0"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    현금 매출
-                  </label>
-                  <input
-                    type="number"
-                    name="pos_cash"
-                    value={formData.pos_cash}
-                    onChange={handleInputChange}
-                    placeholder="0"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="p-3 bg-blue-50 rounded text-sm text-gray-700">
-                <p>POS 합계: <span className="font-semibold">{posTotal.toLocaleString()}</span></p>
-              </div>
-            </form>
-          </div>
+          <span className={`text-xs font-medium px-3 py-1 rounded-full ${statusBadge[closingStatus]}`}>
+            {statusLabel[closingStatus]}
+          </span>
         )}
       </div>
 
-      {closingId && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          {/* 실제 데이터 입력 */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">실제 데이터</h2>
+      {/* Messages */}
+      {error && <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>}
+      {success && <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">{success}</div>}
 
-            <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    실제 카드
-                  </label>
-                  <input
-                    type="number"
-                    name="actual_card"
-                    value={formData.actual_card}
-                    onChange={handleInputChange}
-                    placeholder="0"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+      {/* ──────── Closing Date ──────── */}
+      <Card className="p-5">
+        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Closing Date</label>
+        <input type="date" value={closingDate} onChange={(e) => setClosingDate(e.target.value)} disabled={isReadOnly} className={`${inputCls} mt-2`} />
+      </Card>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    실제 현금
-                  </label>
-                  <input
-                    type="number"
-                    name="actual_cash"
-                    value={formData.actual_cash}
-                    onChange={handleInputChange}
-                    placeholder="0"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="p-3 bg-blue-50 rounded text-sm text-gray-700">
-                <p>실제 합계: <span className="font-semibold">{actualTotal.toLocaleString()}</span></p>
-              </div>
-            </form>
+      {/* ──────── POS ──────── */}
+      <Card className="p-5">
+        <SectionLabel>POS</SectionLabel>
+        <div className="grid grid-cols-2 gap-4 mb-3">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Card</label>
+            <input type="number" step="0.01" value={posCard} onChange={(e) => setPosCard(e.target.value)} disabled={isReadOnly} placeholder="0.00" className={inputCls} />
           </div>
-
-          {/* 차이 분석 */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">차이 분석</h2>
-
-            <div className={`p-4 rounded-lg text-center ${
-              variance === 0 ? 'bg-green-50' : 'bg-yellow-50'
-            }`}>
-              <p className="text-sm text-gray-600 mb-2">차이(Variance)</p>
-              <p className={`text-3xl font-bold ${
-                variance === 0 ? 'text-green-600' : 'text-yellow-600'
-              }`}>
-                {variance.toLocaleString()}
-              </p>
-              <p className="text-xs text-gray-500 mt-2">
-                {variance === 0 ? '✓ 정상' : '⚠ 확인 필요'}
-              </p>
-            </div>
-          </div>
-
-          {/* HR 현금 입력 */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">HR 현금</h2>
-
-            <form onSubmit={handleAddHRCash} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  금액
-                </label>
-                <input
-                  type="number"
-                  name="amount"
-                  value={hrCash.amount}
-                  onChange={handleHRCashChange}
-                  placeholder="0"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  비고
-                </label>
-                <textarea
-                  name="notes"
-                  value={hrCash.notes}
-                  onChange={handleHRCashChange}
-                  placeholder="(선택사항)"
-                  rows="3"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading || !hrCash.amount}
-                className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition"
-              >
-                {loading ? '추가 중...' : 'HR 현금 추가'}
-              </button>
-            </form>
-          </div>
-
-          {/* 지출 입력 */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">현금 지출</h2>
-
-            <form onSubmit={handleAddExpense} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  카테고리
-                </label>
-                <select
-                  name="category"
-                  value={newExpense.category}
-                  onChange={handleExpenseChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="SUPPLIES">소비재</option>
-                  <option value="MAINTENANCE">유지보수</option>
-                  <option value="OTHER">기타</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  사유
-                </label>
-                <input
-                  type="text"
-                  name="reason"
-                  value={newExpense.reason}
-                  onChange={handleExpenseChange}
-                  placeholder="지출 사유"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  금액
-                </label>
-                <input
-                  type="number"
-                  name="amount"
-                  value={newExpense.amount}
-                  onChange={handleExpenseChange}
-                  placeholder="0"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  첨부 파일 (선택)
-                </label>
-                <input
-                  type="file"
-                  name="attachment"
-                  onChange={handleExpenseChange}
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  최대 5MB (PDF, JPG, PNG)
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading || !newExpense.reason || !newExpense.amount}
-                className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400 transition"
-              >
-                {loading ? '추가 중...' : '지출 추가'}
-              </button>
-            </form>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Cash</label>
+            <input type="number" step="0.01" value={posCash} onChange={(e) => setPosCash(e.target.value)} disabled={isReadOnly} placeholder="0.00" className={inputCls} />
           </div>
         </div>
+        <div className="bg-blue-50 rounded-xl px-4 py-2.5 flex items-center justify-between">
+          <span className="text-xs text-blue-600 font-medium">POS Total</span>
+          <span className="text-sm font-bold text-blue-700">{fmt(posTotal)}</span>
+        </div>
+      </Card>
+
+      {/* ──────── Actual ──────── */}
+      <Card className="p-5">
+        <SectionLabel>Actual</SectionLabel>
+        <div className="grid grid-cols-2 gap-4 mb-3">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Card</label>
+            <input type="number" step="0.01" value={actualCard} onChange={(e) => setActualCard(e.target.value)} disabled={isReadOnly} placeholder="0.00" className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Cash</label>
+            <input type="number" step="0.01" value={actualCash} onChange={(e) => setActualCash(e.target.value)} disabled={isReadOnly} placeholder="0.00" className={inputCls} />
+          </div>
+        </div>
+        <div className="bg-blue-50 rounded-xl px-4 py-2.5 flex items-center justify-between">
+          <span className="text-xs text-blue-600 font-medium">Actual Total</span>
+          <span className="text-sm font-bold text-blue-700">{fmt(actualTotal)}</span>
+        </div>
+      </Card>
+
+      {/* ──────── Variance ──────── */}
+      <Card className={`p-5 ${totalVariance === 0 ? 'bg-green-50 border-green-200' : Math.abs(totalVariance) > 10 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-xs text-gray-500 font-medium">Variance</p>
+            <p className="text-xs text-gray-400 mt-0.5">Actual − POS</p>
+          </div>
+          <p className={`text-2xl font-bold ${totalVariance === 0 ? 'text-green-600' : Math.abs(totalVariance) > 10 ? 'text-red-600' : 'text-amber-600'}`}>
+            {fmt(totalVariance)}
+          </p>
+        </div>
+        <div className="space-y-1.5 pt-2 border-t border-black/5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500">Card</span>
+            <span className={`text-xs font-semibold ${cardVariance === 0 ? 'text-green-600' : 'text-red-600'}`}>{fmt(cardVariance)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500">Cash</span>
+            <span className={`text-xs font-semibold ${cashVariance === 0 ? 'text-green-600' : 'text-red-600'}`}>{fmt(cashVariance)}</span>
+          </div>
+        </div>
+      </Card>
+
+      {/* ──────── Tab Count ──────── */}
+      <Card className="p-5">
+        <SectionLabel>Tab Count</SectionLabel>
+        <p className="text-xs text-gray-400 mb-2">Number of transactions today</p>
+        <input type="number" step="1" value={tabCount} onChange={(e) => setTabCount(e.target.value)} disabled={isReadOnly} placeholder="0" className={inputCls} />
+      </Card>
+
+      {/* ──────── Other Sales ──────── */}
+      {salesCategories.length > 0 && (
+        <Card className="p-5">
+          <SectionLabel>Other Sales</SectionLabel>
+          <div className="space-y-3">
+            {salesCategories.map((cat) => (
+              <div key={cat.id} className="flex items-center gap-3">
+                <span className="text-sm font-medium text-gray-900 w-32 shrink-0 truncate">{cat.name}</span>
+                <input
+                  type="number" step="0.01"
+                  value={otherSaleAmounts[cat.name] || ''}
+                  onChange={(e) => setOtherSaleAmounts(prev => ({ ...prev, [cat.name]: e.target.value }))}
+                  disabled={isReadOnly} placeholder="0.00" className={inputCls}
+                />
+              </div>
+            ))}
+          </div>
+          {otherSaleTotal > 0 && (
+            <div className="flex justify-end pt-3 mt-3 border-t border-gray-100">
+              <span className="text-sm font-bold text-gray-700">Total: {fmt(otherSaleTotal)}</span>
+            </div>
+          )}
+        </Card>
       )}
+
+      {/* ──────── Today's Invoices ──────── */}
+      {suppliers.length > 0 && (
+        <Card className="p-5">
+          <SectionLabel>Today's Invoices</SectionLabel>
+          <div className="space-y-3">
+            {suppliers.map((sup) => {
+              const entries = supplierCosts.filter(sc => sc.supplier === sup.id)
+              return (
+                <div key={sup.id} className="border border-gray-100 rounded-xl overflow-hidden">
+                  <div className="flex items-center gap-3 p-3 bg-gray-50">
+                    <span className="text-sm font-medium text-gray-900 w-32 shrink-0 truncate">{sup.name}</span>
+                    {!isReadOnly && (
+                      <>
+                        <input
+                          type="number" step="0.01"
+                          value={invoiceAmounts[sup.id] || ''}
+                          onChange={(e) => setInvoiceAmounts(prev => ({ ...prev, [sup.id]: e.target.value }))}
+                          placeholder="0.00" className={inputCls}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddInvoice(sup.id) } }}
+                        />
+                        <button
+                          onClick={() => handleAddInvoice(sup.id)}
+                          disabled={loading || !invoiceAmounts[sup.id]}
+                          className="shrink-0 flex items-center gap-1 px-3 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 disabled:opacity-40 transition"
+                        >
+                          <PlusIcon size={14} /> Add
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {entries.length > 0 && (
+                    <div className="px-3 pb-2">
+                      {entries.map((sc) => (
+                        <div key={sc.id} className="flex items-center justify-between py-1.5 pl-3">
+                          <span className="text-xs text-gray-500">{fmt(sc.amount)}</span>
+                          {!isReadOnly && (
+                            <button onClick={() => handleDeleteCost(sc.id)} className="text-gray-300 hover:text-red-500 transition p-1">
+                              <TrashIcon size={14} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {entries.length > 1 && (
+                        <div className="flex justify-end pt-1 border-t border-gray-100 mt-1">
+                          <span className="text-xs font-semibold text-gray-600">
+                            {fmt(entries.reduce((s, c) => s + parseFloat(c.amount || 0), 0))}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          {supplierCostTotal > 0 && (
+            <div className="flex justify-end pt-3 mt-3 border-t border-gray-100">
+              <span className="text-sm font-bold text-gray-700">Total: {fmt(supplierCostTotal)}</span>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* ──────── Cash Up ──────── */}
+      <Card className="p-5">
+        <SectionLabel>Cash Up</SectionLabel>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Bank Deposit</label>
+            <input type="number" step="0.01" value={bankDeposit} onChange={(e) => setBankDeposit(e.target.value)} disabled={isReadOnly} placeholder="0.00" className={inputCls} />
+          </div>
+          {hrCashEnabled && (
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">HR Cash</label>
+              <input type="number" step="0.01" value={hrCashAmount} onChange={(e) => setHrCashAmount(e.target.value)} disabled={isReadOnly} placeholder="0.00" className={inputCls} />
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* ──────── Actions ──────── */}
+      <div className="space-y-3 pb-6">
+        {!isReadOnly && (
+          <button
+            onClick={handleSaveAndSubmit}
+            disabled={saving}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition"
+          >
+            <CheckCircleIcon size={18} />
+            {saving ? 'Saving...' : 'Save & Submit'}
+          </button>
+        )}
+
+        <button
+          onClick={() => navigate('/closing')}
+          className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
+        >
+          Back to List
+          <ArrowRightIcon size={14} />
+        </button>
+      </div>
     </div>
-  );
+  )
 }

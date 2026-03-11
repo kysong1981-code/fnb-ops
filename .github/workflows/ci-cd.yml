@@ -215,7 +215,7 @@ jobs:
 
     environment:
       name: production
-      url: https://yourdomain.com
+      url: https://oneops.co.nz
 
     steps:
     - uses: actions/checkout@v4
@@ -244,7 +244,7 @@ jobs:
       if: env.DEPLOY_HOST != ''
       run: |
         sleep 10
-        curl -f https://yourdomain.com/health/ || exit 1
+        curl -f https://oneops.co.nz/health/ || exit 1
       continue-on-error: true
 
     - name: Notify Deployment Success

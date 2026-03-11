@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Organization, UserProfile, Permission, AuditLog
+from .models import Organization, UserProfile, Permission, AuditLog, Integration, StoreApplication
 
 
 # 1. 간단한 것부터: Organization
@@ -12,8 +12,12 @@ class OrganizationSerializer(serializers.ModelSerializer):
         model = Organization
         fields = [
             'id', 'name', 'level', 'parent', 'parent_name',
-            'address', 'phone', 'email',
+            'address', 'phone', 'email', 'region',
+            'ird_number', 'logo',
             'opening_time', 'closing_time',
+            'hr_cash_enabled',
+            'enabled_modules',
+            'otherwise_working_weeks', 'otherwise_working_threshold',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
@@ -110,7 +114,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'manager', 'manager_name',
             'date_of_joining', 'phone', 'date_of_birth',
             'employment_status', 'employment_status_display',
-            'tax_file_number', 'kiwisaver_status', 'kiwisaver_rate',
+            'tax_file_number', 'kiwisaver_status', 'kiwisaver_rate', 'bank_account',
             'work_type', 'work_type_display',
             'is_active', 'user_permissions',
             'created_at', 'updated_at'
@@ -125,3 +129,51 @@ class UserProfileSerializer(serializers.ModelSerializer):
         # 해당 역할의 모든 권한 조회
         permissions = Permission.objects.filter(role=obj.role)
         return PermissionSerializer(permissions, many=True).data
+
+
+# 6. Integration
+class IntegrationSerializer(serializers.ModelSerializer):
+    """Third-party integration serializer"""
+    service_display = serializers.CharField(source='get_service_display', read_only=True)
+    connected_by_name = serializers.CharField(
+        source='connected_by.user.get_full_name', read_only=True, default=None
+    )
+
+    class Meta:
+        model = Integration
+        fields = [
+            'id', 'service', 'service_display', 'is_connected',
+            'api_key', 'config',
+            'connected_by_name', 'connected_at',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'connected_by_name', 'connected_at']
+        extra_kwargs = {
+            'api_key': {'write_only': True},
+        }
+
+
+# 7. StoreApplication
+class StoreApplicationSerializer(serializers.ModelSerializer):
+    """Store opening application serializer"""
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    reviewed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StoreApplication
+        fields = [
+            'id', 'applicant_name', 'applicant_email', 'applicant_phone',
+            'store_name', 'store_address', 'store_phone',
+            'desired_modules', 'status', 'status_display',
+            'admin_notes', 'reviewed_by', 'reviewed_by_name', 'reviewed_at',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'status', 'admin_notes', 'reviewed_by', 'reviewed_at',
+            'created_at', 'updated_at',
+        ]
+
+    def get_reviewed_by_name(self, obj):
+        if obj.reviewed_by and obj.reviewed_by.user:
+            return obj.reviewed_by.user.get_full_name() or obj.reviewed_by.user.username
+        return None

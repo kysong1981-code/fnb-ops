@@ -111,7 +111,7 @@ export default function CleaningSchedule() {
       )}
 
       {/* 주간 네비게이션 */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex justify-between items-center mb-6">
           <button
             onClick={getPrevWeek}

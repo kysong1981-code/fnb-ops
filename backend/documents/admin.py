@@ -39,7 +39,7 @@ class DocumentAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         """저장 시 생성자 자동 설정"""
         if not change:  # 새로 생성할 때만
-            obj.created_by = request.user.userprofile
+            obj.created_by = request.user.profile
         super().save_model(request, obj, form, change)
 
 

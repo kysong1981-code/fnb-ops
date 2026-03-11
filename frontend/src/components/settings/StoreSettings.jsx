@@ -1,0 +1,1694 @@
+import { useState, useEffect, useCallback } from 'react'
+import { useAuth } from '../../context/AuthContext'
+import { storeAPI, safetyAPI, hrAPI } from '../../services/api'
+import ALL_MODULES from '../../constants/modules'
+import PageHeader from '../ui/PageHeader'
+import Card from '../ui/Card'
+import { SettingsIcon, PlusIcon, EditIcon, TrashIcon, XIcon, CheckCircleIcon, CameraIcon } from '../icons'
+
+const NZ_REGIONS = [
+  { value: 'AUCKLAND', label: 'Auckland' },
+  { value: 'WELLINGTON', label: 'Wellington' },
+  { value: 'CANTERBURY', label: 'Canterbury' },
+  { value: 'OTAGO', label: 'Otago' },
+  { value: 'WAIKATO', label: 'Waikato' },
+  { value: 'BAY_OF_PLENTY', label: 'Bay of Plenty' },
+  { value: 'HAWKES_BAY', label: "Hawke's Bay" },
+  { value: 'TARANAKI', label: 'Taranaki' },
+  { value: 'MANAWATU_WHANGANUI', label: 'Manawatū-Whanganui' },
+  { value: 'NELSON', label: 'Nelson' },
+  { value: 'MARLBOROUGH', label: 'Marlborough' },
+  { value: 'WEST_COAST', label: 'West Coast' },
+  { value: 'SOUTHLAND', label: 'Southland' },
+  { value: 'NORTHLAND', label: 'Northland' },
+  { value: 'GISBORNE', label: 'Gisborne' },
+  { value: 'CHATHAM_ISLANDS', label: 'Chatham Islands' },
+]
+
+const TABS = [
+  { key: 'modules', label: 'Modules' },
+  { key: 'company', label: 'Company' },
+  { key: 'business', label: 'Business' },
+  { key: 'suppliers', label: 'Suppliers' },
+  { key: 'sales', label: 'Sales' },
+  { key: 'safety', label: 'Food Safety' },
+  { key: 'hr', label: 'HR Setup' },
+  { key: 'integrations', label: 'Integrations' },
+]
+
+const INTEGRATION_INFO = {
+  GOMENU: {
+    name: 'GoMenu POS',
+    description: 'Connect your GoMenu POS system to sync sales data automatically.',
+    icon: '\uD83C\uDF5C',
+    color: 'orange',
+    syncable: true,
+    fields: [
+      { key: 'api_key', label: 'API Key', type: 'text', placeholder: 'Enter GoMenu API key' },
+      { key: 'account', label: 'Account', type: 'text', placeholder: 'GoMenu login account' },
+      { key: 'password', label: 'Password', type: 'password', placeholder: 'GoMenu login password' },
+    ],
+  },
+  LIGHTSPEED: {
+    name: 'Lightspeed POS',
+    description: 'Integrate with Lightspeed Restaurant K-Series for real-time sales sync.',
+    icon: '\u26A1',
+    color: 'blue',
+    fields: [
+      { key: 'api_key', label: 'API Key', type: 'text', placeholder: 'Enter Lightspeed API key' },
+      { key: 'api_secret', label: 'API Secret', type: 'password', placeholder: 'Enter API secret' },
+    ],
+  },
+  XERO: {
+    name: 'Xero Accounting',
+    description: 'Sync expenses, invoices, and financial data with Xero.',
+    icon: '\uD83D\uDCCA',
+    color: 'green',
+    fields: [
+      { key: 'api_key', label: 'Client ID', type: 'text', placeholder: 'Enter Xero Client ID' },
+      { key: 'api_secret', label: 'Client Secret', type: 'password', placeholder: 'Enter Client Secret' },
+    ],
+  },
+}
+
+const TRAINING_MODULE_TYPES = [
+  { value: 'SAFETY', label: 'Safety Training' },
+  { value: 'FCP', label: 'FCP Training' },
+  { value: 'HAZARD', label: 'Hazard Training' },
+  { value: 'CUSTOM', label: 'Custom' },
+]
+
+export default function StoreSettings() {
+  const { refreshProfile } = useAuth()
+  const [tab, setTab] = useState('modules')
+  const [settings, setSettings] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState('')
+
+  // Company form
+  const [form, setForm] = useState({
+    name: '', address: '', phone: '', email: '',
+    region: '', ird_number: '',
+    opening_time: '', closing_time: '',
+  })
+  const [logoFile, setLogoFile] = useState(null)
+  const [logoPreview, setLogoPreview] = useState(null)
+
+  // Modules
+  const [enabledModules, setEnabledModules] = useState(ALL_MODULES.map(m => m.key))
+
+  // Business
+  const [hrCashEnabled, setHrCashEnabled] = useState(true)
+  const [owWeeks, setOwWeeks] = useState(8)
+  const [owThreshold, setOwThreshold] = useState(7)
+
+  // Suppliers
+  const [suppliers, setSuppliers] = useState([])
+  const [supplierForm, setSupplierForm] = useState(null)
+
+  // Sales Categories
+  const [categories, setCategories] = useState([])
+  const [categoryForm, setCategoryForm] = useState(null)
+
+  // Temperature Locations
+  const [tempLocations, setTempLocations] = useState([])
+  const [tempForm, setTempForm] = useState(null)
+
+  // Checklist Templates
+  const [templates, setTemplates] = useState([])
+
+  // MPI Record Configs
+  const [recordConfigs, setRecordConfigs] = useState([])
+  const [recordConfigsLoading, setRecordConfigsLoading] = useState(false)
+  const [specialistOpen, setSpecialistOpen] = useState(false)
+
+  // HR Setup: Document Templates & Training Modules
+  const [docTemplates, setDocTemplates] = useState([])
+  const [trainingModules, setTrainingModules] = useState([])
+  const [docTemplateUploading, setDocTemplateUploading] = useState(false)
+  const [trainingForm, setTrainingForm] = useState(null)
+
+  // Integrations
+  const [integrations, setIntegrations] = useState([])
+  const [connectingService, setConnectingService] = useState(null)
+  const [connectForm, setConnectForm] = useState({})
+  const [testingService, setTestingService] = useState(null)
+  const [syncingService, setSyncingService] = useState(null)
+  const [syncResult, setSyncResult] = useState(null)
+
+  const showToast = (msg) => {
+    setToast(msg)
+    setTimeout(() => setToast(''), 2500)
+  }
+
+  // Load settings
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await storeAPI.getSettings()
+      const d = res.data
+      setSettings(d)
+      setForm({
+        name: d.name || '',
+        address: d.address || '',
+        phone: d.phone || '',
+        email: d.email || '',
+        region: d.region || '',
+        ird_number: d.ird_number || '',
+        opening_time: d.opening_time || '',
+        closing_time: d.closing_time || '',
+      })
+      setLogoPreview(d.logo || null)
+      if (d.enabled_modules && d.enabled_modules.length > 0) {
+        setEnabledModules(d.enabled_modules)
+      }
+      setHrCashEnabled(d.hr_cash_enabled)
+      setOwWeeks(d.otherwise_working_weeks)
+      setOwThreshold(d.otherwise_working_threshold)
+    } catch (e) {
+      console.error('Failed to load settings', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const fetchSuppliers = useCallback(async () => {
+    try {
+      const res = await storeAPI.getSuppliers()
+      setSuppliers(res.data)
+    } catch (e) { console.error(e) }
+  }, [])
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await storeAPI.getSalesCategories()
+      setCategories(res.data)
+    } catch (e) { console.error(e) }
+  }, [])
+
+  const fetchTempLocations = useCallback(async () => {
+    try {
+      const res = await safetyAPI.getTemperatureLocations()
+      setTempLocations(res.data)
+    } catch (e) { console.error(e) }
+  }, [])
+
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const res = await safetyAPI.getTemplates()
+      setTemplates(Array.isArray(res.data) ? res.data : res.data.results || [])
+    } catch (e) { console.error(e) }
+  }, [])
+
+  const fetchRecordConfigs = useCallback(async () => {
+    try {
+      const res = await safetyAPI.getRecordConfigs()
+      setRecordConfigs(Array.isArray(res.data) ? res.data : res.data.results || [])
+    } catch (e) { console.error(e) }
+  }, [])
+
+  const fetchDocTemplates = useCallback(async () => {
+    try {
+      const res = await hrAPI.getDocumentTemplates()
+      setDocTemplates(Array.isArray(res.data) ? res.data : res.data.results || [])
+    } catch (e) { console.error(e) }
+  }, [])
+
+  const fetchTrainingModules = useCallback(async () => {
+    try {
+      const res = await hrAPI.getTrainingModules()
+      setTrainingModules(Array.isArray(res.data) ? res.data : res.data.results || [])
+    } catch (e) { console.error(e) }
+  }, [])
+
+  const fetchIntegrations = useCallback(async () => {
+    try {
+      const res = await storeAPI.getIntegrations()
+      setIntegrations(Array.isArray(res.data) ? res.data : res.data.results || [])
+    } catch (e) { console.error(e) }
+  }, [])
+
+  useEffect(() => {
+    fetchSettings()
+    fetchSuppliers()
+    fetchCategories()
+    fetchTempLocations()
+    fetchTemplates()
+    fetchRecordConfigs()
+    fetchDocTemplates()
+    fetchTrainingModules()
+    fetchIntegrations()
+  }, [fetchSettings, fetchSuppliers, fetchCategories, fetchTempLocations, fetchTemplates, fetchRecordConfigs, fetchDocTemplates, fetchTrainingModules, fetchIntegrations])
+
+  // ── Company Tab ──
+  const handleSaveCompany = async () => {
+    setSaving(true)
+    try {
+      if (logoFile) {
+        const fd = new FormData()
+        Object.entries(form).forEach(([k, v]) => { if (v !== '') fd.append(k, v) })
+        fd.append('logo', logoFile)
+        await storeAPI.updateSettingsWithFile(fd)
+      } else {
+        const data = {}
+        Object.entries(form).forEach(([k, v]) => { data[k] = v || null })
+        await storeAPI.updateSettings(data)
+      }
+      showToast('Settings saved')
+      fetchSettings()
+      setLogoFile(null)
+    } catch (e) {
+      showToast('Error saving settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setLogoFile(file)
+      setLogoPreview(URL.createObjectURL(file))
+    }
+  }
+
+  // ── Modules Tab ──
+  const toggleModule = (key) => {
+    setEnabledModules(prev =>
+      prev.includes(key)
+        ? prev.filter(m => m !== key)
+        : [...prev, key]
+    )
+  }
+
+  const handleSaveModules = async () => {
+    setSaving(true)
+    try {
+      await storeAPI.updateSettings({ enabled_modules: enabledModules })
+      await refreshProfile()
+      showToast('Modules updated')
+    } catch (e) {
+      showToast('Error saving modules')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ── Business Tab ──
+  const handleSaveBusiness = async () => {
+    setSaving(true)
+    try {
+      await storeAPI.updateSettings({
+        hr_cash_enabled: hrCashEnabled,
+        otherwise_working_weeks: owWeeks,
+        otherwise_working_threshold: owThreshold,
+      })
+      showToast('Settings saved')
+    } catch (e) {
+      showToast('Error saving settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ── Suppliers ──
+  const handleSaveSupplier = async () => {
+    try {
+      if (supplierForm.id) {
+        await storeAPI.updateSupplier(supplierForm.id, supplierForm)
+      } else {
+        await storeAPI.createSupplier(supplierForm)
+      }
+      setSupplierForm(null)
+      fetchSuppliers()
+      showToast('Supplier saved')
+    } catch (e) {
+      showToast(e.response?.data?.code?.[0] || e.response?.data?.name?.[0] || 'Error saving supplier')
+    }
+  }
+
+  const handleDeleteSupplier = async (id) => {
+    try {
+      await storeAPI.deleteSupplier(id)
+      fetchSuppliers()
+      showToast('Supplier deleted')
+    } catch (e) {
+      showToast('Error deleting supplier')
+    }
+  }
+
+  // ── Sales Categories ──
+  const handleSaveCategory = async () => {
+    try {
+      if (categoryForm.id) {
+        await storeAPI.updateSalesCategory(categoryForm.id, categoryForm)
+      } else {
+        await storeAPI.createSalesCategory(categoryForm)
+      }
+      setCategoryForm(null)
+      fetchCategories()
+      showToast('Category saved')
+    } catch (e) {
+      showToast(e.response?.data?.name?.[0] || 'Error saving category')
+    }
+  }
+
+  const handleDeleteCategory = async (id) => {
+    try {
+      await storeAPI.deleteSalesCategory(id)
+      fetchCategories()
+      showToast('Category deleted')
+    } catch (e) {
+      showToast('Error deleting category')
+    }
+  }
+
+  // ── Temperature Locations ──
+  const handleSaveTempLocation = async () => {
+    try {
+      const data = {
+        ...tempForm,
+        standard_min: tempForm.standard_min || null,
+        standard_max: tempForm.standard_max || null,
+      }
+      if (tempForm.id) {
+        await safetyAPI.updateTemperatureLocation(tempForm.id, data)
+      } else {
+        await safetyAPI.createTemperatureLocation(data)
+      }
+      setTempForm(null)
+      fetchTempLocations()
+      showToast('Location saved')
+    } catch (e) {
+      showToast(e.response?.data?.name?.[0] || 'Error saving location')
+    }
+  }
+
+  const handleDeleteTempLocation = async (id) => {
+    try {
+      await safetyAPI.deleteTemperatureLocation(id)
+      fetchTempLocations()
+      showToast('Location deleted')
+    } catch (e) {
+      showToast('Error deleting location')
+    }
+  }
+
+  // ── HR Document Templates ──
+  const handleUploadDocTemplate = async (docType, file, { workType, jobTitle } = {}) => {
+    setDocTemplateUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('document_type', docType)
+      fd.append('title', file.name)
+      fd.append('file', file)
+      if (workType) fd.append('work_type', workType)
+      if (jobTitle) fd.append('job_title', jobTitle)
+      await hrAPI.createDocumentTemplate(fd)
+      fetchDocTemplates()
+      showToast('Template uploaded')
+    } catch (e) {
+      showToast('Error uploading template')
+    } finally {
+      setDocTemplateUploading(false)
+    }
+  }
+
+  const handleDeleteDocTemplate = async (id) => {
+    try {
+      await hrAPI.deleteDocumentTemplate(id)
+      fetchDocTemplates()
+      showToast('Template deleted')
+    } catch (e) {
+      showToast('Error deleting template')
+    }
+  }
+
+  // ── HR Training Modules ──
+  const handleSaveTraining = async () => {
+    if (!trainingForm) return
+    try {
+      const fd = new FormData()
+      fd.append('module_type', trainingForm.module_type)
+      fd.append('title', trainingForm.title)
+      if (trainingForm.description) fd.append('description', trainingForm.description)
+      if (trainingForm.video_url) fd.append('video_url', trainingForm.video_url)
+      if (trainingForm.file_obj) fd.append('file', trainingForm.file_obj)
+
+      if (trainingForm.id) {
+        await hrAPI.updateTrainingModule(trainingForm.id, fd)
+      } else {
+        await hrAPI.createTrainingModule(fd)
+      }
+      setTrainingForm(null)
+      fetchTrainingModules()
+      showToast('Training module saved')
+    } catch (e) {
+      showToast('Error saving training module')
+    }
+  }
+
+  const handleDeleteTraining = async (id) => {
+    try {
+      await hrAPI.deleteTrainingModule(id)
+      fetchTrainingModules()
+      showToast('Training module deleted')
+    } catch (e) {
+      showToast('Error deleting training module')
+    }
+  }
+
+  // ── Delete checklist template ──
+  const handleDeleteTemplate = async (id) => {
+    try {
+      await safetyAPI.deleteTemplate(id)
+      fetchTemplates()
+      showToast('Template deleted')
+    } catch (e) {
+      showToast('Error deleting template')
+    }
+  }
+
+  // ── MPI Record Configs ──
+  const handleInitializeConfigs = async () => {
+    setRecordConfigsLoading(true)
+    try {
+      const res = await safetyAPI.initializeConfigs()
+      showToast(`${res.data.created} record types initialized`)
+      fetchRecordConfigs()
+    } catch (e) {
+      showToast('Error initializing record types')
+    } finally {
+      setRecordConfigsLoading(false)
+    }
+  }
+
+  const handleToggleConfig = async (id) => {
+    try {
+      await safetyAPI.toggleConfig(id)
+      fetchRecordConfigs()
+    } catch (e) {
+      showToast('Error toggling record type')
+    }
+  }
+
+  const handleConfigRoleChange = async (id, role) => {
+    try {
+      await safetyAPI.updateConfig(id, { assigned_role: role })
+      fetchRecordConfigs()
+    } catch (e) {
+      showToast('Error updating role')
+    }
+  }
+
+  // ── Integrations ──
+  const handleConnect = async (service) => {
+    try {
+      let data = { ...connectForm }
+
+      // GoMenu: separate account/password into config
+      if (service === 'GOMENU') {
+        data = {
+          api_key: connectForm.api_key || '',
+          config: {
+            account: connectForm.account || '',
+            password: connectForm.password || '',
+          },
+        }
+      }
+
+      await storeAPI.connectIntegration(service.toLowerCase(), data)
+      showToast(`${INTEGRATION_INFO[service]?.name} connected`)
+      setConnectingService(null)
+      setConnectForm({})
+      fetchIntegrations()
+    } catch (e) {
+      showToast('Connection failed: ' + (e.response?.data?.error || e.message))
+    }
+  }
+
+  const handleDisconnect = async (service) => {
+    if (!window.confirm(`Disconnect ${INTEGRATION_INFO[service]?.name}?`)) return
+    try {
+      await storeAPI.disconnectIntegration(service.toLowerCase())
+      showToast(`${INTEGRATION_INFO[service]?.name} disconnected`)
+      setSyncResult(null)
+      fetchIntegrations()
+    } catch (e) {
+      showToast('Disconnect failed')
+    }
+  }
+
+  const handleTestConnection = async (service) => {
+    setTestingService(service)
+    try {
+      const res = await storeAPI.testIntegration(service.toLowerCase())
+      showToast(res.data.message || 'Connection OK')
+    } catch (e) {
+      showToast('Test failed: ' + (e.response?.data?.error || e.message))
+    } finally {
+      setTestingService(null)
+    }
+  }
+
+  const handleSync = async (service) => {
+    setSyncingService(service)
+    setSyncResult(null)
+    try {
+      const res = await storeAPI.syncIntegration(service.toLowerCase())
+      setSyncResult(res.data)
+      if (res.data.success) {
+        showToast(res.data.message || 'Sync completed')
+      } else {
+        showToast(res.data.error || 'Sync failed')
+      }
+    } catch (e) {
+      const msg = e.response?.data?.error || e.message
+      setSyncResult({ success: false, error: msg })
+      showToast('Sync failed: ' + msg)
+    } finally {
+      setSyncingService(null)
+    }
+  }
+
+  // Group record configs by category
+  const groupedConfigs = recordConfigs.reduce((acc, cfg) => {
+    const cat = cfg.record_type_detail?.category || 'OTHER'
+    if (!acc[cat]) acc[cat] = []
+    acc[cat].push(cfg)
+    return acc
+  }, {})
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  const inputCls = 'w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+  const labelCls = 'block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5'
+  const btnPrimary = 'px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition disabled:opacity-50'
+  const btnSecondary = 'px-3 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition'
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Store Settings" subtitle="Manage store configuration" icon={<SettingsIcon size={24} />} />
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl overflow-x-auto">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg whitespace-nowrap transition ${
+              tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2">
+          <CheckCircleIcon size={16} />
+          {toast}
+        </div>
+      )}
+
+      {/* ── Modules Tab ── */}
+      {tab === 'modules' && (
+        <Card className="p-6">
+          <div className="space-y-5">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Feature Modules</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Enable or disable features for your store. Disabled modules will be hidden from the sidebar and navigation.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {ALL_MODULES.map((mod) => {
+                const isEnabled = enabledModules.includes(mod.key)
+                return (
+                  <div
+                    key={mod.key}
+                    className={`flex items-center gap-3 p-4 rounded-xl border transition ${
+                      isEnabled ? 'border-blue-200 bg-blue-50/50' : 'border-gray-100 bg-gray-50/50'
+                    }`}
+                  >
+                    <span className="text-2xl shrink-0">{mod.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">{mod.label}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{mod.desc}</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={isEnabled}
+                        onChange={() => toggleModule(mod.key)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
+                    </label>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-xs text-gray-400">
+                {enabledModules.length} of {ALL_MODULES.length} modules enabled
+              </p>
+              <button onClick={handleSaveModules} disabled={saving} className="px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-40 transition">
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* ── Company Tab ── */}
+      {tab === 'company' && (
+        <Card className="p-6">
+          <div className="space-y-6">
+            {/* Logo */}
+            <div>
+              <label className={labelCls}>Logo</label>
+              <div className="flex items-center gap-4">
+                {logoPreview ? (
+                  <img src={logoPreview} alt="Logo" className="w-16 h-16 rounded-xl object-cover border border-gray-200" />
+                ) : (
+                  <div className="w-16 h-16 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 text-xs">No logo</div>
+                )}
+                <label className={`${btnSecondary} cursor-pointer`}>
+                  Upload
+                  <input type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+                </label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Store Name</label>
+                <input className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </div>
+              <div>
+                <label className={labelCls}>IRD Number</label>
+                <input className={inputCls} value={form.ird_number} onChange={(e) => setForm({ ...form, ird_number: e.target.value })} placeholder="e.g. 12-345-678" />
+              </div>
+            </div>
+
+            <div>
+              <label className={labelCls}>Address</label>
+              <textarea className={inputCls} rows={2} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Phone</label>
+                <input className={inputCls} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              </div>
+              <div>
+                <label className={labelCls}>Email</label>
+                <input className={inputCls} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              </div>
+            </div>
+
+            <div>
+              <label className={labelCls}>Region (Anniversary Day)</label>
+              <select className={inputCls} value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>
+                <option value="">Select region...</option>
+                {NZ_REGIONS.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Opening Time</label>
+                <input className={inputCls} type="time" value={form.opening_time} onChange={(e) => setForm({ ...form, opening_time: e.target.value })} />
+              </div>
+              <div>
+                <label className={labelCls}>Closing Time</label>
+                <input className={inputCls} type="time" value={form.closing_time} onChange={(e) => setForm({ ...form, closing_time: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button onClick={handleSaveCompany} disabled={saving} className={btnPrimary}>
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* ── Business Tab ── */}
+      {tab === 'business' && (
+        <Card className="p-6">
+          <div className="space-y-8">
+            {/* HR Cash Toggle */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">HR Cash</h3>
+              <p className="text-xs text-gray-500 mb-3">Enable HR cash input section in Daily Closing</p>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hrCashEnabled}
+                  onChange={(e) => setHrCashEnabled(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
+                <span className="ml-3 text-sm text-gray-700">{hrCashEnabled ? 'Enabled' : 'Disabled'}</span>
+              </label>
+            </div>
+
+            {/* Otherwise Working Rule */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Otherwise Working Rule</h3>
+              <p className="text-xs text-gray-500 mb-3">Public holiday entitlement: employee must have worked on that day in X out of last Y weeks</p>
+              <div className="flex items-center gap-2 text-sm text-gray-700">
+                <span>Worked</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={52}
+                  className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={owThreshold}
+                  onChange={(e) => setOwThreshold(Number(e.target.value))}
+                />
+                <span>out of last</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={52}
+                  className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={owWeeks}
+                  onChange={(e) => setOwWeeks(Number(e.target.value))}
+                />
+                <span>weeks</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button onClick={handleSaveBusiness} disabled={saving} className={btnPrimary}>
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* ── Suppliers Tab ── */}
+      {tab === 'suppliers' && (
+        <Card>
+          <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Suppliers</h3>
+              <p className="text-xs text-gray-500">Suppliers automatically appear in Daily Closing</p>
+            </div>
+            <button
+              onClick={() => setSupplierForm({ name: '', code: '', contact: '', phone: '', is_active: true })}
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition"
+            >
+              <PlusIcon size={14} /> Add
+            </button>
+          </div>
+
+          {/* Add/Edit Form */}
+          {supplierForm && (
+            <div className="px-5 py-4 bg-blue-50 border-b border-blue-100">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                <input className={inputCls} placeholder="Name" value={supplierForm.name} onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })} />
+                <input className={inputCls} placeholder="Code" value={supplierForm.code} onChange={(e) => setSupplierForm({ ...supplierForm, code: e.target.value })} />
+                <input className={inputCls} placeholder="Contact" value={supplierForm.contact} onChange={(e) => setSupplierForm({ ...supplierForm, contact: e.target.value })} />
+                <input className={inputCls} placeholder="Phone" value={supplierForm.phone} onChange={(e) => setSupplierForm({ ...supplierForm, phone: e.target.value })} />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleSaveSupplier} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700">Save</button>
+                <button onClick={() => setSupplierForm(null)} className="px-3 py-1.5 text-gray-500 text-xs font-medium hover:text-gray-700">Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-400 border-b border-gray-100">
+                  <th className="px-5 py-3">Name</th>
+                  <th className="px-5 py-3">Code</th>
+                  <th className="px-5 py-3 hidden md:table-cell">Contact</th>
+                  <th className="px-5 py-3 hidden md:table-cell">Phone</th>
+                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {suppliers.length === 0 ? (
+                  <tr><td colSpan={6} className="px-5 py-8 text-center text-gray-400 text-sm">No suppliers yet</td></tr>
+                ) : suppliers.map((s) => (
+                  <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-5 py-3 font-medium text-gray-900">{s.name}</td>
+                    <td className="px-5 py-3 text-gray-500">{s.code}</td>
+                    <td className="px-5 py-3 text-gray-500 hidden md:table-cell">{s.contact || '-'}</td>
+                    <td className="px-5 py-3 text-gray-500 hidden md:table-cell">{s.phone || '-'}</td>
+                    <td className="px-5 py-3">
+                      <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${s.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {s.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => setSupplierForm({ ...s })}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                        >
+                          <EditIcon size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSupplier(s.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                        >
+                          <TrashIcon size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {/* ── Sales Tab ── */}
+      {tab === 'sales' && (
+        <Card>
+          <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Sales Categories</h3>
+              <p className="text-xs text-gray-500">Categories automatically appear in Daily Closing</p>
+            </div>
+            <button
+              onClick={() => setCategoryForm({ name: '', is_active: true, sort_order: categories.length })}
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition"
+            >
+              <PlusIcon size={14} /> Add
+            </button>
+          </div>
+
+          {/* Add/Edit Form */}
+          {categoryForm && (
+            <div className="px-5 py-4 bg-blue-50 border-b border-blue-100">
+              <div className="flex items-center gap-3 mb-3">
+                <input className={`${inputCls} flex-1`} placeholder="Category name (e.g. Dining, Uber Eats)" value={categoryForm.name} onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })} autoFocus />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleSaveCategory} disabled={!categoryForm.name?.trim()} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-40">Save</button>
+                <button onClick={() => setCategoryForm(null)} className="px-3 py-1.5 text-gray-500 text-xs font-medium hover:text-gray-700">Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-400 border-b border-gray-100">
+                  <th className="px-5 py-3">Name</th>
+                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categories.length === 0 ? (
+                  <tr><td colSpan={3} className="px-5 py-8 text-center text-gray-400 text-sm">No categories yet</td></tr>
+                ) : categories.map((c) => (
+                  <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-5 py-3 font-medium text-gray-900">{c.name}</td>
+                    <td className="px-5 py-3">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await storeAPI.updateSalesCategory(c.id, { is_active: !c.is_active })
+                            fetchCategories()
+                          } catch (e) { showToast('Error toggling status') }
+                        }}
+                        className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full cursor-pointer transition ${c.is_active ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                      >
+                        {c.is_active ? 'Active' : 'Inactive'}
+                      </button>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => setCategoryForm({ ...c })}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                        >
+                          <EditIcon size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(c.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                        >
+                          <TrashIcon size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {/* ── HR Setup Tab ── */}
+      {tab === 'hr' && (
+        <div className="space-y-6">
+          {/* Placeholder Guide */}
+          <Card className="bg-blue-50 border-blue-200">
+            <div className="px-5 py-4">
+              <h3 className="text-sm font-semibold text-blue-900">DOCX Placeholder Guide</h3>
+              <p className="text-xs text-blue-700 mt-1 mb-2">Upload <strong>.docx</strong> files with placeholders below. They will be auto-filled with employee & company data during onboarding.</p>
+              <p className="text-[11px] font-semibold text-blue-800 mb-1">Auto-fill placeholders:</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-xs text-blue-800">
+                <span><code className="bg-blue-100 px-1 rounded">{'{{employee_name}}'}</code></span>
+                <span><code className="bg-blue-100 px-1 rounded">{'{{hourly_rate}}'}</code></span>
+                <span><code className="bg-blue-100 px-1 rounded">{'{{job_title}}'}</code></span>
+                <span><code className="bg-blue-100 px-1 rounded">{'{{work_type}}'}</code></span>
+                <span><code className="bg-blue-100 px-1 rounded">{'{{start_date}}'}</code></span>
+                <span><code className="bg-blue-100 px-1 rounded">{'{{company_name}}'}</code></span>
+                <span><code className="bg-blue-100 px-1 rounded">{'{{company_address}}'}</code></span>
+                <span><code className="bg-blue-100 px-1 rounded">{'{{company_phone}}'}</code></span>
+                <span><code className="bg-blue-100 px-1 rounded">{'{{company_email}}'}</code></span>
+              </div>
+              <p className="text-[11px] font-semibold text-blue-800 mt-3 mb-1">Signature markers (place where you want sign areas):</p>
+              <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs text-blue-800">
+                <span><code className="bg-orange-100 text-orange-800 px-1 rounded">{'[[SIGNATURE]]'}</code></span>
+                <span><code className="bg-orange-100 text-orange-800 px-1 rounded">{'[[INITIALS]]'}</code></span>
+                <span><code className="bg-orange-100 text-orange-800 px-1 rounded">{'[[DATE]]'}</code></span>
+              </div>
+              <p className="text-[10px] text-blue-600 mt-1">These markers will be auto-detected and shown as clickable sign areas during onboarding.</p>
+            </div>
+          </Card>
+
+          {/* Contract Templates — per work type */}
+          <Card>
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">Contract Templates</h3>
+              <p className="text-xs text-gray-500">One contract template per employment type — auto-assigned during onboarding</p>
+            </div>
+            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {[
+                { key: 'FULL_TIME', label: 'Full Time' },
+                { key: 'PART_TIME', label: 'Part Time' },
+                { key: 'CASUAL', label: 'Casual' },
+                { key: 'SALARY', label: 'Salary' },
+                { key: 'VISA_FULL_TIME', label: 'Visa Full Time' },
+              ].map(({ key, label }) => {
+                const existing = docTemplates.find((t) => t.document_type === 'CONTRACT' && t.work_type === key)
+                return (
+                  <div key={key} className="flex flex-col p-3 bg-gray-50 rounded-xl">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-900">{label}</p>
+                      <div className="flex items-center gap-1">
+                        {existing && (
+                          <button
+                            onClick={() => handleDeleteDocTemplate(existing.id)}
+                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                          >
+                            <TrashIcon size={14} />
+                          </button>
+                        )}
+                        <label className="px-2.5 py-1 bg-white border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                          {existing ? 'Replace' : 'Upload'}
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx"
+                            className="hidden"
+                            disabled={docTemplateUploading}
+                            onChange={(e) => {
+                              if (e.target.files[0]) {
+                                if (existing) handleDeleteDocTemplate(existing.id)
+                                handleUploadDocTemplate('CONTRACT', e.target.files[0], { workType: key })
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                    {existing ? (
+                      <p className="text-xs text-green-600 truncate">{existing.title}</p>
+                    ) : (
+                      <p className="text-xs text-gray-400">No template</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
+
+          {/* Job Offer — single template */}
+          <Card>
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">Job Offer Template</h3>
+              <p className="text-xs text-gray-500">Single template used for all new hire job offers</p>
+            </div>
+            <div className="p-5">
+              {(() => {
+                const existing = docTemplates.find((t) => t.document_type === 'JOB_OFFER')
+                return (
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">Job Offer</p>
+                      {existing ? (
+                        <p className="text-xs text-green-600 mt-0.5">{existing.title}</p>
+                      ) : (
+                        <p className="text-xs text-gray-400 mt-0.5">No template uploaded</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 ml-3">
+                      {existing && (
+                        <button
+                          onClick={() => handleDeleteDocTemplate(existing.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                        >
+                          <TrashIcon size={14} />
+                        </button>
+                      )}
+                      <label className={`${btnSecondary} cursor-pointer text-xs`}>
+                        {existing ? 'Replace' : 'Upload'}
+                        <input
+                          type="file"
+                          accept=".pdf,.doc,.docx"
+                          className="hidden"
+                          disabled={docTemplateUploading}
+                          onChange={(e) => {
+                            if (e.target.files[0]) {
+                              if (existing) handleDeleteDocTemplate(existing.id)
+                              handleUploadDocTemplate('JOB_OFFER', e.target.files[0])
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          </Card>
+
+          {/* Job Descriptions — per job role */}
+          <Card>
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">Job Descriptions</h3>
+              <p className="text-xs text-gray-500">Upload a job description per role — auto-assigned based on employee's job title</p>
+            </div>
+            <div className="p-5 space-y-2">
+              {[
+                { key: 'STORE_MANAGER', label: 'Store Manager' },
+                { key: 'ASSISTANT_MANAGER', label: 'Assistant Manager' },
+                { key: 'SUPERVISOR', label: 'Supervisor' },
+                { key: 'BARISTA', label: 'Barista' },
+                { key: 'HEAD_CHEF', label: 'Head Chef' },
+                { key: 'CHEF', label: 'Chef' },
+                { key: 'COOK', label: 'Cook' },
+                { key: 'KITCHEN_HAND', label: 'Kitchen Hand' },
+                { key: 'SERVER', label: 'Server' },
+                { key: 'CASHIER', label: 'Cashier' },
+                { key: 'ALL_ROUNDER', label: 'All Rounder' },
+                { key: 'CLEANER', label: 'Cleaner' },
+                { key: 'OTHER', label: 'Other' },
+              ].map(({ key, label }) => {
+                const existing = docTemplates.find((t) => t.document_type === 'JOB_DESCRIPTION' && t.job_title === key)
+                return (
+                  <div key={key} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{label}</p>
+                      {existing ? (
+                        <p className="text-xs text-green-600 mt-0.5 truncate">{existing.title}</p>
+                      ) : (
+                        <p className="text-xs text-gray-400 mt-0.5">No description</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 ml-3">
+                      {existing && (
+                        <button
+                          onClick={() => handleDeleteDocTemplate(existing.id)}
+                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                        >
+                          <TrashIcon size={14} />
+                        </button>
+                      )}
+                      <label className="px-2.5 py-1 bg-white border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                        {existing ? 'Replace' : 'Upload'}
+                        <input
+                          type="file"
+                          accept=".pdf,.doc,.docx"
+                          className="hidden"
+                          disabled={docTemplateUploading}
+                          onChange={(e) => {
+                            if (e.target.files[0]) {
+                              if (existing) handleDeleteDocTemplate(existing.id)
+                              handleUploadDocTemplate('JOB_DESCRIPTION', e.target.files[0], { jobTitle: key })
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
+
+          {/* Training Materials */}
+          <Card>
+            <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Training Materials</h3>
+                <p className="text-xs text-gray-500">Upload training PDFs or add video links for onboarding</p>
+              </div>
+              <button
+                onClick={() => setTrainingForm({ module_type: 'SAFETY', title: '', description: '', video_url: '', file_obj: null })}
+                className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition"
+              >
+                <PlusIcon size={14} /> Add
+              </button>
+            </div>
+
+            {/* Add/Edit Form */}
+            {trainingForm && (
+              <div className="px-5 py-4 bg-blue-50 border-b border-blue-100">
+                <div className="space-y-3 mb-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">Type</label>
+                      <select
+                        className={inputCls}
+                        value={trainingForm.module_type}
+                        onChange={(e) => setTrainingForm({ ...trainingForm, module_type: e.target.value })}
+                      >
+                        {TRAINING_MODULE_TYPES.map((t) => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">Title</label>
+                      <input
+                        className={inputCls}
+                        placeholder="e.g. Fire Safety Procedures"
+                        value={trainingForm.title}
+                        onChange={(e) => setTrainingForm({ ...trainingForm, title: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Video URL (optional)</label>
+                    <input
+                      className={inputCls}
+                      placeholder="https://youtube.com/..."
+                      value={trainingForm.video_url}
+                      onChange={(e) => setTrainingForm({ ...trainingForm, video_url: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">PDF Material (optional)</label>
+                    <label className="flex items-center gap-2 px-3 py-2.5 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-blue-300 hover:bg-blue-50/50 transition">
+                      <CameraIcon size={16} className="text-gray-400" />
+                      <span className="text-sm text-gray-500">
+                        {trainingForm.file_obj ? trainingForm.file_obj.name : 'Choose file...'}
+                      </span>
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        className="hidden"
+                        onChange={(e) => setTrainingForm({ ...trainingForm, file_obj: e.target.files[0] || null })}
+                      />
+                    </label>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveTraining}
+                    disabled={!trainingForm.title}
+                    className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                  <button onClick={() => setTrainingForm(null)} className="px-3 py-1.5 text-gray-500 text-xs font-medium hover:text-gray-700">Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {/* List */}
+            <div className="divide-y divide-gray-50">
+              {trainingModules.length === 0 ? (
+                <div className="px-5 py-8 text-center text-gray-400 text-sm">No training modules yet</div>
+              ) : trainingModules.map((m) => (
+                <div key={m.id} className="px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
+                        m.module_type === 'SAFETY' ? 'bg-red-50 text-red-700' :
+                        m.module_type === 'FCP' ? 'bg-blue-50 text-blue-700' :
+                        m.module_type === 'HAZARD' ? 'bg-amber-50 text-amber-700' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {m.module_type_display}
+                      </span>
+                      <span className="text-sm font-medium text-gray-900 truncate">{m.title}</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1">
+                      {m.file && <span className="text-xs text-green-600">PDF attached</span>}
+                      {m.video_url && <span className="text-xs text-blue-600">Video link</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 ml-3">
+                    <button
+                      onClick={() => setTrainingForm({
+                        id: m.id, module_type: m.module_type, title: m.title,
+                        description: m.description || '', video_url: m.video_url || '', file_obj: null
+                      })}
+                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                    >
+                      <EditIcon size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTraining(m.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                    >
+                      <TrashIcon size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Food Safety Tab ── */}
+      {tab === 'safety' && (
+        <div className="space-y-6">
+          {/* Temperature Locations */}
+          <Card>
+            <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Temperature Check Locations</h3>
+                <p className="text-xs text-gray-500">Define locations for temperature monitoring (fridge, freezer, etc.)</p>
+              </div>
+              <button
+                onClick={() => setTempForm({ name: '', standard_min: '', standard_max: '', is_active: true, sort_order: tempLocations.length })}
+                className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition"
+              >
+                <PlusIcon size={14} /> Add
+              </button>
+            </div>
+
+            {/* Add/Edit Form */}
+            {tempForm && (
+              <div className="px-5 py-4 bg-blue-50 border-b border-blue-100">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                  <input className={inputCls} placeholder="Location name" value={tempForm.name} onChange={(e) => setTempForm({ ...tempForm, name: e.target.value })} />
+                  <input className={inputCls} type="number" step="0.1" placeholder="Min °C" value={tempForm.standard_min} onChange={(e) => setTempForm({ ...tempForm, standard_min: e.target.value })} />
+                  <input className={inputCls} type="number" step="0.1" placeholder="Max °C" value={tempForm.standard_max} onChange={(e) => setTempForm({ ...tempForm, standard_max: e.target.value })} />
+                  <input className={inputCls} type="number" placeholder="Order" value={tempForm.sort_order} onChange={(e) => setTempForm({ ...tempForm, sort_order: Number(e.target.value) })} />
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={handleSaveTempLocation} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700">Save</button>
+                  <button onClick={() => setTempForm(null)} className="px-3 py-1.5 text-gray-500 text-xs font-medium hover:text-gray-700">Cancel</button>
+                </div>
+              </div>
+            )}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-400 border-b border-gray-100">
+                    <th className="px-5 py-3">Location</th>
+                    <th className="px-5 py-3">Min (°C)</th>
+                    <th className="px-5 py-3">Max (°C)</th>
+                    <th className="px-5 py-3">Status</th>
+                    <th className="px-5 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tempLocations.length === 0 ? (
+                    <tr><td colSpan={5} className="px-5 py-8 text-center text-gray-400 text-sm">No locations yet</td></tr>
+                  ) : tempLocations.map((loc) => (
+                    <tr key={loc.id} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="px-5 py-3 font-medium text-gray-900">{loc.name}</td>
+                      <td className="px-5 py-3 text-gray-500">{loc.standard_min != null ? `${loc.standard_min}°` : '-'}</td>
+                      <td className="px-5 py-3 text-gray-500">{loc.standard_max != null ? `${loc.standard_max}°` : '-'}</td>
+                      <td className="px-5 py-3">
+                        <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${loc.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {loc.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setTempForm({ ...loc, standard_min: loc.standard_min ?? '', standard_max: loc.standard_max ?? '' })}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                          >
+                            <EditIcon size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTempLocation(loc.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                          >
+                            <TrashIcon size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          {/* MPI Record Types */}
+          <Card>
+            <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">MPI Record Types</h3>
+                <p className="text-xs text-gray-500">NZ MPI food safety record types — toggle on/off per store</p>
+              </div>
+              {recordConfigs.length === 0 && (
+                <button
+                  onClick={handleInitializeConfigs}
+                  disabled={recordConfigsLoading}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                >
+                  {recordConfigsLoading ? 'Setting up...' : 'Initialize'}
+                </button>
+              )}
+            </div>
+
+            {recordConfigs.length === 0 ? (
+              <div className="px-5 py-8 text-center text-gray-400 text-sm">
+                No record types configured. Click "Initialize" to set up MPI record types.
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {[
+                  { key: 'DAILY', label: 'Daily', emoji: '📋' },
+                  { key: 'WEEKLY', label: 'Weekly', emoji: '📅' },
+                  { key: 'MONTHLY', label: 'Monthly', emoji: '📆' },
+                  { key: 'EVENT', label: 'Event-based', emoji: '⚠️' },
+                  { key: 'SETUP', label: 'Setup / Reference', emoji: '📌' },
+                  { key: 'SPECIALIST', label: 'Specialist', emoji: '🔬' },
+                ].map(({ key, label, emoji }) => {
+                  const configs = groupedConfigs[key] || []
+                  if (configs.length === 0) return null
+
+                  const isSpecialist = key === 'SPECIALIST'
+                  const showList = isSpecialist ? specialistOpen : true
+
+                  return (
+                    <div key={key} className="px-5 py-3">
+                      <button
+                        onClick={() => isSpecialist && setSpecialistOpen(!specialistOpen)}
+                        className={`flex items-center gap-2 mb-2 w-full text-left ${isSpecialist ? 'cursor-pointer' : 'cursor-default'}`}
+                      >
+                        <span className="text-sm">{emoji}</span>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</span>
+                        <span className="text-xs text-gray-400">({configs.length})</span>
+                        {isSpecialist && (
+                          <span className="text-xs text-gray-400 ml-auto">{specialistOpen ? '▲' : '▼'}</span>
+                        )}
+                      </button>
+
+                      {showList && (
+                        <div className="space-y-1.5">
+                          {configs.map((cfg) => {
+                            const rt = cfg.record_type_detail
+                            return (
+                              <div
+                                key={cfg.id}
+                                className={`flex items-center justify-between py-2 px-3 rounded-lg ${
+                                  cfg.is_enabled ? 'bg-blue-50/50' : 'bg-gray-50'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                  {/* Toggle */}
+                                  <button
+                                    onClick={() => handleToggleConfig(cfg.id)}
+                                    className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
+                                      cfg.is_enabled ? 'bg-blue-600' : 'bg-gray-300'
+                                    }`}
+                                  >
+                                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                      cfg.is_enabled ? 'translate-x-4' : 'translate-x-0.5'
+                                    }`} />
+                                  </button>
+                                  <div className="min-w-0">
+                                    <p className={`text-sm truncate ${cfg.is_enabled ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
+                                      {rt?.name || 'Unknown'}
+                                    </p>
+                                    {rt?.name_ko && (
+                                      <p className="text-xs text-gray-400 truncate">{rt.name_ko}</p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Role selector */}
+                                {cfg.is_enabled && (
+                                  <select
+                                    value={cfg.assigned_role}
+                                    onChange={(e) => handleConfigRoleChange(cfg.id, e.target.value)}
+                                    className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 ml-2"
+                                  >
+                                    <option value="EMPLOYEE">Employee</option>
+                                    <option value="MANAGER">Manager</option>
+                                    <option value="BOTH">Both</option>
+                                  </select>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </Card>
+
+          {/* Checklist Templates */}
+          <Card>
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">Checklist Templates</h3>
+              <p className="text-xs text-gray-500">Safety checklists for daily operations</p>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-400 border-b border-gray-100">
+                    <th className="px-5 py-3">Name</th>
+                    <th className="px-5 py-3">Stage</th>
+                    <th className="px-5 py-3">Items</th>
+                    <th className="px-5 py-3">Status</th>
+                    <th className="px-5 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {templates.length === 0 ? (
+                    <tr><td colSpan={5} className="px-5 py-8 text-center text-gray-400 text-sm">No templates yet</td></tr>
+                  ) : templates.map((t) => (
+                    <tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="px-5 py-3 font-medium text-gray-900">{t.name}</td>
+                      <td className="px-5 py-3 text-gray-500 capitalize">{t.stage}</td>
+                      <td className="px-5 py-3 text-gray-500">{Array.isArray(t.items) ? t.items.length : 0}</td>
+                      <td className="px-5 py-3">
+                        <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${t.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {t.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          onClick={() => handleDeleteTemplate(t.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                        >
+                          <TrashIcon size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Integrations Tab ── */}
+      {tab === 'integrations' && (
+        <div className="space-y-6">
+          <Card>
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">Third-Party Integrations</h3>
+              <p className="text-xs text-gray-500">Connect your POS and accounting systems</p>
+            </div>
+          </Card>
+
+          {['GOMENU', 'LIGHTSPEED', 'XERO'].map((serviceKey) => {
+            const info = INTEGRATION_INFO[serviceKey]
+            const integration = integrations.find((i) => i.service === serviceKey)
+            const isConnected = integration?.is_connected
+            const isExpanded = connectingService === serviceKey
+            const colorMap = { orange: 'orange', blue: 'blue', green: 'green' }
+            const c = colorMap[info.color] || 'gray'
+            const isSyncing = syncingService === serviceKey
+
+            return (
+              <Card key={serviceKey}>
+                <div className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className={`w-12 h-12 rounded-xl bg-${c}-50 flex items-center justify-center text-2xl`}>
+                        {info.icon}
+                      </div>
+                      <div>
+                        <h3 className="text-base font-semibold text-gray-900">{info.name}</h3>
+                        <p className="text-sm text-gray-500 mt-0.5">{info.description}</p>
+                        {isConnected && integration.connected_at && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            Connected {new Date(integration.connected_at).toLocaleDateString('en-NZ')}
+                            {integration.connected_by_name && ` by ${integration.connected_by_name}`}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isConnected ? (
+                        <>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-green-50 text-green-700 rounded-full">
+                            <CheckCircleIcon size={12} /> Connected
+                          </span>
+                          {info.syncable && (
+                            <button
+                              onClick={() => handleSync(serviceKey)}
+                              disabled={isSyncing}
+                              className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
+                            >
+                              {isSyncing ? 'Syncing...' : 'Sync Now'}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleTestConnection(serviceKey)}
+                            disabled={testingService === serviceKey}
+                            className="px-3 py-1.5 text-xs font-medium border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            {testingService === serviceKey ? 'Testing...' : 'Test'}
+                          </button>
+                          <button
+                            onClick={() => handleDisconnect(serviceKey)}
+                            className="px-3 py-1.5 text-xs font-medium border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
+                          >
+                            Disconnect
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setConnectingService(isExpanded ? null : serviceKey)
+                            setConnectForm({})
+                          }}
+                          className={`px-4 py-1.5 text-xs font-medium rounded-lg transition ${
+                            isExpanded
+                              ? 'bg-gray-100 text-gray-600'
+                              : `bg-${c}-600 text-white hover:bg-${c}-700`
+                          }`}
+                        >
+                          {isExpanded ? 'Cancel' : 'Connect'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sync Result */}
+                  {isConnected && info.syncable && syncResult && (
+                    <div className={`mt-4 p-3 rounded-lg text-sm ${
+                      syncResult.success
+                        ? 'bg-green-50 text-green-800 border border-green-200'
+                        : 'bg-red-50 text-red-800 border border-red-200'
+                    }`}>
+                      <div className="font-medium mb-1">
+                        {syncResult.success ? 'Sync Completed' : 'Sync Failed'}
+                      </div>
+                      <p className="text-xs">
+                        {syncResult.success
+                          ? syncResult.message
+                          : (syncResult.error || 'Unknown error')}
+                      </p>
+                      {syncResult.success && syncResult.pos_total && (
+                        <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                          <div>
+                            <span className="text-gray-500">Card: </span>
+                            <span className="font-semibold">${syncResult.pos_card}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Cash: </span>
+                            <span className="font-semibold">${syncResult.pos_cash}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Total: </span>
+                            <span className="font-semibold">${syncResult.pos_total}</span>
+                          </div>
+                        </div>
+                      )}
+                      {syncResult.success && syncResult.store_name && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Store: {syncResult.store_name} | Date: {syncResult.date}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Connect Form */}
+                  {isExpanded && !isConnected && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {info.fields.map((field) => (
+                          <div key={field.key}>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">{field.label}</label>
+                            <input
+                              type={field.type}
+                              value={connectForm[field.key] || ''}
+                              onChange={(e) => setConnectForm({ ...connectForm, [field.key]: e.target.value })}
+                              placeholder={field.placeholder}
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-4 flex justify-end">
+                        <button
+                          onClick={() => handleConnect(serviceKey)}
+                          className={`px-4 py-2 text-sm font-medium bg-${c}-600 text-white rounded-lg hover:bg-${c}-700 transition`}
+                        >
+                          Connect {info.name}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}

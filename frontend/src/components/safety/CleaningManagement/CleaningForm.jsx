@@ -93,7 +93,7 @@ export default function CleaningForm() {
       {/* 폼 */}
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 기본 정보 */}
-        <div className="bg-white rounded-lg shadow-md p-6 space-y-4">
+        <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">기본 정보</h3>
 
           <div>
@@ -109,7 +109,7 @@ export default function CleaningForm() {
         </div>
 
         {/* 청소 영역 */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">청소 영역</h3>
           <p className="text-sm text-gray-600 mb-4">청소한 영역을 모두 선택하세요</p>
 
@@ -144,7 +144,7 @@ export default function CleaningForm() {
         </div>
 
         {/* 추가 정보 */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">추가 정보</h3>
 
           <div>

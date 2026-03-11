@@ -101,7 +101,7 @@ export default function VerificationForm() {
       {/* 폼 */}
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 기본 정보 */}
-        <div className="bg-white rounded-lg shadow-md p-6 space-y-4">
+        <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">검증 정보</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -144,7 +144,7 @@ export default function VerificationForm() {
         </div>
 
         {/* 체크리스트 */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">검증 체크리스트</h3>
 
           <div className="space-y-3 mb-4">
@@ -191,7 +191,7 @@ export default function VerificationForm() {
         </div>
 
         {/* 발견사항 및 개선 계획 */}
-        <div className="bg-white rounded-lg shadow-md p-6 space-y-4">
+        <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">발견사항 및 개선</h3>
 
           <div>

@@ -81,7 +81,7 @@ export default function ChecklistList() {
       )}
 
       {/* 필터 및 액션 */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex flex-col gap-4">
           {/* 액션 버튼 */}
           <div className="flex justify-between items-center">
@@ -134,7 +134,7 @@ export default function ChecklistList() {
       </div>
 
       {/* 체크리스트 목록 */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         {checklists.length === 0 ? (
           <div className="p-12 text-center">
             <p className="text-gray-600 text-lg">체크리스트가 없습니다.</p>

@@ -2,15 +2,21 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext'
 import LoginPage from './components/auth/LoginPage'
 import ProtectedRoute from './components/auth/ProtectedRoute'
+import Layout from './components/Layout'
 import Dashboard from './components/dashboard/Dashboard'
 import DailyClosingForm from './components/closing/DailyClosingForm'
 import ClosingList from './components/closing/ClosingList'
+import CashUpPage from './components/closing/CashUpPage'
 import SalesAnalysis from './components/sales/SalesAnalysis'
 import StoreReport from './components/reports/StoreReport'
-import OnboardingList from './components/hr/OnboardingList'
+import SkyReport from './components/reports/SkyReport'
+import HRHub from './components/hr/HRHub'
 import OnboardingDetail from './components/hr/OnboardingDetail'
+import AcceptInvite from './components/hr/AcceptInvite'
 import MyPayslips from './components/payroll/MyPayslips'
 import PayslipDetail from './components/payroll/PayslipDetail'
+import PayrollHub from './components/payroll/PayrollHub'
+import MyLeave from './components/payroll/MyLeave'
 import SafetyDashboard from './components/safety/SafetyDashboard'
 import ChecklistList from './components/safety/DailyChecklist/ChecklistList'
 import ChecklistForm from './components/safety/DailyChecklist/ChecklistForm'
@@ -34,359 +40,534 @@ import DocumentLibrary from './components/documents/DocumentLibrary'
 import DocumentUpload from './components/documents/DocumentUpload'
 import DocumentDetail from './components/documents/DocumentDetail'
 import DocumentVersionHistory from './components/documents/DocumentVersionHistory'
+import MyTasks from './components/tasks/MyTasks'
+import TimeTracking from './components/timesheet/TimeTracking'
+import MyRoster from './components/timesheet/MyRoster'
+import MyPage from './components/profile/MyPage'
+import StoreSettings from './components/settings/StoreSettings'
+import RosterManagement from './components/manager/RosterManagement'
+import TimesheetReview from './components/manager/TimesheetReview'
+import AssignTasks from './components/manager/AssignTasks'
+import ShiftTemplateSettings from './components/manager/ShiftTemplateSettings'
+import InspectionReport from './components/safety/inspection/InspectionReport'
+import InquiriesManager from './components/hr/InquiriesManager'
+import GetStartedPage from './components/auth/GetStartedPage'
+import StoreApplications from './components/admin/StoreApplications'
+
+// Helper component to wrap protected routes with Layout
+function ProtectedWithLayout({ children }) {
+  return (
+    <ProtectedRoute>
+      <Layout>{children}</Layout>
+    </ProtectedRoute>
+  )
+}
 
 function App() {
   return (
     <Router>
       <AuthProvider>
         <Routes>
-          {/* 로그인 페이지 */}
+          {/* Login page (no sidebar) */}
           <Route path="/login" element={<LoginPage />} />
 
-          {/* 대시보드 (보호됨) */}
+          {/* Public: Get Started (store application) */}
+          <Route path="/get-started" element={<GetStartedPage />} />
+
+          {/* Public: Accept Invite (no sidebar) */}
+          <Route path="/invite/:inviteCode" element={<AcceptInvite />} />
+
+          {/* Dashboard (with sidebar) */}
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <Dashboard />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 클로징 목록 (보호됨) */}
+          {/* Daily Closing (with sidebar) */}
           <Route
             path="/closing"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <ClosingList />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 클로징 폼 (보호됨) */}
           <Route
             path="/closing/form"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <DailyClosingForm />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 매출 분석 (보호됨) */}
+          {/* Cash Up (manager only) */}
+          <Route
+            path="/cashup"
+            element={
+              <ProtectedWithLayout>
+                <CashUpPage />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* HR Cash redirect to Cash Up */}
+          <Route path="/hr-cash" element={<Navigate to="/cashup" replace />} />
+
+          {/* Sales Analysis (with sidebar) */}
           <Route
             path="/sales"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <SalesAnalysis />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 매장 리포트 (보호됨) */}
+          {/* Reports (with sidebar) */}
           <Route
             path="/reports"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <StoreReport />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* HR/온보딩 목록 (보호됨) */}
+          {/* Sky Report (with sidebar) */}
+          <Route
+            path="/sky-report"
+            element={
+              <ProtectedWithLayout>
+                <SkyReport />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* HR Management (with sidebar) */}
           <Route
             path="/hr"
             element={
-              <ProtectedRoute>
-                <OnboardingList />
-              </ProtectedRoute>
+              <ProtectedWithLayout>
+                <HRHub />
+              </ProtectedWithLayout>
             }
           />
 
-          {/* HR/온보딩 상세 (보호됨) */}
           <Route
-            path="/hr/:id"
+            path="/hr/onboarding/:id"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <OnboardingDetail />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 급여명세서 목록 (보호됨) */}
+          {/* Payroll Manager Hub */}
+          <Route
+            path="/manager/payroll"
+            element={
+              <ProtectedWithLayout>
+                <PayrollHub />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* My Leave (employee) */}
+          <Route
+            path="/leave"
+            element={
+              <ProtectedWithLayout>
+                <MyLeave />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Payroll / My Payslips (with sidebar) */}
           <Route
             path="/payroll"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <MyPayslips />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 급여명세서 상세 (보호됨) */}
           <Route
             path="/payroll/:id"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <PayslipDetail />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 메인 대시보드 (보호됨) */}
+          {/* My Tasks (with sidebar) */}
+          <Route
+            path="/tasks"
+            element={
+              <ProtectedWithLayout>
+                <MyTasks />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Time Clock (with sidebar) */}
+          <Route
+            path="/timesheet"
+            element={
+              <ProtectedWithLayout>
+                <TimeTracking />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* My Roster (with sidebar) */}
+          <Route
+            path="/roster"
+            element={
+              <ProtectedWithLayout>
+                <MyRoster />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* My Page (with sidebar) */}
+          <Route
+            path="/mypage"
+            element={
+              <ProtectedWithLayout>
+                <MyPage />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Store Settings (with sidebar) */}
+          <Route
+            path="/store-settings"
+            element={
+              <ProtectedWithLayout>
+                <StoreSettings />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Manager Dashboard (with sidebar) */}
+          <Route
+            path="/manager"
+            element={
+              <ProtectedWithLayout>
+                <Dashboard />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Manager - Roster Management */}
+          <Route
+            path="/manager/roster"
+            element={
+              <ProtectedWithLayout>
+                <RosterManagement />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Manager - Roster Template Settings */}
+          <Route
+            path="/manager/roster/settings"
+            element={
+              <ProtectedWithLayout>
+                <ShiftTemplateSettings />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Manager - Timesheet Review */}
+          <Route
+            path="/manager/timesheet-review"
+            element={
+              <ProtectedWithLayout>
+                <TimesheetReview />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Manager - Assign Tasks */}
+          <Route
+            path="/manager/assign-tasks"
+            element={
+              <ProtectedWithLayout>
+                <AssignTasks />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Manager - Inquiries */}
+          <Route
+            path="/inquiries"
+            element={
+              <ProtectedWithLayout>
+                <InquiriesManager />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Admin - Store Applications */}
+          <Route
+            path="/admin/applications"
+            element={
+              <ProtectedWithLayout>
+                <StoreApplications />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Food Safety Inspection Report */}
+          <Route
+            path="/safety/inspection"
+            element={
+              <ProtectedWithLayout>
+                <InspectionReport />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Food Safety (with sidebar) */}
           <Route
             path="/safety"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <SafetyDashboard />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 체크리스트 목록 (보호됨) */}
           <Route
             path="/safety/checklists"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <ChecklistList />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 새 체크리스트 (보호됨) */}
           <Route
             path="/safety/checklists/new"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <ChecklistForm />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 체크리스트 상세 (보호됨) */}
           <Route
             path="/safety/checklists/:id"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <ChecklistDetail />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 체크리스트 편집 (보호됨) */}
           <Route
             path="/safety/checklists/:id/edit"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <ChecklistForm />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 온도 목록 (보호됨) */}
           <Route
             path="/safety/temperatures"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <TemperatureList />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 온도 입력 (보호됨) */}
           <Route
             path="/safety/temperatures/new"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <TemperatureForm />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 온도 경고 (보호됨) */}
           <Route
             path="/safety/temperature-alerts"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <TemperatureAlert />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 사건 목록 (보호됨) */}
           <Route
             path="/safety/incidents"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <IncidentList />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 새 사건 보고 (보호됨) */}
           <Route
             path="/safety/incidents/new"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <IncidentForm />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 사건 상세 (보호됨) */}
           <Route
             path="/safety/incidents/:id"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <IncidentDetail />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 사건 편집 (보호됨) */}
           <Route
             path="/safety/incidents/:id/edit"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <IncidentForm />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 청소 기록 (보호됨) */}
           <Route
             path="/safety/cleaning"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <CleaningForm />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 주간 청소 일정 (보호됨) */}
           <Route
             path="/safety/cleaning/schedule"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <CleaningSchedule />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 청소 이력 (보호됨) */}
           <Route
             path="/safety/cleaning/history"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <CleaningHistory />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 교육 목록 (보호됨) */}
           <Route
             path="/safety/training"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <TrainingList />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 새 교육 (보호됨) */}
           <Route
             path="/safety/training/new"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <TrainingForm />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 직원 교육 현황 (보호됨) */}
           <Route
             path="/safety/training/status"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <TrainingStatus />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 검증 작성 (보호됨) */}
           <Route
             path="/safety/verifications"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <VerificationForm />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 검증 기록 목록 (보호됨) */}
           <Route
             path="/safety/verifications/list"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <VerificationList />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 음식 안전 관리 - 검증 보고서 (보호됨) */}
           <Route
             path="/safety/verifications/:id"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <VerificationReport />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 자료 라이브러리 (보호됨) */}
+          {/* Documents (with sidebar) */}
           <Route
             path="/documents"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <DocumentLibrary />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 문서 업로드 (보호됨) */}
           <Route
             path="/documents/upload"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <DocumentUpload />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 문서 상세 (보호됨) */}
           <Route
             path="/documents/:id"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <DocumentDetail />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 문서 버전 이력 (보호됨) */}
           <Route
             path="/documents/:id/versions"
             element={
-              <ProtectedRoute>
+              <ProtectedWithLayout>
                 <DocumentVersionHistory />
-              </ProtectedRoute>
+              </ProtectedWithLayout>
             }
           />
 
-          {/* 루트 경로 - 대시보드로 리다이렉트 */}
+          {/* Root path - redirect to dashboard */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-          {/* 존재하지 않는 경로 - 대시보드로 리다이렉트 */}
+          {/* 404 - redirect to dashboard */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>

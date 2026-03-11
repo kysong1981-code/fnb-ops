@@ -185,9 +185,11 @@ CORS_ALLOW_HEADERS = [
 # ============================================================================
 # JWT CONFIGURATION
 # ============================================================================
+from datetime import timedelta as td
+
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': config('JWT_ACCESS_LIFETIME', default=5, cast=int),  # minutes
-    'REFRESH_TOKEN_LIFETIME': config('JWT_REFRESH_LIFETIME', default=7, cast=int),  # days
+    'ACCESS_TOKEN_LIFETIME': td(minutes=config('JWT_ACCESS_LIFETIME', default=60, cast=int)),
+    'REFRESH_TOKEN_LIFETIME': td(days=config('JWT_REFRESH_LIFETIME', default=7, cast=int)),
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
 }

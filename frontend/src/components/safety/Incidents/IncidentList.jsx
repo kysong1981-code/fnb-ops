@@ -122,25 +122,25 @@ export default function IncidentList() {
 
       {/* 요약 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
+        <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-blue-500">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">전체 사건</h3>
           <div className="text-3xl font-bold text-blue-600">{incidents.length}</div>
           <p className="text-sm text-gray-600 mt-2">보고된 사건</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-500">
+        <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-orange-500">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">미해결</h3>
           <div className="text-3xl font-bold text-orange-600">{openCount}</div>
           <p className="text-sm text-gray-600 mt-2">해결 대기</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-500">
+        <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-red-500">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">위험</h3>
           <div className="text-3xl font-bold text-red-600">{criticalCount}</div>
           <p className="text-sm text-gray-600 mt-2">심각한 사건</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
+        <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-green-500">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">해결율</h3>
           <div className="text-3xl font-bold text-green-600">
             {incidents.length > 0
@@ -155,7 +155,7 @@ export default function IncidentList() {
       </div>
 
       {/* 필터 */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">필터</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -211,7 +211,7 @@ export default function IncidentList() {
       {/* 사건 목록 */}
       <div className="space-y-4">
         {incidents.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-12 text-center">
+          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
             <p className="text-gray-600 text-lg">보고된 사건이 없습니다.</p>
             <p className="text-green-600 font-semibold mt-2">✓ 시스템 정상</p>
           </div>
@@ -219,7 +219,7 @@ export default function IncidentList() {
           incidents.map((incident) => (
             <div
               key={incident.id}
-              className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition border-l-4 border-gray-300"
+              className="bg-white rounded-lg shadow-sm p-6 hover:shadow-lg transition border-l-4 border-gray-300"
             >
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
                 {/* 제목 및 설명 */}

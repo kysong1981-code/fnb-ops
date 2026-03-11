@@ -1,29 +1,29 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import api from '../services/api'
 
-// Context 생성
+// Create Context
 const AuthContext = createContext()
 
-// AuthProvider 컴포넌트
+// AuthProvider component
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [token, setToken] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // 초기화: localStorage에서 토큰 복원
+  // Initialization: restore token from localStorage
   useEffect(() => {
     const storedToken = localStorage.getItem('access_token')
     if (storedToken) {
       setToken(storedToken)
-      // 토큰이 유효한지 확인하기 위해 프로필 조회
+      // Fetch profile to verify token validity
       fetchUserProfile(storedToken)
     } else {
       setLoading(false)
     }
   }, [])
 
-  // 사용자 프로필 조회
+  // Fetch user profile
   const fetchUserProfile = async (accessToken) => {
     try {
       const response = await api.get('/auth/profile/', {
@@ -34,7 +34,7 @@ export function AuthProvider({ children }) {
       setUser(response.data.profile)
       setError(null)
     } catch (err) {
-      console.error('프로필 조회 실패:', err)
+      console.error('Failed to fetch profile:', err)
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
       setToken(null)
@@ -44,31 +44,37 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // 로그인
-  const login = async (username, password) => {
+  // Login (email-based)
+  const login = async (email, password) => {
     setLoading(true)
     setError(null)
     try {
       const response = await api.post('/auth/token/', {
-        username,
+        email,
         password,
       })
 
       const { access, refresh } = response.data
 
-      // 토큰 저장
+      // Save tokens
       localStorage.setItem('access_token', access)
       localStorage.setItem('refresh_token', refresh)
       setToken(access)
 
-      // 프로필 조회
-      await fetchUserProfile(access)
+      // Attempt to fetch profile (ignore if it fails)
+      try {
+        await fetchUserProfile(access)
+      } catch (profileErr) {
+        console.warn('Failed to fetch profile (ignoring and continuing):', profileErr)
+        setLoading(false)
+      }
 
       return { success: true }
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || '로그인 실패'
+      const errData = err.response?.data
+      const errorMsg = errData?.detail || errData?.non_field_errors?.[0] || (Array.isArray(errData) ? errData[0] : null) || 'Login failed'
       setError(errorMsg)
-      console.error('로그인 에러:', err)
+      console.error('Login error:', err)
       return { success: false, error: errorMsg }
     } finally {
       setLoading(false)
@@ -82,19 +88,19 @@ export function AuthProvider({ children }) {
     try {
       const response = await api.post('/auth/register/', userData)
 
-      // 회원가입 후 자동 로그인
+      // Auto-login after registration
       return await login(userData.username, userData.password)
     } catch (err) {
-      const errorMsg = err.response?.data?.error || '회원가입 실패'
+      const errorMsg = err.response?.data?.error || 'Registration failed'
       setError(errorMsg)
-      console.error('회원가입 에러:', err)
+      console.error('Registration error:', err)
       return { success: false, error: errorMsg }
     } finally {
       setLoading(false)
     }
   }
 
-  // 로그아웃
+  // Logout
   const logout = () => {
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
@@ -103,7 +109,22 @@ export function AuthProvider({ children }) {
     setError(null)
   }
 
-  // 권한 확인
+  // Refresh user profile (e.g. after settings change)
+  const refreshProfile = async () => {
+    const storedToken = localStorage.getItem('access_token')
+    if (storedToken) {
+      await fetchUserProfile(storedToken)
+    }
+  }
+
+  // Check if a feature module is enabled for this organization
+  const isModuleEnabled = (moduleKey) => {
+    const modules = user?.organization_detail?.enabled_modules
+    if (!modules || modules.length === 0) return true  // fallback: all enabled
+    return modules.includes(moduleKey)
+  }
+
+  // Check permissions
   const hasPermission = async (resource, action) => {
     if (!token) return false
 
@@ -119,7 +140,7 @@ export function AuthProvider({ children }) {
       )
       return response.data.has_permission
     } catch (err) {
-      console.error('권한 확인 실패:', err)
+      console.error('Permission check failed:', err)
       return false
     }
   }
@@ -133,6 +154,8 @@ export function AuthProvider({ children }) {
     register,
     logout,
     hasPermission,
+    isModuleEnabled,
+    refreshProfile,
     isAuthenticated: !!token && !!user,
   }
 

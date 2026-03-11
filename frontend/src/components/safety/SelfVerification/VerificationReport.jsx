@@ -119,7 +119,7 @@ export default function VerificationReport() {
       )}
 
       {/* 규정 준수 점수 카드 */}
-      <div className="bg-white rounded-lg shadow-md p-8">
+      <div className="bg-white rounded-lg shadow-sm p-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* 점수 원형 */}
           <div className="flex flex-col items-center justify-center">
@@ -193,7 +193,7 @@ export default function VerificationReport() {
       </div>
 
       {/* 체크리스트 섹션 */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">검증 체크리스트</h3>
         <div className="space-y-2">
           {verification.responses && Object.entries(verification.responses).map(([key, value]) => (
@@ -223,7 +223,7 @@ export default function VerificationReport() {
       </div>
 
       {/* 발견사항 */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">발견사항</h3>
         {verification.findings ? (
           <div className="p-4 bg-gray-50 rounded border-l-4 border-blue-500">
@@ -237,7 +237,7 @@ export default function VerificationReport() {
       </div>
 
       {/* 개선 계획 */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">개선 계획</h3>
         {verification.corrective_actions ? (
           <div className="p-4 bg-yellow-50 rounded border-l-4 border-yellow-500">

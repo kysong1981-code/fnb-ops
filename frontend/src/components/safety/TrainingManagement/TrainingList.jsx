@@ -84,7 +84,7 @@ export default function TrainingList() {
       )}
 
       {/* 탭 */}
-      <div className="bg-white rounded-lg shadow-md">
+      <div className="bg-white rounded-lg shadow-sm">
         <div className="border-b border-gray-200 flex">
           <button
             onClick={() => setActiveTab('all')}

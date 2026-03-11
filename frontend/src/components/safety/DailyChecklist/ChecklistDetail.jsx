@@ -112,7 +112,7 @@ export default function ChecklistDetail() {
       {/* 체크리스트 정보 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* 상태 */}
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
+        <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-blue-500">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">상태</h3>
           <div className={`text-2xl font-bold ${checklist.is_completed ? 'text-green-600' : 'text-yellow-600'}`}>
             {checklist.is_completed ? '완료' : '진행 중'}
@@ -123,21 +123,21 @@ export default function ChecklistDetail() {
         </div>
 
         {/* 완료율 */}
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
+        <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-green-500">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">완료율</h3>
           <div className="text-2xl font-bold text-green-600">{completionPercentage}%</div>
           <p className="text-sm text-gray-600 mt-2">항목 완료</p>
         </div>
 
         {/* 작성자 */}
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
+        <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-purple-500">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">작성자</h3>
           <div className="text-lg font-semibold text-gray-900">{checklist.completed_by_name || '미배정'}</div>
           <p className="text-sm text-gray-600 mt-2">담당자</p>
         </div>
 
         {/* 작성일시 */}
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-500">
+        <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-orange-500">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">작성일시</h3>
           <div className="text-sm font-semibold text-gray-900">
             {checklist.completed_at
@@ -150,7 +150,7 @@ export default function ChecklistDetail() {
 
       {/* 템플릿 정보 및 항목 */}
       {template && (
-        <div className="bg-white rounded-lg shadow-md p-6 space-y-6">
+        <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">템플릿: {template.name}</h3>
             <div className="w-full bg-gray-200 rounded-full h-3">
@@ -202,7 +202,7 @@ export default function ChecklistDetail() {
 
       {/* 비고 */}
       {checklist.notes && (
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-3">비고</h3>
           <p className="text-gray-700 whitespace-pre-wrap">{checklist.notes}</p>
         </div>

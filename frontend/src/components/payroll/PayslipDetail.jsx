@@ -1,239 +1,229 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import api from '../../services/api';
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { payrollAPI } from '../../services/api'
 
 export default function PayslipDetail() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [payslip, setPayslip] = useState(null);
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [payslip, setPayslip] = useState(null)
+  const [summary, setSummary] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    fetchPayslip();
-  }, [id]);
+    fetchPayslip()
+  }, [id])
 
   const fetchPayslip = async () => {
-    setLoading(true);
-    setError('');
-
+    setLoading(true)
+    setError('')
     try {
       const [payslipRes, summaryRes] = await Promise.all([
-        api.get(`/payroll/payslips/${id}/`),
-        api.get(`/payroll/payslips/${id}/summary/`)
-      ]);
-      setPayslip(payslipRes.data);
-      setSummary(summaryRes.data);
+        payrollAPI.getPayslip(id),
+        payrollAPI.getPayslipSummary(id),
+      ])
+      setPayslip(payslipRes.data)
+      setSummary(summaryRes.data)
     } catch (err) {
-      setError(err.response?.data?.error || '급여명세서를 불러올 수 없습니다.');
+      setError(err.response?.data?.error || 'Unable to load payslip.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const formatCurrency = (value) => {
-    return `NZ$${parseFloat(value || 0).toFixed(2)}`;
-  };
+  const fmt = (v) => `$${parseFloat(v || 0).toFixed(2)}`
 
   if (loading) {
     return (
       <div className="text-center py-12">
-        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <p className="text-gray-600 mt-4">급여명세서 로드 중...</p>
+        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+        <p className="text-gray-600 mt-4">Loading payslip...</p>
       </div>
-    );
+    )
   }
 
   if (!payslip || !summary) {
     return (
       <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-4 rounded">
-        {error || '급여명세서를 찾을 수 없습니다.'}
+        {error || 'Payslip not found.'}
       </div>
-    );
+    )
+  }
+
+  const workTypeLabel = {
+    FULL_TIME: 'Full-time',
+    PART_TIME: 'Part-time',
+    CASUAL: 'Casual',
   }
 
   return (
-    <div className="space-y-6">
-      {/* 헤더 */}
+    <div className="space-y-4 max-w-2xl mx-auto">
+      {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <button
-            onClick={() => navigate('/payroll')}
-            className="text-blue-600 hover:text-blue-900 text-sm mb-2"
-          >
-            ← 목록으로 돌아가기
+          <button onClick={() => navigate(-1)} className="text-blue-600 hover:text-blue-800 text-sm mb-1">
+            &larr; Back
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">급여명세서</h1>
-          <p className="text-gray-600 mt-1">{summary.employee}</p>
+          <h1 className="text-2xl font-bold text-gray-900">Pay Slip</h1>
+          <p className="text-gray-500 text-sm">{summary.employee}</p>
         </div>
-        <button
-          onClick={() => window.print()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          인쇄
-        </button>
+        {payslip.is_locked && (
+          <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Finalised</span>
+        )}
       </div>
 
-      {/* 기본 정보 */}
-      <div className="bg-white rounded-lg shadow p-6 grid grid-cols-2 gap-6">
+      {/* Info Grid */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 grid grid-cols-2 gap-3 text-sm">
         <div>
-          <p className="text-xs text-gray-600 mb-1">급여 기간</p>
-          <p className="text-lg font-semibold text-gray-900">{summary.period}</p>
+          <p className="text-gray-400 text-xs">Pay Period</p>
+          <p className="font-medium text-gray-900">{summary.period}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-600 mb-1">지급일</p>
-          <p className="text-lg font-semibold text-gray-900">
-            {new Date(payslip.pay_period_details.payment_date).toLocaleDateString('ko-KR')}
+          <p className="text-gray-400 text-xs">Payment Date</p>
+          <p className="font-medium text-gray-900">
+            {payslip.pay_period_details?.payment_date}
           </p>
         </div>
         <div>
-          <p className="text-xs text-gray-600 mb-1">IRD 번호</p>
-          <p className="text-lg font-semibold text-gray-900">{summary.employee || 'N/A'}</p>
+          <p className="text-gray-400 text-xs">IRD Number</p>
+          <p className="font-medium text-gray-900">{payslip.tax_file_number || 'N/A'}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-600 mb-1">근무 형태</p>
-          <p className="text-lg font-semibold text-gray-900">
-            {payslip.work_type === 'FULL_TIME' ? '정규직' : payslip.work_type === 'PART_TIME' ? '파트타임' : '계약직'}
-          </p>
+          <p className="text-gray-400 text-xs">Tax Code</p>
+          <p className="font-medium text-gray-900">{summary.tax_code || payslip.tax_code || 'M'}</p>
+        </div>
+        <div>
+          <p className="text-gray-400 text-xs">Work Type</p>
+          <p className="font-medium text-gray-900">{workTypeLabel[payslip.work_type] || payslip.work_type}</p>
+        </div>
+        <div>
+          <p className="text-gray-400 text-xs">Employee ID</p>
+          <p className="font-medium text-gray-900">{payslip.employee_id || '-'}</p>
         </div>
       </div>
 
-      {/* 근무 시간 */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">근무 시간</h2>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <p className="text-xs text-gray-600 mb-1">정규 시간</p>
-            <p className="text-2xl font-bold text-blue-600">{summary.hours.regular}h</p>
+      {/* Hours */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <h2 className="text-sm font-semibold text-gray-900 mb-3">Hours Worked</h2>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-blue-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500">Regular</p>
+            <p className="text-lg font-bold text-blue-600">{summary.hours.regular}h</p>
           </div>
-          <div className="bg-orange-50 p-4 rounded-lg">
-            <p className="text-xs text-gray-600 mb-1">초과 시간</p>
-            <p className="text-2xl font-bold text-orange-600">{summary.hours.overtime}h</p>
+          <div className="bg-orange-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500">Overtime</p>
+            <p className="text-lg font-bold text-orange-600">{summary.hours.overtime}h</p>
           </div>
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-xs text-gray-600 mb-1">총 시간</p>
-            <p className="text-2xl font-bold text-gray-900">{summary.hours.total}h</p>
-          </div>
-        </div>
-      </div>
-
-      {/* 급여 계산 */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">급여 계산</h2>
-        <div className="space-y-3">
-          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-            <span className="text-sm text-gray-700">시급</span>
-            <span className="text-sm font-semibold text-gray-900">
-              {formatCurrency(payslip.hourly_rate)}/h
-            </span>
-          </div>
-          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-            <span className="text-sm text-gray-700">정규 급여</span>
-            <span className="text-sm font-semibold text-gray-900">
-              {formatCurrency(summary.earnings.regular_pay)}
-            </span>
-          </div>
-          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-            <span className="text-sm text-gray-700">초과 시급</span>
-            <span className="text-sm font-semibold text-gray-900">
-              {formatCurrency(payslip.overtime_rate)}/h
-            </span>
-          </div>
-          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-            <span className="text-sm text-gray-700">초과 급여</span>
-            <span className="text-sm font-semibold text-gray-900">
-              {formatCurrency(summary.earnings.overtime_pay)}
-            </span>
-          </div>
-          <div className="border-t-2 border-gray-200 flex justify-between items-center p-3 bg-blue-50 rounded">
-            <span className="text-sm font-bold text-gray-900">총 급여 (Gross)</span>
-            <span className="text-lg font-bold text-blue-600">
-              {formatCurrency(summary.earnings.gross_salary)}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 공제 사항 (뉴질랜드) */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">공제 사항 (뉴질랜드)</h2>
-        <div className="space-y-3">
-          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-            <span className="text-sm text-gray-700">PAYE 소득세</span>
-            <span className="text-sm font-semibold text-red-600">
-              -{formatCurrency(summary.deductions.paye_tax)}
-            </span>
-          </div>
-          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-            <span className="text-sm text-gray-700">Kiwisaver (직원)</span>
-            <span className="text-sm font-semibold text-red-600">
-              -{formatCurrency(summary.deductions.kiwisaver)}
-            </span>
-          </div>
-          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-            <span className="text-sm text-gray-700">ACC 산재보험</span>
-            <span className="text-sm font-semibold text-red-600">
-              -{formatCurrency(summary.deductions.acc_levy)}
-            </span>
-          </div>
-          {summary.deductions.other > 0 && (
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-              <span className="text-sm text-gray-700">기타 공제</span>
-              <span className="text-sm font-semibold text-red-600">
-                -{formatCurrency(summary.deductions.other)}
-              </span>
+          {summary.hours.public_holiday > 0 && (
+            <div className="bg-purple-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500">Public Holiday</p>
+              <p className="text-lg font-bold text-purple-600">{summary.hours.public_holiday}h</p>
             </div>
           )}
-          <div className="border-t-2 border-gray-200 flex justify-between items-center p-3 bg-red-50 rounded">
-            <span className="text-sm font-bold text-gray-900">총 공제액</span>
-            <span className="text-lg font-bold text-red-600">
-              -{formatCurrency(summary.deductions.total)}
-            </span>
+          <div className="bg-gray-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500">Total</p>
+            <p className="text-lg font-bold text-gray-900">{summary.hours.total}h</p>
           </div>
         </div>
       </div>
 
-      {/* 순급여 */}
-      <div className="bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-200 rounded-lg p-6">
-        <p className="text-sm text-gray-600 mb-2">순급여 (Net Salary)</p>
-        <p className="text-4xl font-bold text-green-600">{formatCurrency(summary.net_salary)}</p>
-      </div>
-
-      {/* 고용주 기여금 (참고용) */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">고용주 기여금 (참고용)</h2>
-        <div className="space-y-3">
-          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-            <span className="text-sm text-gray-700">Kiwisaver 고용주 기여금 (3%)</span>
-            <span className="text-sm font-semibold text-gray-900">
-              +{formatCurrency(summary.employer_contributions.kiwisaver)}
-            </span>
-          </div>
-          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-            <span className="text-sm text-gray-700">ACC 고용주 기여금</span>
-            <span className="text-sm font-semibold text-gray-900">
-              +{formatCurrency(summary.employer_contributions.acc_levy)}
-            </span>
+      {/* Earnings */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <h2 className="text-sm font-semibold text-gray-900 mb-3">Earnings</h2>
+        <div className="space-y-2">
+          <Row label={`Regular Pay (${fmt(payslip.hourly_rate)}/h)`} value={fmt(summary.earnings.regular_pay)} />
+          {summary.earnings.overtime_pay > 0 && (
+            <Row label={`Overtime Pay (${fmt(payslip.overtime_rate)}/h)`} value={fmt(summary.earnings.overtime_pay)} />
+          )}
+          {summary.earnings.public_holiday_pay > 0 && (
+            <Row label="Public Holiday Pay (T&H extra)" value={fmt(summary.earnings.public_holiday_pay)} />
+          )}
+          {summary.earnings.holiday_pay > 0 && (
+            <Row label="Holiday Pay (8%)" value={fmt(summary.earnings.holiday_pay)} />
+          )}
+          <div className="border-t border-gray-200 pt-2">
+            <Row label="Gross Pay" value={fmt(summary.earnings.gross_salary)} bold />
           </div>
         </div>
       </div>
 
-      {/* 메모 */}
-      {payslip.notes && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-          <h3 className="font-semibold text-gray-900 mb-2">메모</h3>
-          <p className="text-gray-700 whitespace-pre-line">{payslip.notes}</p>
+      {/* Deductions */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <h2 className="text-sm font-semibold text-gray-900 mb-3">Deductions</h2>
+        <div className="space-y-2">
+          <Row label="PAYE Income Tax" value={`-${fmt(summary.deductions.paye_tax)}`} red />
+          {summary.deductions.kiwisaver > 0 && (
+            <Row label={`KiwiSaver Employee (${payslip.kiwisaver_rate || '3'}%)`} value={`-${fmt(summary.deductions.kiwisaver)}`} red />
+          )}
+          {summary.deductions.student_loan > 0 && (
+            <Row label="Student Loan (12%)" value={`-${fmt(summary.deductions.student_loan)}`} red />
+          )}
+          {summary.deductions.other > 0 && (
+            <Row label="Other Deductions" value={`-${fmt(summary.deductions.other)}`} red />
+          )}
+          <div className="border-t border-gray-200 pt-2">
+            <Row label="Total Deductions" value={`-${fmt(summary.deductions.total)}`} bold red />
+          </div>
+        </div>
+      </div>
+
+      {/* Net Pay */}
+      <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4 text-center">
+        <p className="text-xs text-gray-500 mb-1">Net Pay</p>
+        <p className="text-3xl font-bold text-green-600">{fmt(summary.net_salary)}</p>
+      </div>
+
+      {/* Employer Contributions */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <h2 className="text-sm font-semibold text-gray-900 mb-3">Employer Contributions (Info)</h2>
+        <div className="space-y-2">
+          {summary.employer_contributions.kiwisaver > 0 && (
+            <Row label="KiwiSaver Employer (3%)" value={`+${fmt(summary.employer_contributions.kiwisaver)}`} />
+          )}
+          {summary.employer_contributions.esct > 0 && (
+            <Row label="ESCT" value={`+${fmt(summary.employer_contributions.esct)}`} />
+          )}
+          {summary.employer_contributions.acc_levy > 0 && (
+            <Row label="ACC Employer Levy" value={`+${fmt(summary.employer_contributions.acc_levy)}`} />
+          )}
+        </div>
+      </div>
+
+      {/* Alternative Holidays */}
+      {summary.alternative_holidays_earned > 0 && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+          <p className="text-sm font-semibold text-indigo-800">
+            Alternative Holidays Earned: {summary.alternative_holidays_earned} day(s)
+          </p>
+          <p className="text-xs text-indigo-600 mt-1">
+            From working on public holidays that were otherwise working days.
+          </p>
         </div>
       )}
 
-      {/* 법적 고지 */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-xs text-gray-600">
-        <p>이 급여명세서는 뉴질랜드 임금관계법(Employment Relations Act)에 따라 작성되었습니다.</p>
-        <p className="mt-2">
-          질문이나 오류가 있는 경우, 회사의 급여 담당자에게 문의하시기 바랍니다.
-        </p>
+      {/* Notes */}
+      {payslip.notes && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">Notes</h3>
+          <p className="text-sm text-gray-700 whitespace-pre-line">{payslip.notes}</p>
+        </div>
+      )}
+
+      {/* Legal */}
+      <div className="text-xs text-gray-400 text-center py-2">
+        Generated in accordance with the NZ Employment Relations Act 2000 and Holidays Act 2003.
       </div>
     </div>
-  );
+  )
+}
+
+function Row({ label, value, bold, red }) {
+  return (
+    <div className="flex justify-between items-center">
+      <span className={`text-sm ${bold ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>{label}</span>
+      <span className={`text-sm ${bold ? 'font-bold' : 'font-medium'} ${red ? 'text-red-600' : 'text-gray-900'}`}>
+        {value}
+      </span>
+    </div>
+  )
 }

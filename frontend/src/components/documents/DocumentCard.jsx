@@ -1,66 +1,66 @@
 import React from 'react'
 import { useAuth } from '../../context/AuthContext'
 
-const documentTypeIcons = {
-  CONTRACT: '📄',
-  JOB_DESCRIPTION: '📋',
-  JOB_OFFER: '💼',
-  POLICY: '📘',
-  MANUAL: '📖',
-  TRAINING: '🎓',
-  SAFETY: '🛡️',
-  OTHER: '📎'
+const documentTypeLabels = {
+  CONTRACT: 'Contract',
+  JOB_DESCRIPTION: 'Job Description',
+  JOB_OFFER: 'Job Offer',
+  POLICY: 'Policy',
+  MANUAL: 'Manual',
+  TRAINING: 'Training',
+  SAFETY: 'Safety',
+  OTHER: 'Other'
 }
 
-const documentTypeLabels = {
-  CONTRACT: '계약서',
-  JOB_DESCRIPTION: '직무기술서',
-  JOB_OFFER: '채용제안',
-  POLICY: '정책',
-  MANUAL: '매뉴얼',
-  TRAINING: '교육',
-  SAFETY: '안전',
-  OTHER: '기타'
+const documentTypeIcons = {
+  CONTRACT: '\uD83D\uDCC4',
+  JOB_DESCRIPTION: '\uD83D\uDCCB',
+  JOB_OFFER: '\uD83D\uDCBC',
+  POLICY: '\uD83D\uDCD8',
+  MANUAL: '\uD83D\uDCD6',
+  TRAINING: '\uD83C\uDF93',
+  SAFETY: '\uD83D\uDEE1\uFE0F',
+  OTHER: '\uD83D\uDCCE'
 }
 
 export default function DocumentCard({ document, onView, onDelete }) {
   const { user } = useAuth()
-  const isCreator = user?.profile?.id === document.created_by
-  const isManager = user?.profile?.role && ['MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO'].includes(user.profile.role)
+  const isCreator = user?.id === document.created_by
+  const isManager = user?.role && ['MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO'].includes(user.role)
   const canDelete = isManager || isCreator
 
-  const icon = documentTypeIcons[document.document_type] || '📎'
+  const icon = documentTypeIcons[document.document_type] || '\uD83D\uDCCE'
   const typeLabel = documentTypeLabels[document.document_type] || document.document_type
 
   return (
-    <div className="bg-white rounded-lg shadow hover:shadow-md transition p-4">
-      {/* 헤더 */}
+    <div className="bg-white rounded-lg shadow hover:shadow-sm transition p-4">
+      {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <span className="text-3xl">{icon}</span>
         {canDelete && (
           <button
             onClick={onDelete}
             className="text-gray-400 hover:text-red-600 transition"
-            title="삭제"
+            title="Delete"
           >
             ✕
           </button>
         )}
       </div>
 
-      {/* 제목 */}
+      {/* Title */}
       <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2">
         {document.title}
       </h3>
 
-      {/* 설명 */}
+      {/* Description */}
       {document.description && (
         <p className="text-gray-600 text-xs mb-3 line-clamp-2">
           {document.description}
         </p>
       )}
 
-      {/* 배지 */}
+      {/* Badges */}
       <div className="flex flex-wrap gap-2 mb-3">
         <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
           {typeLabel}
@@ -77,24 +77,24 @@ export default function DocumentCard({ document, onView, onDelete }) {
         )}
       </div>
 
-      {/* 메타데이터 */}
+      {/* Metadata */}
       <div className="text-xs text-gray-500 space-y-1 mb-4 border-t pt-2">
-        <div>작성자: {document.created_by_name || '알 수 없음'}</div>
+        <div>By: {document.created_by_name || 'Unknown'}</div>
         <div>
-          {new Date(document.created_at).toLocaleDateString('ko-KR')}
+          {new Date(document.created_at).toLocaleDateString('en-NZ')}
         </div>
         <div className="flex justify-between">
-          <span>📥 {document.download_count || 0}회</span>
-          {document.is_public && <span>🔓 공개</span>}
+          <span>{document.download_count || 0} downloads</span>
+          {document.is_public && <span>Public</span>}
         </div>
       </div>
 
-      {/* 버튼 */}
+      {/* Button */}
       <button
         onClick={onView}
         className="w-full px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition"
       >
-        보기 및 다운로드
+        View & Download
       </button>
     </div>
   )

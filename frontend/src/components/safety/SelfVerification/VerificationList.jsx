@@ -105,7 +105,7 @@ export default function VerificationList() {
       )}
 
       {/* 필터 */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">필터</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

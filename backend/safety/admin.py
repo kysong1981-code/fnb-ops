@@ -2,7 +2,8 @@ from django.contrib import admin
 from .models import (
     SafetyChecklistTemplate, DailyChecklistResponse,
     CleaningRecord, TemperatureRecord, TrainingRecord,
-    SelfVerificationRecord, Incident, AuditLog
+    SelfVerificationRecord, Incident, AuditLog,
+    SafetyRecordType, StoreRecordConfig, SafetyRecord
 )
 
 
@@ -79,4 +80,35 @@ class AuditLogAdmin(admin.ModelAdmin):
     list_filter = ('audit_type', 'overall_rating', 'date', 'organization', 'created_at')
     search_fields = ('organization__name', 'auditor_name', 'recommendations')
     ordering = ['-date']
+    readonly_fields = ('created_at', 'updated_at')
+
+
+# ============================================================
+# MPI Food Safety Record System Admin
+# ============================================================
+
+@admin.register(SafetyRecordType)
+class SafetyRecordTypeAdmin(admin.ModelAdmin):
+    list_display = ('code', 'name', 'name_ko', 'category', 'frequency', 'is_system', 'is_active', 'sort_order')
+    list_filter = ('category', 'frequency', 'is_system', 'is_active')
+    search_fields = ('code', 'name', 'name_ko')
+    ordering = ['category', 'sort_order', 'name']
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(StoreRecordConfig)
+class StoreRecordConfigAdmin(admin.ModelAdmin):
+    list_display = ('organization', 'record_type', 'is_enabled', 'assigned_role', 'custom_schedule_time')
+    list_filter = ('is_enabled', 'assigned_role', 'organization')
+    search_fields = ('organization__name', 'record_type__name')
+    ordering = ['organization', 'record_type__sort_order']
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(SafetyRecord)
+class SafetyRecordAdmin(admin.ModelAdmin):
+    list_display = ('organization', 'record_type', 'date', 'time', 'completed_by', 'status', 'created_at')
+    list_filter = ('status', 'record_type__category', 'date', 'organization')
+    search_fields = ('organization__name', 'record_type__name', 'notes')
+    ordering = ['-date', '-time']
     readonly_fields = ('created_at', 'updated_at')

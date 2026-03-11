@@ -3,6 +3,26 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from users.models import Organization, UserProfile
 
 
+class TemperatureLocation(models.Model):
+    """온도 체크 위치 (Store Settings에서 정의, 온도 기록 시 자동 표시)"""
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='temperature_locations')
+    name = models.CharField(max_length=255, help_text="냉장고, 냉동고, 디스플레이 등")
+    standard_min = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True, help_text="기준 최저 온도 (°C)")
+    standard_max = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True, help_text="기준 최고 온도 (°C)")
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['sort_order', 'name']
+        unique_together = ('organization', 'name')
+
+    def __str__(self):
+        return f"{self.name}"
+
+
 class SafetyChecklistTemplate(models.Model):
     """안전 체크리스트 템플릿"""
     STAGE_CHOICES = [
@@ -279,3 +299,147 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.organization.name} - {self.get_audit_type_display()} - {self.date}"
+
+
+# ============================================================
+# MPI Food Safety Record System
+# ============================================================
+
+class SafetyRecordType(models.Model):
+    """MPI Food Safety Record Type 정의 (마스터 카탈로그)"""
+    CATEGORY_CHOICES = [
+        ('DAILY', 'Daily'),
+        ('WEEKLY', 'Weekly'),
+        ('MONTHLY', 'Monthly'),
+        ('EVENT', 'Event-based'),
+        ('SETUP', 'Setup/Reference'),
+        ('SPECIALIST', 'Specialist'),
+    ]
+
+    FREQUENCY_CHOICES = [
+        ('DAILY', 'Daily'),
+        ('WEEKLY', 'Weekly'),
+        ('MONTHLY', 'Monthly'),
+        ('QUARTERLY', 'Quarterly'),
+        ('ON_EVENT', 'On Event'),
+        ('ONE_TIME', 'One Time'),
+    ]
+
+    code = models.CharField(max_length=50, unique=True, help_text="Unique slug: opening_checks, daily_temp, etc.")
+    name = models.CharField(max_length=255)
+    name_ko = models.CharField(max_length=255, blank=True, help_text="Korean name for bilingual display")
+    description = models.TextField(blank=True)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    frequency = models.CharField(max_length=20, choices=FREQUENCY_CHOICES)
+
+    # Form schema
+    default_fields = models.JSONField(
+        default=list,
+        help_text="Array of field definitions: [{key, label, label_ko, type, required, options}]"
+    )
+
+    # UI display
+    color_code = models.CharField(max_length=7, default='#3B82F6', help_text="Hex color for UI")
+    icon = models.CharField(max_length=50, default='clipboard', help_text="Icon key for frontend")
+    sort_order = models.IntegerField(default=0)
+
+    # System flag
+    is_system = models.BooleanField(default=True, help_text="True = MPI-provided, False = custom")
+    is_active = models.BooleanField(default=True)
+
+    # Bridge to existing models
+    legacy_model = models.CharField(
+        max_length=50, blank=True,
+        help_text="Existing model name to bridge: TemperatureRecord, CleaningRecord, etc."
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['category', 'sort_order', 'name']
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+
+class StoreRecordConfig(models.Model):
+    """매장별 기록 유형 on/off 설정"""
+    ROLE_CHOICES = [
+        ('EMPLOYEE', 'Employee'),
+        ('MANAGER', 'Manager'),
+        ('BOTH', 'Both'),
+    ]
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='safety_record_configs')
+    record_type = models.ForeignKey(SafetyRecordType, on_delete=models.CASCADE, related_name='store_configs')
+    is_enabled = models.BooleanField(default=True)
+    assigned_role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='EMPLOYEE')
+
+    # Store-specific overrides
+    custom_fields = models.JSONField(default=list, blank=True, help_text="Override default_fields for this store")
+    custom_schedule_time = models.TimeField(null=True, blank=True, help_text="Custom time for this task")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('organization', 'record_type')
+        ordering = ['record_type__sort_order']
+
+    def __str__(self):
+        return f"{self.organization.name} - {self.record_type.name} ({'ON' if self.is_enabled else 'OFF'})"
+
+
+class SafetyRecord(models.Model):
+    """완료된 식품안전 기록 (통합 모델)"""
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('COMPLETED', 'Completed'),
+        ('FLAGGED', 'Flagged'),
+        ('REVIEWED', 'Reviewed'),
+    ]
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='safety_records')
+    record_type = models.ForeignKey(SafetyRecordType, on_delete=models.PROTECT, related_name='records')
+
+    # When
+    date = models.DateField()
+    time = models.TimeField(null=True, blank=True)
+
+    # Who
+    completed_by = models.ForeignKey(
+        UserProfile, on_delete=models.SET_NULL, null=True,
+        related_name='safety_records_completed'
+    )
+
+    # What (flexible JSON storage)
+    data = models.JSONField(default=dict, help_text="Flexible field storage matching record_type.default_fields")
+
+    # Status
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    notes = models.TextField(blank=True, default='')
+
+    # Review workflow
+    reviewed_by = models.ForeignKey(
+        UserProfile, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='safety_records_reviewed'
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_notes = models.TextField(blank=True, default='')
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date', '-time', '-created_at']
+        indexes = [
+            models.Index(fields=['organization', 'record_type', 'date']),
+            models.Index(fields=['organization', 'date', 'status']),
+            models.Index(fields=['completed_by', 'date']),
+            models.Index(fields=['status', 'date']),
+        ]
+
+    def __str__(self):
+        return f"{self.record_type.name} - {self.date} ({self.get_status_display()})"

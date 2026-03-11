@@ -100,7 +100,7 @@ export default function TrainingForm() {
       {/* 폼 */}
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 기본 정보 */}
-        <div className="bg-white rounded-lg shadow-md p-6 space-y-4">
+        <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">교육 정보</h3>
 
           <div>
@@ -161,7 +161,7 @@ export default function TrainingForm() {
         </div>
 
         {/* 참여자 */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">참여 직원</h3>
 
           {staff.length === 0 ? (

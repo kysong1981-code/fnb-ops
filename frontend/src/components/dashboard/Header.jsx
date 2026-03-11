@@ -1,61 +1,81 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useState } from 'react'
 
 export default function Header() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, logout } = useAuth()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleLogout = () => {
     logout()
     navigate('/login')
   }
 
-  const getRoleDisplay = (role) => {
-    const roles = {
-      EMPLOYEE: '직원',
-      MANAGER: '매니저',
-      SENIOR_MANAGER: '시니어 매니저',
-      REGIONAL_MANAGER: '지역 매니저',
-      HQ: '본사',
-      CEO: 'CEO',
-    }
-    return roles[role] || role
-  }
+  const navigationItems = [
+    { label: 'Dashboard', path: '/dashboard', roles: ['EMPLOYEE', 'MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO', 'ADMIN'] },
+    { label: 'My Roster', path: '/hr', roles: ['EMPLOYEE', 'MANAGER', 'SENIOR_MANAGER', 'ADMIN'] },
+    { label: 'My Payslips', path: '/payroll', roles: ['EMPLOYEE', 'MANAGER', 'SENIOR_MANAGER', 'ADMIN'] },
+    { label: 'Daily Closing', path: '/closing', roles: ['MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO', 'ADMIN'] },
+    { label: 'Sales Analysis', path: '/sales', roles: ['MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO', 'ADMIN'] },
+    { label: 'Reports', path: '/reports', roles: ['MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO', 'ADMIN'] },
+    { label: 'Food Safety', path: '/safety', roles: ['EMPLOYEE', 'MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO', 'ADMIN'] },
+    { label: 'Documents', path: '/documents', roles: ['EMPLOYEE', 'MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO', 'ADMIN'] },
+  ]
+
+  const visibleItems = navigationItems.filter(item => user && item.roles.includes(user.role))
+  const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/')
 
   return (
-    <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-        {/* 좌측: 로고/제목 */}
-        <div className="flex items-center">
-          <h1 className="text-2xl font-bold text-indigo-600">FNB Ops</h1>
+    <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+      <div className="px-4 py-4">
+        {/* Top Row */}
+        <div className="flex justify-between items-center mb-4">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="text-2xl font-bold text-indigo-600 hover:text-indigo-700"
+          >
+            Oneops
+          </button>
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            >
+              Logout
+            </button>
+
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="sm:hidden px-3 py-2 text-lg text-gray-700 hover:bg-gray-100 rounded-lg transition"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? '✕' : '☰'}
+            </button>
+          </div>
         </div>
 
-        {/* 우측: 사용자 정보 및 로그아웃 */}
-        <div className="flex items-center gap-6">
-          {user && (
-            <>
-              <div className="text-right">
-                <p className="text-sm font-semibold text-gray-900">
-                  {user.user_first_name} {user.user_last_name}
-                </p>
-                <p className="text-xs text-gray-600">
-                  {getRoleDisplay(user.role)}
-                </p>
-              </div>
-
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold">
-                {user.user_first_name?.charAt(0)}
-              </div>
-
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-              >
-                로그아웃
-              </button>
-            </>
-          )}
-        </div>
+        {/* Navigation - Always Visible */}
+        <nav className={`gap-2 ${mobileMenuOpen ? 'block space-y-2' : 'hidden'} sm:grid sm:grid-cols-4 lg:grid-cols-8`}>
+          {visibleItems.map(item => (
+            <button
+              key={item.path}
+              onClick={() => {
+                navigate(item.path)
+                setMobileMenuOpen(false)
+              }}
+              className={`px-3 py-2 text-sm font-medium rounded-md transition whitespace-nowrap text-center ${
+                isActive(item.path)
+                  ? 'text-indigo-600 bg-indigo-50'
+                  : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
       </div>
     </header>
   )

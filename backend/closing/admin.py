@@ -1,7 +1,9 @@
 from django.contrib import admin
 from .models import (
     Supplier, DailyClosing, ClosingSupplierCost,
-    ClosingHRCash, ClosingCashExpense
+    ClosingHRCash, ClosingCashExpense, SupplierMonthlyStatement,
+    MonthlyClose, SalesCategory, ClosingOtherSale,
+    CQAccountBalance, CQExpense
 )
 
 
@@ -150,3 +152,52 @@ class ClosingCashExpenseAdmin(admin.ModelAdmin):
         if obj:  # 수정 시
             return self.readonly_fields + ['daily_closing', 'category', 'reason', 'amount']
         return self.readonly_fields
+
+
+@admin.register(SupplierMonthlyStatement)
+class SupplierMonthlyStatementAdmin(admin.ModelAdmin):
+    """공급사 월별 명세서 관리"""
+    list_display = ('supplier', 'organization', 'year', 'month', 'statement_total', 'our_total', 'variance', 'status')
+    list_filter = ('status', 'year', 'month', 'organization')
+    search_fields = ('supplier__name',)
+    readonly_fields = ('our_total', 'variance', 'status', 'created_at', 'updated_at')
+
+
+@admin.register(MonthlyClose)
+class MonthlyCloseAdmin(admin.ModelAdmin):
+    """Monthly close admin"""
+    list_display = ('organization', 'year', 'month', 'status', 'closed_by', 'closed_at')
+    list_filter = ('status', 'year', 'organization')
+    search_fields = ('organization__name',)
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(SalesCategory)
+class SalesCategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'organization', 'is_active')
+    list_filter = ('organization', 'is_active')
+    search_fields = ('name',)
+
+
+@admin.register(ClosingOtherSale)
+class ClosingOtherSaleAdmin(admin.ModelAdmin):
+    list_display = ('closing', 'name', 'amount', 'created_at')
+    list_filter = ('closing__organization', 'created_at')
+    search_fields = ('name',)
+    readonly_fields = ('created_at',)
+
+
+@admin.register(CQAccountBalance)
+class CQAccountBalanceAdmin(admin.ModelAdmin):
+    list_display = ('organization', 'account', 'balance', 'updated_by', 'updated_at')
+    list_filter = ('organization', 'account')
+    readonly_fields = ('updated_at',)
+
+
+@admin.register(CQExpense)
+class CQExpenseAdmin(admin.ModelAdmin):
+    list_display = ('organization', 'account', 'category', 'description', 'amount', 'status', 'created_by', 'date')
+    list_filter = ('organization', 'account', 'category', 'status')
+    search_fields = ('description',)
+    readonly_fields = ('created_at', 'updated_at', 'approved_at')
+    date_hierarchy = 'date'
