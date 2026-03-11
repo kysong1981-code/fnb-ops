@@ -1,8 +1,11 @@
+import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import { BellIcon } from '../icons'
+import { BellIcon, LogoutIcon } from '../icons'
 
 export default function EmployeeHeader() {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef(null)
 
   const getGreeting = () => {
     const h = new Date().getHours()
@@ -13,6 +16,15 @@ export default function EmployeeHeader() {
 
   const firstName = user?.user?.first_name || user?.user?.username || ''
   const initials = firstName.charAt(0).toUpperCase()
+
+  // Close menu on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false)
+    }
+    if (menuOpen) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
 
   return (
     <header className="bg-white px-5 pt-4 pb-3 shrink-0">
@@ -26,8 +38,28 @@ export default function EmployeeHeader() {
             <BellIcon size={18} className="text-gray-500" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />
           </button>
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
-            {initials}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-sm"
+            >
+              {initials}
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-12 w-44 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
+                <div className="px-3 py-2 border-b border-gray-100">
+                  <p className="text-sm font-semibold text-gray-900">{firstName}</p>
+                  <p className="text-xs text-gray-400">{user?.role || ''}</p>
+                </div>
+                <button
+                  onClick={() => { setMenuOpen(false); logout() }}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 transition"
+                >
+                  <LogoutIcon size={16} />
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
