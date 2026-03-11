@@ -47,6 +47,8 @@ export function StoreProvider({ children }) {
   const selectStore = (store) => {
     setSelectedStore(store)
     localStorage.setItem('selected_store_id', String(store.id))
+    // 스토어 변경 시 페이지 새로고침하여 새 스토어 데이터 로드
+    window.location.reload()
   }
 
   return (
