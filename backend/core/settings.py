@@ -211,3 +211,10 @@ SPECTACULAR_SETTINGS = {
 # Time Zone for New Zealand
 TIME_ZONE = 'Pacific/Auckland'
 USE_TZ = True
+
+# Email (dev: console backend, production overrides in settings_production.py)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = 'noreply@oneops.co.nz'
+
+# Frontend URL (used for password reset links, etc.)
+FRONTEND_URL = 'https://oneops.co.nz'

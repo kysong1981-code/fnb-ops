@@ -53,6 +53,8 @@ import ShiftTemplateSettings from './components/manager/ShiftTemplateSettings'
 import InspectionReport from './components/safety/inspection/InspectionReport'
 import InquiriesManager from './components/hr/InquiriesManager'
 import GetStartedPage from './components/auth/GetStartedPage'
+import ForgotPassword from './components/auth/ForgotPassword'
+import ResetPassword from './components/auth/ResetPassword'
 import StoreApplications from './components/admin/StoreApplications'
 
 // Helper component to wrap protected routes with Layout
@@ -72,6 +74,10 @@ function App() {
         <Routes>
           {/* Login page (no sidebar) */}
           <Route path="/login" element={<LoginPage />} />
+
+          {/* Public: Forgot Password / Reset Password */}
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
 
           {/* Public: Get Started (store application) */}
           <Route path="/get-started" element={<GetStartedPage />} />

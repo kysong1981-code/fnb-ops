@@ -5,6 +5,8 @@ from .views import (
     UserProfileView,
     ChangePasswordView,
     PermissionCheckView,
+    PasswordResetRequestView,
+    PasswordResetConfirmView,
 )
 from users.views import StoreApplicationPublicView
 
@@ -20,6 +22,10 @@ urlpatterns = [
 
     # 비밀번호 변경
     path('change-password/', ChangePasswordView.as_view(), name='change_password'),
+
+    # 비밀번호 초기화
+    path('password-reset/', PasswordResetRequestView.as_view(), name='password_reset_request'),
+    path('password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
 
     # 권한 확인
     path('check-permission/', PermissionCheckView.as_view(), name='check_permission'),

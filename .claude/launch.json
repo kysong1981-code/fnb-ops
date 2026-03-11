@@ -14,6 +14,12 @@
       "runtimeArgs": ["manage.py", "runserver"],
       "port": 8000,
       "cwd": "${workspaceFolder}/backend"
+    },
+    {
+      "name": "sky-pos",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/song/sky-pos", "run", "dev"],
+      "port": 3000
     }
   ]
 }

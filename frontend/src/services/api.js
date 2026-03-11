@@ -114,6 +114,10 @@ export const authAPI = {
   // 비밀번호 변경
   changePassword: (data) => api.post('/auth/change-password/', data),
 
+  // 비밀번호 초기화
+  requestPasswordReset: (email) => api.post('/auth/password-reset/', { email }),
+  confirmPasswordReset: (data) => api.post('/auth/password-reset/confirm/', data),
+
   // 권한 확인
   checkPermission: (resource, action) =>
     api.post('/auth/check-permission/', { resource, action }),
