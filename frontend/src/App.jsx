@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { StoreProvider } from './context/StoreContext'
 import LoginPage from './components/auth/LoginPage'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import Layout from './components/Layout'
@@ -67,6 +68,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
+        <StoreProvider>
         <Routes>
           {/* Login page (no sidebar) */}
           <Route path="/login" element={<LoginPage />} />
@@ -570,6 +572,7 @@ function App() {
           {/* 404 - redirect to dashboard */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </StoreProvider>
       </AuthProvider>
     </Router>
   )

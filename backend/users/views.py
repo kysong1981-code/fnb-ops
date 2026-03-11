@@ -18,6 +18,18 @@ from .permissions import IsManager
 logger = logging.getLogger(__name__)
 
 
+class StoreListView(generics.ListAPIView):
+    """CEO/HQ: 모든 스토어 목록, Manager: 자기 스토어만"""
+    serializer_class = OrganizationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        profile = self.request.user.profile
+        if profile.role in ('CEO', 'HQ', 'ADMIN'):
+            return Organization.objects.filter(level='STORE').order_by('name')
+        return Organization.objects.filter(id=profile.organization_id)
+
+
 class OrganizationSettingsView(generics.RetrieveUpdateAPIView):
     """매장 설정 조회/수정 (자기 조직만)"""
     serializer_class = OrganizationSerializer
