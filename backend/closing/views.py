@@ -70,7 +70,7 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
         return DailyClosingDetailSerializer
 
     def get_queryset(self):
-        """직원은 자기 것만, 매니저는 조직 전체"""
+        """직원은 자기 것만, 매니저는 조직 전체. CEO/HQ는 store_id로 전환 가능."""
         queryset = super().get_queryset()
         user = self.request.user
 
@@ -78,7 +78,18 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
             profile = user.profile
             org = profile.organization
 
-            if profile.role in self.MANAGER_ROLES:
+            # CEO/HQ can switch stores via store_id query param
+            if profile.role in ['CEO', 'HQ']:
+                store_id = self.request.query_params.get('store_id')
+                if store_id:
+                    from users.models import Organization
+                    try:
+                        org = Organization.objects.get(id=store_id)
+                    except Organization.DoesNotExist:
+                        pass
+                if org:
+                    queryset = queryset.filter(organization=org)
+            elif profile.role in self.MANAGER_ROLES:
                 queryset = queryset.filter(organization=org)
             else:
                 # 직원은 자기가 만든 것만

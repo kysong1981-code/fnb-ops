@@ -11,9 +11,16 @@ class OrganizationFilterBackend(BaseFilterBackend):
     """
 
     def filter_queryset(self, request, queryset, view):
-        """사용자의 역할에 따라 쿼리셋 필터링"""
+        """사용자의 역할에 따라 쿼리셋 필터링. CEO/HQ는 store_id로 전환 가능."""
         try:
             profile = request.user.profile
+            # CEO/HQ can filter by store_id query param
+            if profile.role in ['CEO', 'HQ']:
+                store_id = request.query_params.get('store_id')
+                if store_id:
+                    model = queryset.model
+                    if hasattr(model, 'organization'):
+                        return queryset.filter(organization_id=store_id)
             return self._filter_by_role(profile, queryset)
         except (AttributeError, UserProfile.DoesNotExist):
             return queryset.none()

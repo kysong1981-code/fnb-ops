@@ -14,12 +14,20 @@ const api = axios.create({
   },
 })
 
-// Request interceptor - JWT 토큰 자동 추가
+// Request interceptor - JWT 토큰 자동 추가 + CEO/HQ store_id 자동 추가
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+    }
+    // CEO/HQ: 선택된 store_id를 자동으로 쿼리 파라미터에 추가
+    const storeId = localStorage.getItem('selected_store_id')
+    if (storeId) {
+      config.params = config.params || {}
+      if (!config.params.store_id) {
+        config.params.store_id = storeId
+      }
     }
     return config
   },

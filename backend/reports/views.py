@@ -43,9 +43,19 @@ class ReportViewSet(viewsets.ModelViewSet):
         return queryset.select_related('organization', 'created_by__user')
 
     def _get_organization(self, request):
-        """사용자 프로필에서 조직 정보를 가져옵니다."""
+        """사용자 프로필에서 조직 정보를 가져옵니다. CEO/HQ는 store_id로 전환 가능."""
         try:
-            return request.user.profile.organization
+            profile = request.user.profile
+            # CEO/HQ can switch stores via store_id query param
+            if profile.role in ['CEO', 'HQ']:
+                store_id = request.query_params.get('store_id')
+                if store_id:
+                    from users.models import Organization
+                    try:
+                        return Organization.objects.get(id=store_id)
+                    except Organization.DoesNotExist:
+                        pass
+            return profile.organization
         except Exception:
             return None
 
