@@ -73,7 +73,7 @@ with open(CSV_PATH, 'r') as f:
         # COGS as ClosingSupplierCost
         if total_cogs > 0:
             ClosingSupplierCost.objects.create(
-                daily_closing=closing,
+                closing=closing,
                 supplier=supplier,
                 amount=total_cogs,
                 description=f'Imported COGS for {closing_date}',
