@@ -1,0 +1,86 @@
+version: '3.8'
+
+# ============================================================================
+# AWS Deployment - Docker Compose
+# Uses external RDS MySQL (no local MySQL container)
+# Nginx serves React frontend + proxies API to Django backend
+# ============================================================================
+
+services:
+  # ========================================================================
+  # Nginx - Reverse Proxy + React Frontend
+  # ========================================================================
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    container_name: fnb-ops-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - fnb-ops-network
+
+  # ========================================================================
+  # Django Backend (Gunicorn)
+  # ========================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: fnb-ops-backend
+    restart: unless-stopped
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings_production
+      - DB_ENGINE=django.db.backends.mysql
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT:-3306}
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=False
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
+      - SECURE_SSL_REDIRECT=False
+      - SECURE_HSTS_SECONDS=0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - JWT_ACCESS_LIFETIME=${JWT_ACCESS_LIFETIME:-60}
+      - JWT_REFRESH_LIFETIME=${JWT_REFRESH_LIFETIME:-7}
+    expose:
+      - "8000"
+    volumes:
+      - backend_logs:/app/logs
+      - backend_static:/app/staticfiles
+      - backend_media:/app/media
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - fnb-ops-network
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn core.wsgi:application
+             --bind 0.0.0.0:8000
+             --workers 3
+             --timeout 120
+             --access-logfile -
+             --error-logfile -
+             --log-level info"
+
+volumes:
+  backend_logs:
+  backend_static:
+  backend_media:
+
+networks:
+  fnb-ops-network:
+    driver: bridge

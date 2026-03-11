@@ -52,8 +52,8 @@ ENV PATH=/home/appuser/.local/bin:$PATH
 # Switch to non-root user
 USER appuser
 
-# Collect static files
-RUN python manage.py collectstatic --noinput --clear
+# Note: collectstatic runs at container startup (in docker-compose command)
+# to ensure env vars like SECRET_KEY are available
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

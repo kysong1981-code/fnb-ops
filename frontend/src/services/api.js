@@ -1,9 +1,9 @@
 import axios from 'axios'
 
-// API base URL - uses environment variable in production, localhost in development
+// API base URL - uses environment variable if set, otherwise relative /api (works with Nginx proxy)
 const API_BASE_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
-  : 'http://localhost:8000/api'
+  : '/api'
 
 // axios 인스턴스 생성
 const api = axios.create({
