@@ -96,7 +96,7 @@ class ClosingCashExpenseSerializer(serializers.ModelSerializer):
         model = ClosingCashExpense
         fields = [
             'id', 'daily_closing', 'category', 'category_display', 'reason',
-            'amount', 'attachment', 'created_by', 'created_by_name',
+            'amount', 'notes', 'attachment', 'created_by', 'created_by_name',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'created_by_name', 'category_display']

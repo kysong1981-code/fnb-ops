@@ -219,6 +219,7 @@ class ClosingCashExpense(models.Model):
     category = models.CharField(max_length=20, choices=EXPENSE_CATEGORY_CHOICES, help_text="지출 카테고리")
     reason = models.CharField(max_length=200, help_text="지출 사유")
     amount = models.DecimalField(max_digits=12, decimal_places=2, help_text="지출 금액")
+    notes = models.TextField(blank=True, default='', help_text="메모")
     attachment = models.FileField(
         upload_to='closing/expenses/%Y/%m/%d/',
         blank=True,

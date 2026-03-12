@@ -40,7 +40,7 @@ export default function CashUpPage() {
   // Cash Expenses
   const [expenses, setExpenses] = useState([])
   const [showExpForm, setShowExpForm] = useState(false)
-  const [expForm, setExpForm] = useState({ category: 'SUPPLIES', reason: '', amount: '', attachment: null })
+  const [expForm, setExpForm] = useState({ category: 'SUPPLIES', reason: '', amount: '', notes: '', attachment: null })
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -202,10 +202,11 @@ export default function CashUpPage() {
       fd.append('category', expForm.category)
       fd.append('reason', expForm.reason)
       fd.append('amount', expForm.amount)
+      if (expForm.notes) fd.append('notes', expForm.notes)
       if (expForm.attachment) fd.append('attachment', expForm.attachment)
 
       await cashExpenseAPI.create(fd)
-      setExpForm({ category: 'SUPPLIES', reason: '', amount: '', attachment: null })
+      setExpForm({ category: 'SUPPLIES', reason: '', amount: '', notes: '', attachment: null })
       setShowExpForm(false)
       loadExpenses(closing.id)
       showMsg('Expense added')
@@ -489,6 +490,7 @@ export default function CashUpPage() {
                     <option value="">Select</option>
                     <option value="ChCh">ChCh</option>
                     <option value="QT">QT</option>
+                    <option value="Manager">Manager</option>
                   </select>
                 </div>
                 <div>
@@ -502,6 +504,15 @@ export default function CashUpPage() {
                     className={inputCls}
                   />
                 </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Notes</label>
+                <input
+                  value={expForm.notes}
+                  onChange={(e) => setExpForm(p => ({ ...p, notes: e.target.value }))}
+                  placeholder="Optional notes"
+                  className={inputCls}
+                />
               </div>
               <div>
                 <label className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition">
@@ -533,6 +544,7 @@ export default function CashUpPage() {
                     <div>
                       <span className="text-sm font-medium text-gray-700">{exp.reason}</span>
                       <span className="text-xs text-gray-400 ml-2">{exp.category}</span>
+                      {exp.notes && <p className="text-xs text-gray-400 mt-0.5">{exp.notes}</p>}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-red-600">-{fmt(exp.amount)}</span>
