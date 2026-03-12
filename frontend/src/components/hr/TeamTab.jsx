@@ -9,6 +9,23 @@ const STATUS_FILTERS = [
   { key: 'ALL', label: 'All' },
 ]
 
+const JOB_TITLES = [
+  { value: '', label: '— Not Set —' },
+  { value: 'STORE_MANAGER', label: 'Store Manager' },
+  { value: 'ASSISTANT_MANAGER', label: 'Assistant Manager' },
+  { value: 'SUPERVISOR', label: 'Supervisor' },
+  { value: 'BARISTA', label: 'Barista' },
+  { value: 'HEAD_CHEF', label: 'Head Chef' },
+  { value: 'CHEF', label: 'Chef' },
+  { value: 'COOK', label: 'Cook' },
+  { value: 'KITCHEN_HAND', label: 'Kitchen Hand' },
+  { value: 'SERVER', label: 'Server' },
+  { value: 'CASHIER', label: 'Cashier' },
+  { value: 'ALL_ROUNDER', label: 'All Rounder' },
+  { value: 'CLEANER', label: 'Cleaner' },
+  { value: 'OTHER', label: 'Other' },
+]
+
 const fmt = (v) => v != null ? `$${parseFloat(v).toFixed(2)}` : '-'
 
 export default function TeamTab() {
@@ -160,7 +177,22 @@ export default function TeamTab() {
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
                             <span className="text-xs text-gray-400">Job Title</span>
-                            <p className="text-gray-900">{detail.job_title_display || '-'}</p>
+                            <select
+                              value={detail.job_title || ''}
+                              onChange={async (e) => {
+                                const val = e.target.value
+                                try {
+                                  const res = await hrAPI.updatePermissions(selected, { job_title: val })
+                                  setDetail({ ...detail, ...res.data })
+                                  loadTeam()
+                                } catch {}
+                              }}
+                              className="w-full mt-0.5 text-sm text-gray-900 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              {JOB_TITLES.map(j => (
+                                <option key={j.value} value={j.value}>{j.label}</option>
+                              ))}
+                            </select>
                           </div>
                           <div>
                             <span className="text-xs text-gray-400">Employee ID</span>

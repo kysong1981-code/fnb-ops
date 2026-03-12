@@ -1054,7 +1054,7 @@ class TeamViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['post'], url_path='update-permissions')
     def update_permissions(self, request, pk=None):
-        """직원 태스크 권한 업데이트 (매니저 전용)"""
+        """직원 태스크 권한 + 프로필 업데이트 (매니저 전용)"""
         profile = request.user.profile
         MANAGER_ROLES = ['MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO']
         if profile.role not in MANAGER_ROLES:
@@ -1072,13 +1072,19 @@ class TeamViewSet(viewsets.ViewSet):
                 setattr(member, field, bool(request.data[field]))
                 updated.append(field)
 
+        if 'job_title' in request.data:
+            member.job_title = request.data['job_title'] or None
+            updated.append('job_title')
+
         if updated:
             member.save(update_fields=updated + ['updated_at'])
 
         return Response({
-            'message': 'Permissions updated',
+            'message': 'Updated',
             'can_daily_close': member.can_daily_close,
             'can_safety_tasks': member.can_safety_tasks,
+            'job_title': member.job_title,
+            'job_title_display': dict(JOB_TITLE_CHOICES).get(member.job_title) if member.job_title else None,
         })
 
     @action(detail=True, methods=['post'], url_path='reset-password')
