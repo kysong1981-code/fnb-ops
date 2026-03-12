@@ -304,6 +304,7 @@ class LeaveRequest(models.Model):
 
     # Details
     reason = models.TextField(blank=True)
+    attachment = models.FileField(upload_to='leave_attachments/', blank=True, null=True, help_text="Supporting document (e.g. medical certificate)")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
 
     # Approval

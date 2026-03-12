@@ -25,7 +25,7 @@ from utils.pdf_zones import extract_and_clean_sign_zones, get_default_zones
 
 from .models import (
     Onboarding, OnboardingTask, EmployeeDocument, ShiftTemplate, Roster, Timesheet, Task,
-    EmployeeInvite, DocumentTemplate, IR330Declaration, TrainingModule, Inquiry,
+    EmployeeInvite, DocumentTemplate, IR330Declaration, TrainingModule, Inquiry, ResignationRequest,
 )
 from .serializers import (
     OnboardingDetailSerializer, OnboardingListSerializer,
@@ -33,7 +33,7 @@ from .serializers import (
     ShiftTemplateSerializer, RosterSerializer, TimesheetSerializer, TaskSerializer,
     EmployeeInviteSerializer, DocumentTemplateSerializer, IR330DeclarationSerializer,
     TrainingModuleSerializer, TeamMemberListSerializer, TeamMemberDetailSerializer,
-    InquirySerializer,
+    InquirySerializer, ResignationRequestSerializer,
 )
 from users.models import UserProfile, ROLE_CHOICES, JOB_TITLE_CHOICES, WORK_TYPE_CHOICES
 from users.serializers import UserProfileDetailSerializer
@@ -1748,3 +1748,75 @@ class InquiryViewSet(viewsets.ModelViewSet):
         inquiry.status = 'CLOSED'
         inquiry.save(update_fields=['status'])
         return Response(InquirySerializer(inquiry).data)
+
+
+class ResignationRequestViewSet(viewsets.ModelViewSet):
+    """퇴직 신청 ViewSet — 직원은 본인만, 매니저는 조직 전체"""
+    serializer_class = ResignationRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    MANAGER_ROLES = ['MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO']
+
+    def get_queryset(self):
+        user = self.request.user.profile
+        if user.role in self.MANAGER_ROLES:
+            return ResignationRequest.objects.filter(
+                organization=user.organization
+            ).select_related('employee__user', 'confirmed_by__user')
+        return ResignationRequest.objects.filter(
+            employee=user
+        ).select_related('employee__user', 'confirmed_by__user')
+
+    def perform_create(self, serializer):
+        profile = self.request.user.profile
+        # Calculate notice period based on work type
+        work_type = profile.work_type
+        if work_type in ('FULL_TIME', 'SALARY', 'VISA_FULL_TIME'):
+            notice_weeks = 2
+        else:  # PART_TIME, CASUAL
+            notice_weeks = 1
+
+        from datetime import date, timedelta
+        today = date.today()
+        earliest = today + timedelta(weeks=notice_weeks)
+
+        serializer.save(
+            employee=profile,
+            organization=profile.organization,
+            notice_period_weeks=notice_weeks,
+            earliest_last_day=earliest,
+        )
+
+    @action(detail=True, methods=['post'])
+    def confirm(self, request, pk=None):
+        """매니저가 퇴직 확인 (last day 네고 가능)"""
+        resignation = self.get_object()
+        if resignation.status != 'PENDING':
+            return Response({'error': 'Only pending requests can be confirmed'}, status=400)
+
+        confirmed_last_day = request.data.get('confirmed_last_day')
+        manager_notes = request.data.get('manager_notes', '')
+
+        if confirmed_last_day:
+            resignation.confirmed_last_day = confirmed_last_day
+        else:
+            resignation.confirmed_last_day = resignation.requested_last_day
+
+        resignation.manager_notes = manager_notes
+        resignation.confirmed_by = request.user.profile
+        resignation.confirmed_at = timezone.now()
+        resignation.status = 'CONFIRMED'
+        resignation.save()
+        return Response(ResignationRequestSerializer(resignation).data)
+
+    @action(detail=True, methods=['post'])
+    def withdraw(self, request, pk=None):
+        """직원이 퇴직 철회"""
+        resignation = self.get_object()
+        if resignation.status != 'PENDING':
+            return Response({'error': 'Only pending requests can be withdrawn'}, status=400)
+        if resignation.employee != request.user.profile:
+            return Response({'error': 'Permission denied'}, status=403)
+        resignation.status = 'WITHDRAWN'
+        resignation.save(update_fields=['status'])
+        return Response(ResignationRequestSerializer(resignation).data)

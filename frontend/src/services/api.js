@@ -317,6 +317,12 @@ export const hrAPI = {
   createInquiry: (data) => api.post('/hr/inquiries/', data),
   replyInquiry: (id, data) => api.post(`/hr/inquiries/${id}/reply/`, data),
   closeInquiry: (id) => api.post(`/hr/inquiries/${id}/close/`),
+
+  // Resignation
+  getResignationRequests: () => api.get('/hr/resignation-requests/'),
+  createResignation: (data) => api.post('/hr/resignation-requests/', data),
+  confirmResignation: (id, data) => api.post(`/hr/resignation-requests/${id}/confirm/`, data),
+  withdrawResignation: (id) => api.post(`/hr/resignation-requests/${id}/withdraw/`),
 }
 
 // Store Settings API
@@ -431,7 +437,12 @@ export const payrollAPI = {
   initializeLeaveBalances: (data) => api.post('/payroll/leave-balances/initialize/', data),
   getLeaveRequests: (params) => api.get('/payroll/leave-requests/', { params }),
   getMyLeaveRequests: () => api.get('/payroll/leave-requests/my_requests/'),
-  createLeaveRequest: (data) => api.post('/payroll/leave-requests/', data),
+  createLeaveRequest: (data) => {
+    if (data instanceof FormData) {
+      return api.post('/payroll/leave-requests/', data, { headers: { 'Content-Type': 'multipart/form-data' } })
+    }
+    return api.post('/payroll/leave-requests/', data)
+  },
   approveLeave: (id) => api.post(`/payroll/leave-requests/${id}/approve/`),
   declineLeave: (id, data) => api.post(`/payroll/leave-requests/${id}/decline/`, data),
   cancelLeave: (id) => api.post(`/payroll/leave-requests/${id}/cancel/`),

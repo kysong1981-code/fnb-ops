@@ -5,6 +5,7 @@ from .views import (
     ShiftTemplateViewSet, RosterViewSet, TimesheetViewSet, TaskViewSet, TeamViewSet,
     EmployeeInviteViewSet, AcceptInviteView, DocumentTemplateViewSet,
     TrainingModuleViewSet, IR330ViewSet, SaveBankAccountView, InquiryViewSet,
+    ResignationRequestViewSet,
 )
 
 # Router for ViewSets
@@ -22,6 +23,7 @@ router.register(r'document-templates', DocumentTemplateViewSet, basename='docume
 router.register(r'training-modules', TrainingModuleViewSet, basename='training-module')
 router.register(r'ir330', IR330ViewSet, basename='ir330')
 router.register(r'inquiries', InquiryViewSet, basename='inquiry')
+router.register(r'resignation-requests', ResignationRequestViewSet, basename='resignation-request')
 
 urlpatterns = [
     path('', include(router.urls)),

@@ -470,7 +470,6 @@ class Inquiry(models.Model):
         ('GENERAL', 'General'),
         ('PAY', 'Pay & Payslip'),
         ('SCHEDULE', 'Schedule & Roster'),
-        ('LEAVE', 'Leave'),
         ('OTHER', 'Other'),
     )
     STATUS_CHOICES = (
@@ -499,3 +498,37 @@ class Inquiry(models.Model):
 
     def __str__(self):
         return f"{self.employee.user.get_full_name()} - {self.subject}"
+
+
+class ResignationRequest(models.Model):
+    """직원 퇴직 신청"""
+    STATUS_CHOICES = (
+        ('PENDING', 'Pending'),
+        ('CONFIRMED', 'Confirmed'),
+        ('WITHDRAWN', 'Withdrawn'),
+    )
+
+    employee = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='resignation_requests')
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='resignation_requests')
+    reason = models.TextField()
+    requested_last_day = models.DateField(help_text='Employee proposed last working day')
+    notice_period_weeks = models.IntegerField(default=2, help_text='Auto-calculated from work type')
+    earliest_last_day = models.DateField(help_text='Calculated: today + notice period')
+    confirmed_last_day = models.DateField(null=True, blank=True, help_text='Manager negotiated last day')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    manager_notes = models.TextField(blank=True, default='')
+    confirmed_by = models.ForeignKey(
+        UserProfile, null=True, blank=True, on_delete=models.SET_NULL, related_name='confirmed_resignations'
+    )
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['organization', 'status']),
+            models.Index(fields=['employee']),
+        ]
+
+    def __str__(self):
+        return f"{self.employee.user.get_full_name()} - Resignation ({self.status})"

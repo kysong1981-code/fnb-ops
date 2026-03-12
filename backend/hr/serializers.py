@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     Onboarding, OnboardingTask, EmployeeDocument, ShiftTemplate, Roster, Timesheet, Task,
-    EmployeeInvite, DocumentTemplate, IR330Declaration, TrainingModule, Inquiry,
+    EmployeeInvite, DocumentTemplate, IR330Declaration, TrainingModule, Inquiry, ResignationRequest,
 )
 
 
@@ -325,4 +325,34 @@ class InquirySerializer(serializers.ModelSerializer):
             'id', 'employee', 'employee_name', 'organization',
             'status', 'status_display', 'category_display',
             'reply', 'replied_by', 'replied_by_name', 'replied_at', 'created_at',
+        ]
+
+
+class ResignationRequestSerializer(serializers.ModelSerializer):
+    """퇴직 신청 시리얼라이저"""
+    employee_name = serializers.CharField(source='employee.user.get_full_name', read_only=True)
+    confirmed_by_name = serializers.CharField(source='confirmed_by.user.get_full_name', read_only=True, allow_null=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    work_type = serializers.CharField(source='employee.work_type', read_only=True)
+    work_type_display = serializers.CharField(source='employee.get_work_type_display', read_only=True)
+
+    class Meta:
+        model = ResignationRequest
+        fields = [
+            'id', 'employee', 'employee_name', 'organization',
+            'reason', 'requested_last_day',
+            'notice_period_weeks', 'earliest_last_day',
+            'confirmed_last_day',
+            'status', 'status_display',
+            'manager_notes', 'confirmed_by', 'confirmed_by_name', 'confirmed_at',
+            'work_type', 'work_type_display',
+            'created_at',
+        ]
+        read_only_fields = [
+            'id', 'employee', 'employee_name', 'organization',
+            'notice_period_weeks', 'earliest_last_day',
+            'status', 'status_display',
+            'manager_notes', 'confirmed_by', 'confirmed_by_name', 'confirmed_at',
+            'work_type', 'work_type_display',
+            'created_at',
         ]

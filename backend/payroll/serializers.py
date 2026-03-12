@@ -155,7 +155,7 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
             'id', 'user', 'user_name', 'employee_id',
             'organization', 'leave_type', 'leave_type_display',
             'start_date', 'end_date', 'total_hours',
-            'reason', 'status',
+            'reason', 'attachment', 'status',
             'approved_by', 'approved_by_name', 'approved_at',
             'decline_reason', 'paid_amount',
             'created_at', 'updated_at'
