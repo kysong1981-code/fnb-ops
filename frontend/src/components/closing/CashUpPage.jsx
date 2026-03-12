@@ -360,46 +360,42 @@ export default function CashUpPage() {
       ) : activeTab === 'cashup' ? (
         /* ============ CASH UP TAB ============ */
         <>
-          {/* Actual Cash from Daily Closing */}
-          <Card className="p-5 bg-gray-900 border-gray-800">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Daily Closing</p>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-300 font-medium">Actual Cash</span>
-              <span className="text-white font-bold text-lg">{fmt(closing.actual_cash)}</span>
-            </div>
-            <div className="mt-3 pt-2 border-t border-gray-700">
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                  closing.status === 'APPROVED' ? 'bg-green-900 text-green-300' :
-                  closing.status === 'SUBMITTED' ? 'bg-blue-900 text-blue-300' :
-                  'bg-gray-700 text-gray-300'
+          <Card className="p-5 space-y-4">
+            {/* Actual Cash */}
+            <div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-500">Actual Cash</span>
+                <span className="text-xl font-bold text-gray-900">{fmt(closing.actual_cash)}</span>
+              </div>
+              <div className="mt-1">
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                  closing.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
+                  closing.status === 'SUBMITTED' ? 'bg-blue-100 text-blue-700' :
+                  'bg-gray-100 text-gray-600'
                 }`}>
                   {closing.status}
                 </span>
-                {closing.created_by_name && (
-                  <span className="text-xs text-gray-500">by {closing.created_by_name}</span>
-                )}
               </div>
             </div>
-          </Card>
 
-          {/* Bank Deposit */}
-          <Card className="p-5">
-            <SectionLabel>Bank Deposit</SectionLabel>
-            <input
-              type="number"
-              step="0.01"
-              value={bankDeposit}
-              onChange={(e) => setBankDeposit(e.target.value)}
-              placeholder="0.00"
-              className={inputCls}
-            />
-          </Card>
+            <div className="border-t border-gray-100" />
 
-          {/* HR Cash */}
-          {hrCashEnabled && (
-            <Card className="p-5">
-              <SectionLabel>HR Cash</SectionLabel>
+            {/* Bank Deposit */}
+            <div>
+              <label className="text-sm font-medium text-gray-500 block mb-1.5">Bank Deposit</label>
+              <input
+                type="number"
+                step="0.01"
+                value={bankDeposit}
+                onChange={(e) => setBankDeposit(e.target.value)}
+                placeholder="0.00"
+                className={inputCls}
+              />
+            </div>
+
+            {/* HR Cash */}
+            <div>
+              <label className="text-sm font-medium text-gray-500 block mb-1.5">HR Cash</label>
               <input
                 type="number"
                 step="0.01"
@@ -408,40 +404,14 @@ export default function CashUpPage() {
                 placeholder="0.00"
                 className={inputCls}
               />
-            </Card>
-          )}
+            </div>
 
-          {/* Cash Reconciliation */}
-          <Card className="p-5">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Cash Reconciliation</p>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Actual Cash</span>
-                <span className="font-medium text-gray-900">{fmt(closing.actual_cash)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Bank Deposit</span>
-                <span className="font-medium text-gray-900">-{fmt(deposit)}</span>
-              </div>
-              {hrCashTotal > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">HR Cash</span>
-                  <span className="font-medium text-gray-900">-{fmt(hrCashTotal)}</span>
-                </div>
-              )}
-              {expenseTotal > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Expenses</span>
-                  <span className="font-medium text-gray-900">-{fmt(expenseTotal)}</span>
-                </div>
-              )}
-              <div className="border-t pt-2">
-                <div className="flex justify-between">
-                  <span className="font-semibold text-gray-700">Remaining Cash</span>
-                  <span className={`font-bold text-lg ${cashVariance === 0 ? 'text-green-600' : cashVariance > 0 ? 'text-amber-600' : 'text-red-600'}`}>
-                    {fmt(cashVariance)}
-                  </span>
-                </div>
+            <div className="border-t border-gray-200 pt-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-semibold text-gray-700">Remaining Cash</span>
+                <span className={`text-xl font-bold ${(actualCash - deposit - (parseFloat(hrCashAmount) || 0)) === 0 ? 'text-green-600' : (actualCash - deposit - (parseFloat(hrCashAmount) || 0)) > 0 ? 'text-amber-600' : 'text-red-600'}`}>
+                  {fmt(actualCash - deposit - (parseFloat(hrCashAmount) || 0))}
+                </span>
               </div>
             </div>
           </Card>
