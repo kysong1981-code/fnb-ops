@@ -115,6 +115,10 @@ export default function StoreSettings() {
   const [tempLocations, setTempLocations] = useState([])
   const [tempForm, setTempForm] = useState(null)
 
+  // Cleaning Areas
+  const [cleaningAreas, setCleaningAreas] = useState([])
+  const [cleaningAreaForm, setCleaningAreaForm] = useState(null)
+
   // Checklist Templates
   const [templates, setTemplates] = useState([])
 
@@ -128,6 +132,9 @@ export default function StoreSettings() {
   const [trainingModules, setTrainingModules] = useState([])
   const [docTemplateUploading, setDocTemplateUploading] = useState(false)
   const [trainingForm, setTrainingForm] = useState(null)
+
+  // Placeholder Preview Modal
+  const [phModal, setPhModal] = useState(null) // { file, filename, known, unknown, docType, workType, jobTitle, mappings }
 
   // Integrations
   const [integrations, setIntegrations] = useState([])
@@ -193,6 +200,13 @@ export default function StoreSettings() {
     } catch (e) { console.error(e) }
   }, [])
 
+  const fetchCleaningAreas = useCallback(async () => {
+    try {
+      const res = await safetyAPI.getCleaningAreas()
+      setCleaningAreas(Array.isArray(res.data) ? res.data : res.data.results || [])
+    } catch (e) { console.error(e) }
+  }, [])
+
   const fetchTemplates = useCallback(async () => {
     try {
       const res = await safetyAPI.getTemplates()
@@ -233,12 +247,13 @@ export default function StoreSettings() {
     fetchSuppliers()
     fetchCategories()
     fetchTempLocations()
+    fetchCleaningAreas()
     fetchTemplates()
     fetchRecordConfigs()
     fetchDocTemplates()
     fetchTrainingModules()
     fetchIntegrations()
-  }, [fetchSettings, fetchSuppliers, fetchCategories, fetchTempLocations, fetchTemplates, fetchRecordConfigs, fetchDocTemplates, fetchTrainingModules, fetchIntegrations])
+  }, [fetchSettings, fetchSuppliers, fetchCategories, fetchTempLocations, fetchCleaningAreas, fetchTemplates, fetchRecordConfigs, fetchDocTemplates, fetchTrainingModules, fetchIntegrations])
 
   // ── Company Tab ──
   const handleSaveCompany = async () => {
@@ -394,8 +409,57 @@ export default function StoreSettings() {
     }
   }
 
+  // ── Cleaning Areas ──
+  const handleSaveCleaningArea = async () => {
+    try {
+      const data = { ...cleaningAreaForm }
+      if (cleaningAreaForm.id) {
+        await safetyAPI.updateCleaningArea(cleaningAreaForm.id, data)
+      } else {
+        await safetyAPI.createCleaningArea(data)
+      }
+      setCleaningAreaForm(null)
+      fetchCleaningAreas()
+      showToast('Cleaning area saved')
+    } catch (e) {
+      showToast(e.response?.data?.name?.[0] || 'Error saving cleaning area')
+    }
+  }
+
+  const handleDeleteCleaningArea = async (id) => {
+    try {
+      await safetyAPI.deleteCleaningArea(id)
+      fetchCleaningAreas()
+      showToast('Cleaning area deleted')
+    } catch (e) {
+      showToast('Error deleting cleaning area')
+    }
+  }
+
   // ── HR Document Templates ──
   const handleUploadDocTemplate = async (docType, file, { workType, jobTitle } = {}) => {
+    // For DOCX files, extract placeholders and show preview modal
+    if (file.name.endsWith('.docx')) {
+      setDocTemplateUploading(true)
+      try {
+        const res = await hrAPI.extractPlaceholders(file)
+        const { known, unknown, known_keys } = res.data
+        // Initialize mappings for unknown placeholders
+        const mappings = {}
+        unknown.forEach(ph => { mappings[ph.key] = '' })
+        setPhModal({
+          file, filename: file.name, known, unknown, known_keys,
+          docType, workType, jobTitle, mappings,
+        })
+      } catch (e) {
+        showToast('Error extracting placeholders')
+      } finally {
+        setDocTemplateUploading(false)
+      }
+      return
+    }
+
+    // Non-DOCX: upload directly
     setDocTemplateUploading(true)
     try {
       const fd = new FormData()
@@ -407,6 +471,42 @@ export default function StoreSettings() {
       await hrAPI.createDocumentTemplate(fd)
       fetchDocTemplates()
       showToast('Template uploaded')
+    } catch (e) {
+      showToast('Error uploading template')
+    } finally {
+      setDocTemplateUploading(false)
+    }
+  }
+
+  const handlePhModalConfirm = async () => {
+    if (!phModal) return
+    setDocTemplateUploading(true)
+    try {
+      let fileToUpload = phModal.file
+
+      // If there are any mappings that map to a known placeholder, fix the file first
+      const activeMappings = {}
+      Object.entries(phModal.mappings).forEach(([key, val]) => {
+        if (val && val !== key) activeMappings[key] = val
+      })
+
+      if (Object.keys(activeMappings).length > 0) {
+        const res = await hrAPI.fixPlaceholders(phModal.file, activeMappings)
+        fileToUpload = new File([res.data], phModal.filename, {
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        })
+      }
+
+      const fd = new FormData()
+      fd.append('document_type', phModal.docType)
+      fd.append('title', phModal.filename)
+      fd.append('file', fileToUpload)
+      if (phModal.workType) fd.append('work_type', phModal.workType)
+      if (phModal.jobTitle) fd.append('job_title', phModal.jobTitle)
+      await hrAPI.createDocumentTemplate(fd)
+      fetchDocTemplates()
+      showToast('Template uploaded')
+      setPhModal(null)
     } catch (e) {
       showToast('Error uploading template')
     } finally {
@@ -616,6 +716,92 @@ export default function StoreSettings() {
         <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2">
           <CheckCircleIcon size={16} />
           {toast}
+        </div>
+      )}
+
+      {/* Placeholder Preview Modal */}
+      {phModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Placeholder Preview</h3>
+                <p className="text-xs text-gray-500 mt-0.5">{phModal.filename}</p>
+              </div>
+              <button onClick={() => setPhModal(null)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+                <XIcon size={18} />
+              </button>
+            </div>
+
+            <div className="px-6 py-4 space-y-4">
+              {/* Known Placeholders */}
+              {phModal.known.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-green-700 mb-2">Known Placeholders ({phModal.known.length})</h4>
+                  <div className="space-y-1">
+                    {phModal.known.map(ph => (
+                      <div key={ph.key} className="flex items-center gap-2 text-sm">
+                        <span className="text-green-500">&#10003;</span>
+                        <code className="px-1.5 py-0.5 bg-green-50 text-green-800 rounded text-xs font-mono">{`{{${ph.key}}}`}</code>
+                        <span className="text-gray-500 text-xs">{ph.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Unknown Placeholders */}
+              {phModal.unknown.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-amber-700 mb-2">Unknown Placeholders ({phModal.unknown.length})</h4>
+                  <p className="text-xs text-gray-500 mb-2">Map these to known placeholders or leave empty to keep as-is</p>
+                  <div className="space-y-2">
+                    {phModal.unknown.map(ph => (
+                      <div key={ph.key} className="flex items-center gap-2">
+                        <code className="px-1.5 py-0.5 bg-amber-50 text-amber-800 rounded text-xs font-mono whitespace-nowrap">{`{{${ph.key}}}`}</code>
+                        <span className="text-gray-400 text-xs">&rarr;</span>
+                        <select
+                          value={phModal.mappings[ph.key] || ''}
+                          onChange={(e) => setPhModal(prev => ({
+                            ...prev,
+                            mappings: { ...prev.mappings, [ph.key]: e.target.value }
+                          }))}
+                          className="flex-1 px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Keep as-is</option>
+                          {phModal.known_keys.map(k => (
+                            <option key={k} value={k}>{`{{${k}}}`}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {phModal.known.length === 0 && phModal.unknown.length === 0 && (
+                <div className="text-center py-4 text-gray-500 text-sm">
+                  No placeholders found in this document.
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setPhModal(null)}
+                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePhModalConfirm}
+                disabled={docTemplateUploading}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50"
+              >
+                {docTemplateUploading ? 'Uploading...' : phModal.unknown.some(ph => phModal.mappings[ph.key]) ? 'Fix & Upload' : 'Upload'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1362,6 +1548,84 @@ export default function StoreSettings() {
                           </button>
                           <button
                             onClick={() => handleDeleteTempLocation(loc.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                          >
+                            <TrashIcon size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          {/* Cleaning Areas */}
+          <Card>
+            <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Cleaning Areas</h3>
+                <p className="text-xs text-gray-500">Define cleaning areas for daily cleaning records</p>
+              </div>
+              <button
+                onClick={() => setCleaningAreaForm({ name: '', is_active: true, sort_order: cleaningAreas.length })}
+                className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 transition"
+              >
+                <PlusIcon size={14} /> Add
+              </button>
+            </div>
+
+            {/* Add/Edit Form */}
+            {cleaningAreaForm && (
+              <div className="px-5 py-4 bg-green-50 border-b border-green-100">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+                  <input className={inputCls} placeholder="Area name" value={cleaningAreaForm.name} onChange={(e) => setCleaningAreaForm({ ...cleaningAreaForm, name: e.target.value })} />
+                  <input className={inputCls} type="number" placeholder="Order" value={cleaningAreaForm.sort_order} onChange={(e) => setCleaningAreaForm({ ...cleaningAreaForm, sort_order: Number(e.target.value) })} />
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" checked={cleaningAreaForm.is_active} onChange={(e) => setCleaningAreaForm({ ...cleaningAreaForm, is_active: e.target.checked })} className="rounded" />
+                    Active
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={handleSaveCleaningArea} className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700">Save</button>
+                  <button onClick={() => setCleaningAreaForm(null)} className="px-3 py-1.5 text-gray-500 text-xs font-medium hover:text-gray-700">Cancel</button>
+                </div>
+              </div>
+            )}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-400 border-b border-gray-100">
+                    <th className="px-5 py-3">Area Name</th>
+                    <th className="px-5 py-3">Order</th>
+                    <th className="px-5 py-3">Status</th>
+                    <th className="px-5 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cleaningAreas.length === 0 ? (
+                    <tr><td colSpan={4} className="px-5 py-8 text-center text-gray-400 text-sm">No cleaning areas yet</td></tr>
+                  ) : cleaningAreas.map((area) => (
+                    <tr key={area.id} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="px-5 py-3 font-medium text-gray-900">{area.name}</td>
+                      <td className="px-5 py-3 text-gray-500">{area.sort_order}</td>
+                      <td className="px-5 py-3">
+                        <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${area.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {area.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setCleaningAreaForm({ ...area })}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                          >
+                            <EditIcon size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCleaningArea(area.id)}
                             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                           >
                             <TrashIcon size={14} />

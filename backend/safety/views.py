@@ -8,14 +8,14 @@ from django.db.models import Q, Count
 from collections import defaultdict
 
 from .models import (
-    TemperatureLocation,
+    TemperatureLocation, CleaningArea,
     SafetyChecklistTemplate, DailyChecklistResponse,
     CleaningRecord, TemperatureRecord, TrainingRecord,
     SelfVerificationRecord, Incident, AuditLog,
     SafetyRecordType, StoreRecordConfig, SafetyRecord
 )
 from .serializers import (
-    TemperatureLocationSerializer,
+    TemperatureLocationSerializer, CleaningAreaSerializer,
     SafetyChecklistTemplateSerializer, DailyChecklistResponseSerializer,
     CleaningRecordSerializer, TemperatureRecordSerializer, TrainingRecordSerializer,
     SelfVerificationSerializer, IncidentSerializer, AuditLogSerializer,
@@ -31,6 +31,18 @@ class TemperatureLocationViewSet(viewsets.ModelViewSet):
     """온도 체크 위치 관리 ViewSet (Store Settings에서 사용)"""
     queryset = TemperatureLocation.objects.all()
     serializer_class = TemperatureLocationSerializer
+    permission_classes = [IsAuthenticated, IsManager]
+    filter_backends = [OrganizationFilterBackend]
+    pagination_class = None
+
+    def perform_create(self, serializer):
+        serializer.save(organization=self.request.user.profile.organization)
+
+
+class CleaningAreaViewSet(viewsets.ModelViewSet):
+    """Cleaning Area management ViewSet (Store Settings)"""
+    queryset = CleaningArea.objects.all()
+    serializer_class = CleaningAreaSerializer
     permission_classes = [IsAuthenticated, IsManager]
     filter_backends = [OrganizationFilterBackend]
     pagination_class = None

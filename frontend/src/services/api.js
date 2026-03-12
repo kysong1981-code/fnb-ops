@@ -246,6 +246,22 @@ export const hrAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
   deleteDocumentTemplate: (id) => api.delete(`/hr/document-templates/${id}/`),
+  extractPlaceholders: (file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return api.post('/hr/document-templates/extract_placeholders/', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  fixPlaceholders: (file, mappings) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('mappings', JSON.stringify(mappings))
+    return api.post('/hr/document-templates/fix_placeholders/', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      responseType: 'blob',
+    })
+  },
 
   // Training Modules
   getTrainingModules: () => api.get('/hr/training-modules/'),
@@ -347,6 +363,12 @@ export const safetyAPI = {
   createTemperatureLocation: (data) => api.post('/safety/temperature-locations/', data),
   updateTemperatureLocation: (id, data) => api.patch(`/safety/temperature-locations/${id}/`, data),
   deleteTemperatureLocation: (id) => api.delete(`/safety/temperature-locations/${id}/`),
+
+  // Cleaning Areas
+  getCleaningAreas: (params) => api.get('/safety/cleaning-areas/', { params }),
+  createCleaningArea: (data) => api.post('/safety/cleaning-areas/', data),
+  updateCleaningArea: (id, data) => api.patch(`/safety/cleaning-areas/${id}/`, data),
+  deleteCleaningArea: (id) => api.delete(`/safety/cleaning-areas/${id}/`),
 
   // Temperature Records
   createTemperatureRecord: (data, params) => api.post('/safety/temperatures/', data, { params }),

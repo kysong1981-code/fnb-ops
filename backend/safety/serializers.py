@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import (
-    TemperatureLocation,
+    TemperatureLocation, CleaningArea,
     SafetyChecklistTemplate, DailyChecklistResponse,
     CleaningRecord, TemperatureRecord, TrainingRecord,
     SelfVerificationRecord, Incident, AuditLog,
@@ -14,6 +14,14 @@ class TemperatureLocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = TemperatureLocation
         fields = ['id', 'name', 'standard_min', 'standard_max', 'is_active', 'sort_order', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class CleaningAreaSerializer(serializers.ModelSerializer):
+    """Cleaning Area Serializer"""
+    class Meta:
+        model = CleaningArea
+        fields = ['id', 'name', 'is_active', 'sort_order', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
@@ -62,7 +70,7 @@ class CleaningRecordSerializer(serializers.ModelSerializer):
             'id', 'organization', 'date', 'area', 'cleaned_by', 'cleaned_by_name',
             'is_completed', 'notes', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'cleaned_by_name']
+        read_only_fields = ['created_at', 'updated_at', 'cleaned_by_name', 'organization', 'cleaned_by']
 
 
 class TemperatureRecordSerializer(serializers.ModelSerializer):

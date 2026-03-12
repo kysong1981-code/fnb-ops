@@ -29,7 +29,7 @@ export default function CleaningSchedule() {
       })
       setSchedule(Array.isArray(response.data) ? response.data : response.data.results || [])
     } catch (err) {
-      setError(err.response?.data?.detail || '청소 일정을 불러올 수 없습니다.')
+      setError(err.response?.data?.detail || 'Failed to load cleaning schedule.')
     } finally {
       setLoading(false)
     }
@@ -59,7 +59,7 @@ export default function CleaningSchedule() {
   }
 
   const getDayName = (date) => {
-    return date.toLocaleDateString('ko-KR', { weekday: 'short', month: 'short', day: 'numeric' })
+    return date.toLocaleDateString('en-NZ', { weekday: 'short', month: 'short', day: 'numeric' })
   }
 
   const getPrevWeek = () => {
@@ -82,47 +82,47 @@ export default function CleaningSchedule() {
     return (
       <div className="text-center py-12">
         <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <p className="text-gray-600 mt-4">청소 일정 로드 중...</p>
+        <p className="text-gray-600 mt-4">Loading cleaning schedule...</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      {/* 페이지 제목 */}
+      {/* Page Title */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">주간 청소 일정</h1>
-          <p className="text-gray-600 mt-1">주간 청소 계획 및 완료 현황을 확인합니다.</p>
+          <h1 className="text-3xl font-bold text-gray-900">Weekly Cleaning Schedule</h1>
+          <p className="text-gray-600 mt-1">View weekly cleaning plan and completion status.</p>
         </div>
         <button
           onClick={() => navigate('/safety/cleaning')}
           className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
         >
-          + 청소 완료 기록
+          + Add Cleaning Record
         </button>
       </div>
 
-      {/* 에러 표시 */}
+      {/* Error Display */}
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-4 rounded">
           {error}
         </div>
       )}
 
-      {/* 주간 네비게이션 */}
+      {/* Week Navigation */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex justify-between items-center mb-6">
           <button
             onClick={getPrevWeek}
             className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
           >
-            ← 이전 주
+            &larr; Previous Week
           </button>
 
           <div className="text-center">
             <p className="text-lg font-semibold text-gray-900">
-              {getStartOfWeek(selectedWeek).toLocaleDateString('ko-KR', {
+              {getStartOfWeek(selectedWeek).toLocaleDateString('en-NZ', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric'
@@ -131,7 +131,7 @@ export default function CleaningSchedule() {
               {(() => {
                 const end = new Date(getStartOfWeek(selectedWeek))
                 end.setDate(end.getDate() + 6)
-                return end.toLocaleDateString('ko-KR', {
+                return end.toLocaleDateString('en-NZ', {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric'
@@ -145,18 +145,18 @@ export default function CleaningSchedule() {
               onClick={getTodayWeek}
               className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
             >
-              오늘
+              Today
             </button>
             <button
               onClick={getNextWeek}
               className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
             >
-              다음 주 →
+              Next Week &rarr;
             </button>
           </div>
         </div>
 
-        {/* 주간 그리드 */}
+        {/* Weekly Grid */}
         <div className="grid grid-cols-7 gap-2">
           {getDaysOfWeek().map(date => {
             const daySchedule = getScheduleForDate(date)
@@ -176,14 +176,14 @@ export default function CleaningSchedule() {
               >
                 <div className="mb-2">
                   <p className="font-semibold text-gray-900">{getDayName(date)}</p>
-                  {isToday && <span className="inline-block px-2 py-1 bg-blue-600 text-white text-xs rounded mt-1">오늘</span>}
-                  {isPast && <span className="inline-block px-2 py-1 bg-gray-400 text-white text-xs rounded mt-1">지났음</span>}
+                  {isToday && <span className="inline-block px-2 py-1 bg-blue-600 text-white text-xs rounded mt-1">Today</span>}
+                  {isPast && <span className="inline-block px-2 py-1 bg-gray-400 text-white text-xs rounded mt-1">Past</span>}
                 </div>
 
-                {/* 해당 날짜 청소 항목 */}
+                {/* Schedule Items for Date */}
                 <div className="space-y-1">
                   {daySchedule.length === 0 ? (
-                    <p className="text-sm text-gray-500 italic">계획 없음</p>
+                    <p className="text-sm text-gray-500 italic">No plans</p>
                   ) : (
                     daySchedule.map(item => (
                       <div
@@ -195,19 +195,19 @@ export default function CleaningSchedule() {
                         }`}
                       >
                         <p className="font-medium">{item.area}</p>
-                        {item.is_completed && <p className="text-xs">✓ 완료</p>}
+                        {item.is_completed && <p className="text-xs">&#10003; Done</p>}
                       </div>
                     ))
                   )}
                 </div>
 
-                {/* 완료 버튼 (당일 또는 미래) */}
+                {/* Record Button (today or future) */}
                 {!isPast && daySchedule.length > 0 && (
                   <button
                     onClick={() => navigate(`/safety/cleaning?date=${date.toISOString().split('T')[0]}`)}
                     className="mt-2 w-full px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
                   >
-                    기록하기
+                    Record
                   </button>
                 )}
               </div>
@@ -216,22 +216,22 @@ export default function CleaningSchedule() {
         </div>
       </div>
 
-      {/* 로딩 상태 */}
+      {/* Loading State */}
       {loading && schedule.length > 0 && (
         <div className="flex justify-center py-4">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
         </div>
       )}
 
-      {/* 일정이 없을 때 */}
+      {/* No Schedule */}
       {!loading && schedule.length === 0 && (
         <div className="bg-gray-50 rounded-lg p-8 text-center">
-          <p className="text-gray-600">이번 주 청소 일정이 없습니다.</p>
+          <p className="text-gray-600">No cleaning schedule for this week.</p>
           <button
             onClick={() => navigate('/safety/cleaning')}
             className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
-            청소 기록 추가
+            Add Cleaning Record
           </button>
         </div>
       )}

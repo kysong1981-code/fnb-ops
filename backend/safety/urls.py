@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    TemperatureLocationViewSet,
+    TemperatureLocationViewSet, CleaningAreaViewSet,
     SafetyChecklistTemplateViewSet, DailyChecklistResponseViewSet,
     TemperatureLogViewSet, TrainingRecordViewSet, CleaningRecordViewSet,
     SelfVerificationViewSet, IncidentViewSet, AuditLogViewSet,
@@ -12,6 +12,7 @@ from .views import (
 # Router for ViewSets
 router = DefaultRouter()
 router.register(r'temperature-locations', TemperatureLocationViewSet, basename='temperature-location')
+router.register(r'cleaning-areas', CleaningAreaViewSet, basename='cleaning-area')
 router.register(r'checklist-templates', SafetyChecklistTemplateViewSet, basename='checklist-template')
 router.register(r'checklists', DailyChecklistResponseViewSet, basename='daily-checklist')
 router.register(r'temperatures', TemperatureLogViewSet, basename='temperature-log')

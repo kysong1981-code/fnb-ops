@@ -1489,6 +1489,160 @@ class DocumentTemplateViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(organization=self.request.user.profile.organization)
 
+    # Known placeholders that are auto-filled during invite creation
+    KNOWN_PLACEHOLDERS = {
+        'employee_name': 'Employee full name',
+        'employee_first_name': 'Employee first name',
+        'employee_last_name': 'Employee last name',
+        'employee_email': 'Employee email',
+        'hourly_rate': 'Hourly rate',
+        'holiday_rate': 'Holiday rate (8% of hourly)',
+        'gross_rate': 'Gross rate (hourly + holiday)',
+        'hours': 'Weekly hours',
+        'job_title': 'Job title',
+        'position_title': 'Position title',
+        'work_type': 'Work type (Full Time, Part Time, etc.)',
+        'start_date': 'Start date',
+        'commencement_date': 'Commencement date',
+        'work_location': 'Work location',
+        'min_hours': 'Minimum hours',
+        'max_hours': 'Maximum hours',
+        'reporting_to': 'Reports to',
+        'company_name': 'Company name',
+        'company_address': 'Company address',
+        'company_phone': 'Company phone',
+        'company_email': 'Company email',
+        'company_ird': 'Company IRD number',
+    }
+
+    @action(detail=False, methods=['post'])
+    def extract_placeholders(self, request):
+        """Extract {{placeholder}} tokens from an uploaded DOCX file."""
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not file.name.endswith('.docx'):
+            return Response({'error': 'Only .docx files are supported'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from docx import Document as DocxDocument
+            import re
+
+            doc = DocxDocument(file)
+            placeholder_re = re.compile(r'\{\{(\w+)\}\}')
+            found = set()
+
+            # Extract from body paragraphs
+            for p in doc.paragraphs:
+                full_text = ''.join(run.text for run in p.runs)
+                found.update(placeholder_re.findall(full_text))
+
+            # Extract from tables
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for p in cell.paragraphs:
+                            full_text = ''.join(run.text for run in p.runs)
+                            found.update(placeholder_re.findall(full_text))
+
+            # Extract from headers/footers
+            for section in doc.sections:
+                for part in [section.header, section.footer,
+                             section.first_page_header, section.first_page_footer]:
+                    if part and part.is_linked_to_previous is False:
+                        for p in part.paragraphs:
+                            full_text = ''.join(run.text for run in p.runs)
+                            found.update(placeholder_re.findall(full_text))
+
+            known = []
+            unknown = []
+            for ph in sorted(found):
+                if ph in self.KNOWN_PLACEHOLDERS:
+                    known.append({'key': ph, 'description': self.KNOWN_PLACEHOLDERS[ph]})
+                else:
+                    unknown.append({'key': ph, 'description': None})
+
+            return Response({
+                'filename': file.name,
+                'total': len(found),
+                'known': known,
+                'unknown': unknown,
+                'known_keys': list(self.KNOWN_PLACEHOLDERS.keys()),
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'])
+    def fix_placeholders(self, request):
+        """Replace incorrect placeholders in a DOCX and return the fixed file."""
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        import json
+        mappings_raw = request.data.get('mappings', '{}')
+        if isinstance(mappings_raw, str):
+            try:
+                mappings = json.loads(mappings_raw)
+            except json.JSONDecodeError:
+                return Response({'error': 'Invalid mappings JSON'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            mappings = mappings_raw
+
+        if not mappings:
+            return Response({'error': 'No mappings provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from docx import Document as DocxDocument
+            import re
+            from io import BytesIO
+
+            doc = DocxDocument(file)
+
+            def replace_in_paragraph(paragraph):
+                full_text = ''.join(run.text for run in paragraph.runs)
+                new_text = full_text
+                for old_key, new_key in mappings.items():
+                    new_text = new_text.replace(f'{{{{{old_key}}}}}', f'{{{{{new_key}}}}}')
+                if new_text != full_text and paragraph.runs:
+                    paragraph.runs[0].text = new_text
+                    for run in paragraph.runs[1:]:
+                        run.text = ''
+
+            # Body paragraphs
+            for p in doc.paragraphs:
+                replace_in_paragraph(p)
+
+            # Tables
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for p in cell.paragraphs:
+                            replace_in_paragraph(p)
+
+            # Headers/footers
+            for section in doc.sections:
+                for part in [section.header, section.footer,
+                             section.first_page_header, section.first_page_footer]:
+                    if part and part.is_linked_to_previous is False:
+                        for p in part.paragraphs:
+                            replace_in_paragraph(p)
+
+            output = BytesIO()
+            doc.save(output)
+            output.seek(0)
+
+            from django.http import FileResponse
+            response = FileResponse(
+                output,
+                content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
+            response['Content-Disposition'] = f'attachment; filename="fixed_{file.name}"'
+            return response
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class TrainingModuleViewSet(viewsets.ModelViewSet):
     """교육 모듈 관리 (Store Settings용)"""

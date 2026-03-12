@@ -23,6 +23,24 @@ class TemperatureLocation(models.Model):
         return f"{self.name}"
 
 
+class CleaningArea(models.Model):
+    """Cleaning area definitions (Store Settings, used in cleaning records)"""
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='cleaning_areas')
+    name = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['sort_order', 'name']
+        unique_together = ('organization', 'name')
+
+    def __str__(self):
+        return f"{self.name}"
+
+
 class SafetyChecklistTemplate(models.Model):
     """안전 체크리스트 템플릿"""
     STAGE_CHOICES = [
