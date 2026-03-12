@@ -636,16 +636,26 @@ export default function DailyClosingForm() {
           </button>
         )}
 
-        {/* Manager: Submit & Approve (new entry or draft) */}
+        {/* Manager: Submit only OR Submit & Approve (new entry or draft) */}
         {!isReadOnly && isManager && !editMode && (!closingId || closingStatus === 'DRAFT') && (
-          <button
-            onClick={handleSubmitAndApprove}
-            disabled={saving}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
-          >
-            <CheckCircleIcon size={18} />
-            {saving ? 'Processing...' : 'Submit & Approve'}
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition"
+            >
+              <CheckCircleIcon size={18} />
+              {saving ? 'Saving...' : 'Submit'}
+            </button>
+            <button
+              onClick={handleSubmitAndApprove}
+              disabled={saving}
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
+            >
+              <CheckCircleIcon size={18} />
+              {saving ? 'Processing...' : 'Submit & Approve'}
+            </button>
+          </div>
         )}
 
         {/* Manager: Approve submitted entries */}
