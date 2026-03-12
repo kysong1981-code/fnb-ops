@@ -1,35 +1,13 @@
-version: '3.8'
-
 services:
-  db:
-    image: mysql:8.0
-    container_name: fnb_ops_db
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: fnb_ops_db
-      MYSQL_CHARACTER_SET_SERVER: utf8mb4
-      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 20s
-      retries: 10
-
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: fnb_ops_backend
-    command: python manage.py runserver 0.0.0.0:8000
-    ports:
-      - "8000:8000"
+    container_name: fnb-ops-backend
+    restart: unless-stopped
     env_file:
       - .env
     environment:
-      - DEBUG=${DEBUG:-True}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,oneops.co.nz,3.27.246.211}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,https://oneops.co.nz}
       - DB_ENGINE=django.db.backends.mysql
@@ -38,24 +16,59 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-root}
       - DB_HOST=${DB_HOST:-db}
       - DB_PORT=${DB_PORT:-3306}
+      - TZ=Pacific/Auckland
     volumes:
       - ./backend:/app
-    depends_on:
-      db:
-        condition: service_healthy
+      - backend_media:/app/media
+    expose:
+      - "8000"
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn core.wsgi:application
+             --bind 0.0.0.0:8000
+             --workers 3
+             --timeout 120
+             --access-logfile -
+             --error-logfile -"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
-  frontend:
+  nginx:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: fnb_ops_frontend
+      context: .
+      dockerfile: nginx/Dockerfile
+    container_name: fnb-ops-nginx
+    restart: unless-stopped
     ports:
-      - "5173:5173"
+      - "80:80"
+      - "443:443"
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    environment:
-      - VITE_API_URL=http://localhost:8000/api
+      - certbot_etc:/etc/letsencrypt
+      - certbot_var:/var/www/certbot
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  certbot:
+    image: certbot/certbot
+    container_name: fnb-ops-certbot
+    restart: unless-stopped
+    volumes:
+      - certbot_etc:/etc/letsencrypt
+      - certbot_var:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done'"
 
 volumes:
-  mysql_data:
+  backend_media:
+  certbot_etc:
+  certbot_var:
