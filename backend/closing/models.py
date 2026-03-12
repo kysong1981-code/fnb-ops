@@ -100,18 +100,18 @@ class DailyClosing(models.Model):
 
     @property
     def card_variance(self):
-        """카드 배리언스 = POS - Actual"""
-        return self.pos_card - self.actual_card
+        """카드 배리언스 = Actual - POS"""
+        return self.actual_card - self.pos_card
 
     @property
     def cash_variance(self):
-        """현금 배리언스 = POS - Actual"""
-        return self.pos_cash - self.actual_cash
+        """현금 배리언스 = Actual - POS"""
+        return self.actual_cash - self.pos_cash
 
     @property
     def total_variance(self):
-        """총 배리언스 = POS Total - Actual Total"""
-        return self.pos_total - self.actual_total
+        """총 배리언스 = Actual Total - POS Total"""
+        return self.actual_total - self.pos_total
 
 
 class ClosingSupplierCost(models.Model):

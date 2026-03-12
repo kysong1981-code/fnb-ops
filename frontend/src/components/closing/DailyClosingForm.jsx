@@ -16,7 +16,10 @@ export default function DailyClosingForm() {
 
   const [closingDate, setClosingDate] = useState(searchParams.get('date') || new Date().toISOString().split('T')[0])
   const [closingId, setClosingId] = useState(null)
-  const [closingStatus, setClosingStatus] = useState('DRAFT')
+  const [closingStatus, setClosingStatus] = useState(null)
+
+  // Edit mode: manager can unlock submitted/approved entries
+  const [editMode, setEditMode] = useState(false)
 
   // POS
   const [posCard, setPosCard] = useState('')
@@ -27,7 +30,7 @@ export default function DailyClosingForm() {
   const [actualCard, setActualCard] = useState('')
   const [actualCash, setActualCash] = useState('')
 
-  // Cash Up
+  // HR Cash
   const [hrCashAmount, setHrCashAmount] = useState('')
   const [hrCashEntryId, setHrCashEntryId] = useState(null)
   const [hrCashEnabled, setHrCashEnabled] = useState(false)
@@ -55,8 +58,20 @@ export default function DailyClosingForm() {
   const totalVariance = cardVariance + cashVariance
 
   const fmt = (v) => `$${parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  // Managers can edit any status, non-managers can only edit DRAFT
-  const isReadOnly = isManager ? false : closingStatus !== 'DRAFT'
+
+  // Read-only logic:
+  // - No existing closing (new entry) → editable
+  // - Existing + DRAFT → editable
+  // - Existing + SUBMITTED/APPROVED → read-only unless manager enables edit mode
+  const isReadOnly = (() => {
+    if (!closingId) return false // New entry
+    if (closingStatus === 'DRAFT') return false
+    if (isManager && editMode) return false
+    return true
+  })()
+
+  // Can manager enable edit?
+  const canEdit = closingId && isManager && !editMode && (closingStatus === 'SUBMITTED' || closingStatus === 'APPROVED')
 
   // Load suppliers + sales categories
   useEffect(() => {
@@ -71,6 +86,7 @@ export default function DailyClosingForm() {
 
   // Check if closing exists for selected date
   useEffect(() => {
+    setEditMode(false)
     const checkExisting = async () => {
       try {
         const res = await closingAPI.getByDate(closingDate)
@@ -85,7 +101,6 @@ export default function DailyClosingForm() {
           setActualCard(c.actual_card || '')
           setActualCash(c.actual_cash || '')
           setHrCashEnabled(c.hr_cash_enabled || false)
-          // HR Cash entry
           const hrEntries = c.hr_cash_entries || []
           if (hrEntries.length > 0) {
             setHrCashAmount(hrEntries[0].amount || '')
@@ -96,7 +111,7 @@ export default function DailyClosingForm() {
           }
         } else {
           setClosingId(null)
-          setClosingStatus('DRAFT')
+          setClosingStatus(null)
           setPosCard('')
           setPosCash('')
           setTabCount('')
@@ -168,7 +183,6 @@ export default function DailyClosingForm() {
         setHrCashEntryId(res.data.id)
       }
     } else if (hrCashEntryId) {
-      // Amount cleared → delete entry
       await hrCashAPI.delete(hrCashEntryId)
       setHrCashEntryId(null)
     }
@@ -197,8 +211,8 @@ export default function DailyClosingForm() {
     }
   }
 
-  // Save & Submit
-  const handleSaveAndSubmit = async () => {
+  // Save (create or update) + Submit
+  const handleSave = async () => {
     setSaving(true)
     setError('')
     try {
@@ -227,10 +241,16 @@ export default function DailyClosingForm() {
       await syncOtherSales(cId)
       await syncHrCash(cId)
 
-      // Submit
-      const res = await closingAPI.submit(cId)
-      setClosingStatus(res.data.status)
-      showMsg('Saved & Submitted')
+      // Submit if still draft
+      if (!closingStatus || closingStatus === 'DRAFT') {
+        try {
+          const res = await closingAPI.submit(cId)
+          setClosingStatus(res.data.status)
+        } catch { /* ignore submit errors for re-save */ }
+      }
+
+      setEditMode(false)
+      showMsg('Saved successfully')
     } catch (err) {
       setError(err.response?.data?.detail || err.response?.data?.closing_date?.[0] || 'Failed to save')
     } finally {
@@ -269,12 +289,10 @@ export default function DailyClosingForm() {
   }
 
   const statusBadge = {
-    DRAFT: 'bg-amber-100 text-amber-700',
     SUBMITTED: 'bg-blue-100 text-blue-700',
     APPROVED: 'bg-green-100 text-green-700',
-    REJECTED: 'bg-red-100 text-red-700',
   }
-  const statusLabel = { DRAFT: 'Draft', SUBMITTED: 'Submitted', APPROVED: 'Approved', REJECTED: 'Rejected' }
+  const statusLabel = { SUBMITTED: 'Submitted', APPROVED: 'Approved' }
 
   const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400'
 
@@ -289,11 +307,21 @@ export default function DailyClosingForm() {
           <h1 className="text-xl font-bold text-gray-900">Daily Closing</h1>
           <p className="text-sm text-gray-400 mt-0.5">Record daily sales, invoices & cash up</p>
         </div>
-        {closingId && (
-          <span className={`text-xs font-medium px-3 py-1 rounded-full ${statusBadge[closingStatus]}`}>
-            {statusLabel[closingStatus]}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {closingId && closingStatus && statusLabel[closingStatus] && (
+            <span className={`text-xs font-medium px-3 py-1 rounded-full ${statusBadge[closingStatus]}`}>
+              {statusLabel[closingStatus]}
+            </span>
+          )}
+          {canEdit && (
+            <button
+              onClick={() => setEditMode(true)}
+              className="text-xs font-medium px-3 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition"
+            >
+              Edit
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Messages */}
@@ -303,7 +331,7 @@ export default function DailyClosingForm() {
       {/* ──────── Closing Date ──────── */}
       <Card className="p-5">
         <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Closing Date</label>
-        <input type="date" value={closingDate} onChange={(e) => setClosingDate(e.target.value)} disabled={isReadOnly} className={`${inputCls} mt-2`} />
+        <input type="date" value={closingDate} onChange={(e) => setClosingDate(e.target.value)} disabled={closingId && isReadOnly} className={`${inputCls} mt-2`} />
       </Card>
 
       {/* ──────── POS ──────── */}
@@ -474,12 +502,21 @@ export default function DailyClosingForm() {
       <div className="space-y-3 pb-6">
         {!isReadOnly && (
           <button
-            onClick={handleSaveAndSubmit}
+            onClick={handleSave}
             disabled={saving}
             className="w-full flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition"
           >
             <CheckCircleIcon size={18} />
-            {saving ? 'Saving...' : 'Save & Submit'}
+            {saving ? 'Saving...' : editMode ? 'Save Changes' : 'Save & Submit'}
+          </button>
+        )}
+
+        {editMode && (
+          <button
+            onClick={() => setEditMode(false)}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
+          >
+            Cancel Edit
           </button>
         )}
 

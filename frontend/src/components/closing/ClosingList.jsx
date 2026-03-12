@@ -54,7 +54,7 @@ export default function ClosingList() {
 
   const fmt = (v) => `$${parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 
-  const filters = ['ALL', 'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED']
+  const filters = ['ALL', 'SUBMITTED', 'APPROVED']
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
