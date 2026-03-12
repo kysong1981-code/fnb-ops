@@ -133,8 +133,15 @@ export default function StoreSettings() {
   const [docTemplateUploading, setDocTemplateUploading] = useState(false)
   const [trainingForm, setTrainingForm] = useState(null)
 
+  // Job Titles (dynamic)
+  const [jobTitles, setJobTitles] = useState([])
+  const [jobTitleForm, setJobTitleForm] = useState(null)
+
   // Placeholder Preview Modal
   const [phModal, setPhModal] = useState(null) // { file, filename, known, unknown, docType, workType, jobTitle, mappings }
+
+  // DOCX Upload Tool
+  const [docxTool, setDocxTool] = useState({ file: null, result: null, loading: false, saveTarget: 'CONTRACT', saveWorkType: 'FULL_TIME', saveJobTitle: '', mappings: {} })
 
   // Integrations
   const [integrations, setIntegrations] = useState([])
@@ -221,6 +228,13 @@ export default function StoreSettings() {
     } catch (e) { console.error(e) }
   }, [])
 
+  const fetchJobTitles = useCallback(async () => {
+    try {
+      const res = await storeAPI.getJobTitles()
+      setJobTitles(Array.isArray(res.data) ? res.data : res.data.results || [])
+    } catch (e) { console.error(e) }
+  }, [])
+
   const fetchDocTemplates = useCallback(async () => {
     try {
       const res = await hrAPI.getDocumentTemplates()
@@ -250,10 +264,11 @@ export default function StoreSettings() {
     fetchCleaningAreas()
     fetchTemplates()
     fetchRecordConfigs()
+    fetchJobTitles()
     fetchDocTemplates()
     fetchTrainingModules()
     fetchIntegrations()
-  }, [fetchSettings, fetchSuppliers, fetchCategories, fetchTempLocations, fetchCleaningAreas, fetchTemplates, fetchRecordConfigs, fetchDocTemplates, fetchTrainingModules, fetchIntegrations])
+  }, [fetchSettings, fetchSuppliers, fetchCategories, fetchTempLocations, fetchCleaningAreas, fetchTemplates, fetchRecordConfigs, fetchJobTitles, fetchDocTemplates, fetchTrainingModules, fetchIntegrations])
 
   // ── Company Tab ──
   const handleSaveCompany = async () => {
@@ -433,6 +448,85 @@ export default function StoreSettings() {
       showToast('Cleaning area deleted')
     } catch (e) {
       showToast('Error deleting cleaning area')
+    }
+  }
+
+  // ── Job Titles ──
+  const handleSaveJobTitle = async () => {
+    if (!jobTitleForm) return
+    try {
+      const data = { code: jobTitleForm.code, label: jobTitleForm.label, is_active: jobTitleForm.is_active, sort_order: jobTitleForm.sort_order }
+      if (jobTitleForm.id) {
+        await storeAPI.updateJobTitle(jobTitleForm.id, data)
+      } else {
+        await storeAPI.createJobTitle(data)
+      }
+      setJobTitleForm(null)
+      fetchJobTitles()
+      showToast('Job title saved')
+    } catch (e) {
+      showToast(e.response?.data?.code?.[0] || e.response?.data?.label?.[0] || 'Error saving job title')
+    }
+  }
+
+  const handleDeleteJobTitle = async (id) => {
+    try {
+      await storeAPI.deleteJobTitle(id)
+      fetchJobTitles()
+      showToast('Job title deleted')
+    } catch (e) {
+      showToast('Error deleting job title')
+    }
+  }
+
+  // ── DOCX Upload Tool ──
+  const handleDocxToolUpload = async (file) => {
+    setDocxTool(prev => ({ ...prev, file, loading: true, result: null, mappings: {} }))
+    try {
+      const res = await hrAPI.extractPlaceholders(file)
+      const { known, unknown, known_keys } = res.data
+      const mappings = {}
+      unknown.forEach(ph => { mappings[ph.key] = '' })
+      setDocxTool(prev => ({ ...prev, loading: false, result: { known, unknown, known_keys }, mappings }))
+    } catch (e) {
+      showToast('Error extracting placeholders')
+      setDocxTool(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  const handleDocxToolSave = async () => {
+    if (!docxTool.file || !docxTool.result) return
+    setDocTemplateUploading(true)
+    try {
+      let fileToUpload = docxTool.file
+
+      // Fix placeholders if any mappings are set
+      const activeMappings = {}
+      Object.entries(docxTool.mappings).forEach(([key, val]) => {
+        if (val && val !== key) activeMappings[key] = val
+      })
+
+      if (Object.keys(activeMappings).length > 0) {
+        const res = await hrAPI.fixPlaceholders(docxTool.file, activeMappings)
+        fileToUpload = new File([res.data], docxTool.file.name, {
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        })
+      }
+
+      const fd = new FormData()
+      fd.append('document_type', docxTool.saveTarget)
+      fd.append('title', docxTool.file.name)
+      fd.append('file', fileToUpload)
+      if (docxTool.saveTarget === 'CONTRACT') fd.append('work_type', docxTool.saveWorkType)
+      if (docxTool.saveTarget === 'JOB_DESCRIPTION') fd.append('job_title', docxTool.saveJobTitle)
+      await hrAPI.createDocumentTemplate(fd)
+      fetchDocTemplates()
+      showToast('Template uploaded')
+      setDocxTool({ file: null, result: null, loading: false, saveTarget: 'CONTRACT', saveWorkType: 'FULL_TIME', saveJobTitle: '', mappings: {} })
+    } catch (e) {
+      showToast('Error uploading template')
+    } finally {
+      setDocTemplateUploading(false)
     }
   }
 
@@ -1156,30 +1250,190 @@ export default function StoreSettings() {
       {/* ── HR Setup Tab ── */}
       {tab === 'hr' && (
         <div className="space-y-6">
-          {/* Placeholder Guide */}
-          <Card className="bg-blue-50 border-blue-200">
-            <div className="px-5 py-4">
-              <h3 className="text-sm font-semibold text-blue-900">DOCX Placeholder Guide</h3>
-              <p className="text-xs text-blue-700 mt-1 mb-2">Upload <strong>.docx</strong> files with placeholders below. They will be auto-filled with employee & company data during onboarding.</p>
-              <p className="text-[11px] font-semibold text-blue-800 mb-1">Auto-fill placeholders:</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-xs text-blue-800">
-                <span><code className="bg-blue-100 px-1 rounded">{'{{employee_name}}'}</code></span>
-                <span><code className="bg-blue-100 px-1 rounded">{'{{hourly_rate}}'}</code></span>
-                <span><code className="bg-blue-100 px-1 rounded">{'{{job_title}}'}</code></span>
-                <span><code className="bg-blue-100 px-1 rounded">{'{{work_type}}'}</code></span>
-                <span><code className="bg-blue-100 px-1 rounded">{'{{start_date}}'}</code></span>
-                <span><code className="bg-blue-100 px-1 rounded">{'{{company_name}}'}</code></span>
-                <span><code className="bg-blue-100 px-1 rounded">{'{{company_address}}'}</code></span>
-                <span><code className="bg-blue-100 px-1 rounded">{'{{company_phone}}'}</code></span>
-                <span><code className="bg-blue-100 px-1 rounded">{'{{company_email}}'}</code></span>
+          {/* DOCX Placeholder Upload Tool */}
+          <Card>
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">DOCX Placeholder Upload Tool</h3>
+              <p className="text-xs text-gray-500">Upload a .docx template, preview/fix placeholders, then save to a document type</p>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              {/* Placeholder Reference */}
+              <details className="group">
+                <summary className="text-xs font-semibold text-blue-800 cursor-pointer select-none hover:text-blue-900">Placeholder Reference (click to expand)</summary>
+                <div className="mt-2 p-3 bg-blue-50 rounded-lg space-y-2">
+                  <p className="text-[11px] font-semibold text-blue-800">Auto-fill placeholders:</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-xs text-blue-800">
+                    <span><code className="bg-blue-100 px-1 rounded">{'{{employee_name}}'}</code></span>
+                    <span><code className="bg-blue-100 px-1 rounded">{'{{hourly_rate}}'}</code></span>
+                    <span><code className="bg-blue-100 px-1 rounded">{'{{job_title}}'}</code></span>
+                    <span><code className="bg-blue-100 px-1 rounded">{'{{work_type}}'}</code></span>
+                    <span><code className="bg-blue-100 px-1 rounded">{'{{start_date}}'}</code></span>
+                    <span><code className="bg-blue-100 px-1 rounded">{'{{company_name}}'}</code></span>
+                    <span><code className="bg-blue-100 px-1 rounded">{'{{company_address}}'}</code></span>
+                    <span><code className="bg-blue-100 px-1 rounded">{'{{company_phone}}'}</code></span>
+                    <span><code className="bg-blue-100 px-1 rounded">{'{{company_email}}'}</code></span>
+                  </div>
+                  <p className="text-[11px] font-semibold text-blue-800 mt-2">Signature markers:</p>
+                  <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs text-blue-800">
+                    <span><code className="bg-orange-100 text-orange-800 px-1 rounded">{'[[SIGNATURE]]'}</code></span>
+                    <span><code className="bg-orange-100 text-orange-800 px-1 rounded">{'[[INITIALS]]'}</code></span>
+                    <span><code className="bg-orange-100 text-orange-800 px-1 rounded">{'[[DATE]]'}</code></span>
+                  </div>
+                </div>
+              </details>
+
+              {/* File Upload */}
+              <div>
+                <label className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
+                  <CameraIcon size={18} className="text-gray-400" />
+                  <span className="text-sm text-gray-500">
+                    {docxTool.file ? docxTool.file.name : 'Choose .docx file to analyze...'}
+                  </span>
+                  <input
+                    type="file"
+                    accept=".docx"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files[0]) handleDocxToolUpload(e.target.files[0])
+                    }}
+                  />
+                </label>
               </div>
-              <p className="text-[11px] font-semibold text-blue-800 mt-3 mb-1">Signature markers (place where you want sign areas):</p>
-              <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs text-blue-800">
-                <span><code className="bg-orange-100 text-orange-800 px-1 rounded">{'[[SIGNATURE]]'}</code></span>
-                <span><code className="bg-orange-100 text-orange-800 px-1 rounded">{'[[INITIALS]]'}</code></span>
-                <span><code className="bg-orange-100 text-orange-800 px-1 rounded">{'[[DATE]]'}</code></span>
-              </div>
-              <p className="text-[10px] text-blue-600 mt-1">These markers will be auto-detected and shown as clickable sign areas during onboarding.</p>
+
+              {docxTool.loading && (
+                <div className="text-center py-3">
+                  <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  <p className="text-xs text-gray-500 mt-1">Analyzing placeholders...</p>
+                </div>
+              )}
+
+              {/* Placeholder Results */}
+              {docxTool.result && !docxTool.loading && (
+                <div className="space-y-3">
+                  {docxTool.result.known.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-green-700 mb-1">Known Placeholders ({docxTool.result.known.length})</h4>
+                      <div className="space-y-0.5">
+                        {docxTool.result.known.map(ph => (
+                          <div key={ph.key} className="flex items-center gap-2 text-xs">
+                            <span className="text-green-500">&#10003;</span>
+                            <code className="px-1 bg-green-50 text-green-800 rounded font-mono">{`{{${ph.key}}}`}</code>
+                            <span className="text-gray-500">{ph.description}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {docxTool.result.unknown.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-amber-700 mb-1">Unknown Placeholders ({docxTool.result.unknown.length})</h4>
+                      <p className="text-[11px] text-gray-500 mb-1">Map these to known placeholders or leave as-is</p>
+                      <div className="space-y-1.5">
+                        {docxTool.result.unknown.map(ph => (
+                          <div key={ph.key} className="flex items-center gap-2">
+                            <code className="px-1 bg-amber-50 text-amber-800 rounded text-xs font-mono whitespace-nowrap">{`{{${ph.key}}}`}</code>
+                            <span className="text-gray-400 text-xs">&rarr;</span>
+                            <select
+                              value={docxTool.mappings[ph.key] || ''}
+                              onChange={(e) => setDocxTool(prev => ({
+                                ...prev,
+                                mappings: { ...prev.mappings, [ph.key]: e.target.value }
+                              }))}
+                              className="flex-1 px-2 py-1 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="">Keep as-is</option>
+                              {docxTool.result.known_keys.map(k => (
+                                <option key={k} value={k}>{`{{${k}}}`}</option>
+                              ))}
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {docxTool.result.known.length === 0 && docxTool.result.unknown.length === 0 && (
+                    <p className="text-xs text-gray-500 text-center py-2">No placeholders found in this document.</p>
+                  )}
+
+                  {/* Save Target */}
+                  <div className="border-t border-gray-100 pt-3 space-y-2">
+                    <h4 className="text-xs font-semibold text-gray-700">Save as:</h4>
+                    <div className="flex items-center gap-4">
+                      {[
+                        { key: 'CONTRACT', label: 'Contract' },
+                        { key: 'JOB_OFFER', label: 'Job Offer' },
+                        { key: 'JOB_DESCRIPTION', label: 'Job Description' },
+                      ].map(({ key, label }) => (
+                        <label key={key} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                          <input
+                            type="radio"
+                            name="docxSaveTarget"
+                            checked={docxTool.saveTarget === key}
+                            onChange={() => setDocxTool(prev => ({ ...prev, saveTarget: key }))}
+                            className="text-blue-600"
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+
+                    {docxTool.saveTarget === 'CONTRACT' && (
+                      <div>
+                        <label className="text-[11px] text-gray-500 mb-1 block">Work Type</label>
+                        <select
+                          value={docxTool.saveWorkType}
+                          onChange={(e) => setDocxTool(prev => ({ ...prev, saveWorkType: e.target.value }))}
+                          className={inputCls + ' max-w-xs'}
+                        >
+                          {[
+                            { key: 'FULL_TIME', label: 'Full Time' },
+                            { key: 'PART_TIME', label: 'Part Time' },
+                            { key: 'CASUAL', label: 'Casual' },
+                            { key: 'SALARY', label: 'Salary' },
+                            { key: 'VISA_FULL_TIME', label: 'Visa Full Time' },
+                          ].map(({ key, label }) => (
+                            <option key={key} value={key}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {docxTool.saveTarget === 'JOB_DESCRIPTION' && (
+                      <div>
+                        <label className="text-[11px] text-gray-500 mb-1 block">Job Title</label>
+                        <select
+                          value={docxTool.saveJobTitle}
+                          onChange={(e) => setDocxTool(prev => ({ ...prev, saveJobTitle: e.target.value }))}
+                          className={inputCls + ' max-w-xs'}
+                        >
+                          <option value="">Select job title...</option>
+                          {jobTitles.filter(j => j.is_active).map(j => (
+                            <option key={j.id} value={j.code}>{j.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDocxToolSave}
+                      disabled={docTemplateUploading || (docxTool.saveTarget === 'JOB_DESCRIPTION' && !docxTool.saveJobTitle)}
+                      className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
+                    >
+                      {docTemplateUploading ? 'Uploading...' : Object.values(docxTool.mappings).some(v => v) ? 'Fix & Upload' : 'Upload'}
+                    </button>
+                    <button
+                      onClick={() => setDocxTool({ file: null, result: null, loading: false, saveTarget: 'CONTRACT', saveWorkType: 'FULL_TIME', saveJobTitle: '', mappings: {} })}
+                      className="px-4 py-2 text-gray-500 text-xs font-medium hover:text-gray-700"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </Card>
 
@@ -1289,46 +1543,80 @@ export default function StoreSettings() {
             </div>
           </Card>
 
-          {/* Job Descriptions — per job role */}
+          {/* Job Descriptions — per job role (dynamic) */}
           <Card>
-            <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-900">Job Descriptions</h3>
-              <p className="text-xs text-gray-500">Upload a job description per role — auto-assigned based on employee's job title</p>
+            <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Job Descriptions</h3>
+                <p className="text-xs text-gray-500">Manage job titles and upload descriptions per role</p>
+              </div>
+              <button
+                onClick={() => setJobTitleForm({ code: '', label: '', is_active: true, sort_order: jobTitles.length })}
+                className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition"
+              >
+                <PlusIcon size={14} /> Add Title
+              </button>
             </div>
+
+            {/* Add/Edit Job Title Form */}
+            {jobTitleForm && (
+              <div className="px-5 py-4 bg-blue-50 border-b border-blue-100">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                  <input className={inputCls} placeholder="Code (e.g. BARISTA)" value={jobTitleForm.code} onChange={(e) => setJobTitleForm({ ...jobTitleForm, code: e.target.value.toUpperCase().replace(/\s+/g, '_') })} />
+                  <input className={inputCls} placeholder="Label (e.g. Barista)" value={jobTitleForm.label} onChange={(e) => setJobTitleForm({ ...jobTitleForm, label: e.target.value })} />
+                  <input className={inputCls} type="number" placeholder="Order" value={jobTitleForm.sort_order} onChange={(e) => setJobTitleForm({ ...jobTitleForm, sort_order: Number(e.target.value) })} />
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" checked={jobTitleForm.is_active} onChange={(e) => setJobTitleForm({ ...jobTitleForm, is_active: e.target.checked })} className="rounded" />
+                    Active
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={handleSaveJobTitle} disabled={!jobTitleForm.code || !jobTitleForm.label} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50">Save</button>
+                  <button onClick={() => setJobTitleForm(null)} className="px-3 py-1.5 text-gray-500 text-xs font-medium hover:text-gray-700">Cancel</button>
+                </div>
+              </div>
+            )}
+
             <div className="p-5 space-y-2">
-              {[
-                { key: 'STORE_MANAGER', label: 'Store Manager' },
-                { key: 'ASSISTANT_MANAGER', label: 'Assistant Manager' },
-                { key: 'SUPERVISOR', label: 'Supervisor' },
-                { key: 'BARISTA', label: 'Barista' },
-                { key: 'HEAD_CHEF', label: 'Head Chef' },
-                { key: 'CHEF', label: 'Chef' },
-                { key: 'COOK', label: 'Cook' },
-                { key: 'KITCHEN_HAND', label: 'Kitchen Hand' },
-                { key: 'SERVER', label: 'Server' },
-                { key: 'CASHIER', label: 'Cashier' },
-                { key: 'ALL_ROUNDER', label: 'All Rounder' },
-                { key: 'CLEANER', label: 'Cleaner' },
-                { key: 'OTHER', label: 'Other' },
-              ].map(({ key, label }) => {
-                const existing = docTemplates.find((t) => t.document_type === 'JOB_DESCRIPTION' && t.job_title === key)
+              {jobTitles.length === 0 ? (
+                <p className="text-center text-gray-400 text-sm py-4">No job titles yet</p>
+              ) : jobTitles.map((jt) => {
+                const existing = docTemplates.find((t) => t.document_type === 'JOB_DESCRIPTION' && t.job_title === jt.code)
                 return (
-                  <div key={key} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl">
+                  <div key={jt.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">{label}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-gray-900">{jt.label}</p>
+                        <span className="text-[10px] text-gray-400 font-mono">{jt.code}</span>
+                        {!jt.is_active && (
+                          <span className="inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-gray-100 text-gray-500">Inactive</span>
+                        )}
+                      </div>
                       {existing ? (
                         <p className="text-xs text-green-600 mt-0.5 truncate">{existing.title}</p>
                       ) : (
                         <p className="text-xs text-gray-400 mt-0.5">No description</p>
                       )}
                     </div>
-                    <div className="flex items-center gap-1.5 ml-3">
+                    <div className="flex items-center gap-1 ml-3">
+                      <button
+                        onClick={() => setJobTitleForm({ ...jt })}
+                        className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                      >
+                        <EditIcon size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteJobTitle(jt.id)}
+                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                      >
+                        <TrashIcon size={14} />
+                      </button>
                       {existing && (
                         <button
                           onClick={() => handleDeleteDocTemplate(existing.id)}
-                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete description"
                         >
-                          <TrashIcon size={14} />
+                          <XIcon size={14} />
                         </button>
                       )}
                       <label className="px-2.5 py-1 bg-white border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 cursor-pointer transition">
@@ -1341,7 +1629,7 @@ export default function StoreSettings() {
                           onChange={(e) => {
                             if (e.target.files[0]) {
                               if (existing) handleDeleteDocTemplate(existing.id)
-                              handleUploadDocTemplate('JOB_DESCRIPTION', e.target.files[0], { jobTitle: key })
+                              handleUploadDocTemplate('JOB_DESCRIPTION', e.target.files[0], { jobTitle: jt.code })
                             }
                           }}
                         />

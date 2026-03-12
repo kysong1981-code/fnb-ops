@@ -5,11 +5,12 @@ from .views import (
     IntegrationListView,
     integration_connect, integration_disconnect, integration_test,
     integration_sync, integration_store_select,
-    StoreApplicationAdminViewSet,
+    StoreApplicationAdminViewSet, JobTitleViewSet,
 )
 
 router = DefaultRouter()
 router.register(r'store-applications', StoreApplicationAdminViewSet, basename='store-application')
+router.register(r'job-titles', JobTitleViewSet, basename='job-title')
 
 urlpatterns = [
     path('stores/', StoreListView.as_view(), name='store-list'),

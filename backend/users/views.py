@@ -11,9 +11,10 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Organization, UserProfile, Integration, StoreApplication
-from .serializers import OrganizationSerializer, IntegrationSerializer, StoreApplicationSerializer
+from .models import Organization, UserProfile, Integration, StoreApplication, JobTitle
+from .serializers import OrganizationSerializer, IntegrationSerializer, StoreApplicationSerializer, JobTitleSerializer
 from .permissions import IsManager
+from .filters import OrganizationFilterBackend
 
 logger = logging.getLogger(__name__)
 
@@ -427,3 +428,15 @@ class StoreApplicationAdminViewSet(viewsets.ReadOnlyModelViewSet):
         application.save()
 
         return Response(StoreApplicationSerializer(application).data)
+
+
+class JobTitleViewSet(viewsets.ModelViewSet):
+    """CRUD for dynamic job titles per organization"""
+    queryset = JobTitle.objects.all()
+    serializer_class = JobTitleSerializer
+    permission_classes = [IsAuthenticated, IsManager]
+    filter_backends = [OrganizationFilterBackend]
+    pagination_class = None
+
+    def perform_create(self, serializer):
+        serializer.save(organization=self.request.user.profile.organization)

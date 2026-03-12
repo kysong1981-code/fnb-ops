@@ -341,6 +341,12 @@ export const storeAPI = {
   updateSalesCategory: (id, data) => api.patch(`/closing/sales-categories/${id}/`, data),
   deleteSalesCategory: (id) => api.delete(`/closing/sales-categories/${id}/`),
 
+  // Job Titles
+  getJobTitles: (params) => api.get('/users/job-titles/', { params }),
+  createJobTitle: (data) => api.post('/users/job-titles/', data),
+  updateJobTitle: (id, data) => api.patch(`/users/job-titles/${id}/`, data),
+  deleteJobTitle: (id) => api.delete(`/users/job-titles/${id}/`),
+
   // Integrations
   getIntegrations: () => api.get('/users/integrations/'),
   connectIntegration: (service, data) => api.post(`/users/integrations/${service}/connect/`, data),

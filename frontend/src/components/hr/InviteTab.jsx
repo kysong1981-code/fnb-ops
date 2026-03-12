@@ -1,24 +1,8 @@
 import { useState, useEffect } from 'react'
-import { hrAPI } from '../../services/api'
+import { hrAPI, storeAPI } from '../../services/api'
 import Card from '../ui/Card'
 import SectionLabel from '../ui/SectionLabel'
 import { TrashIcon, ClipboardIcon } from '../icons'
-
-const JOB_TITLES = [
-  { value: 'STORE_MANAGER', label: 'Store Manager' },
-  { value: 'ASSISTANT_MANAGER', label: 'Assistant Manager' },
-  { value: 'SUPERVISOR', label: 'Supervisor' },
-  { value: 'BARISTA', label: 'Barista' },
-  { value: 'HEAD_CHEF', label: 'Head Chef' },
-  { value: 'CHEF', label: 'Chef' },
-  { value: 'COOK', label: 'Cook' },
-  { value: 'KITCHEN_HAND', label: 'Kitchen Hand' },
-  { value: 'SERVER', label: 'Server' },
-  { value: 'CASHIER', label: 'Cashier' },
-  { value: 'ALL_ROUNDER', label: 'All Rounder' },
-  { value: 'CLEANER', label: 'Cleaner' },
-  { value: 'OTHER', label: 'Other' },
-]
 
 const WORK_TYPES = [
   { value: 'FULL_TIME', label: 'Full Time' },
@@ -37,6 +21,7 @@ export default function InviteTab() {
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
   const [credentials, setCredentials] = useState(null) // { email, password, invite_code }
+  const [jobTitles, setJobTitles] = useState([])
 
   const [form, setForm] = useState({
     first_name: '',
@@ -65,7 +50,15 @@ export default function InviteTab() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { loadInvites() }, [])
+  const loadJobTitles = async () => {
+    try {
+      const res = await storeAPI.getJobTitles()
+      const titles = (Array.isArray(res.data) ? res.data : res.data.results || []).filter(j => j.is_active)
+      setJobTitles(titles)
+    } catch (e) { console.error('Failed to load job titles', e) }
+  }
+
+  useEffect(() => { loadInvites(); loadJobTitles() }, [])
 
   const showMsg = (msg) => {
     setSuccess(msg)
@@ -202,7 +195,7 @@ export default function InviteTab() {
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Job Title *</label>
               <select value={form.job_title} onChange={(e) => setForm({ ...form, job_title: e.target.value })} className={inputCls}>
-                {JOB_TITLES.map((j) => <option key={j.value} value={j.value}>{j.label}</option>)}
+                {jobTitles.map((j) => <option key={j.code} value={j.code}>{j.label}</option>)}
               </select>
             </div>
             <div>

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Organization, UserProfile, Permission, AuditLog, Integration, StoreApplication
+from .models import Organization, UserProfile, Permission, AuditLog, Integration, StoreApplication, JobTitle
 
 
 # 1. 간단한 것부터: Organization
@@ -180,3 +180,11 @@ class StoreApplicationSerializer(serializers.ModelSerializer):
         if obj.reviewed_by and obj.reviewed_by.user:
             return obj.reviewed_by.user.get_full_name() or obj.reviewed_by.user.username
         return None
+
+
+# 8. JobTitle
+class JobTitleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = JobTitle
+        fields = ['id', 'code', 'label', 'is_active', 'sort_order', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']

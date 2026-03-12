@@ -2,7 +2,7 @@ import uuid
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
-from users.models import Organization, UserProfile, ROLE_CHOICES, WORK_TYPE_CHOICES, JOB_TITLE_CHOICES
+from users.models import Organization, UserProfile, ROLE_CHOICES, WORK_TYPE_CHOICES
 
 
 class Onboarding(models.Model):
@@ -336,7 +336,7 @@ class EmployeeInvite(models.Model):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100, blank=True, default='')
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='EMPLOYEE')
-    job_title = models.CharField(max_length=30, choices=JOB_TITLE_CHOICES)
+    job_title = models.CharField(max_length=30)
     work_type = models.CharField(max_length=20, choices=WORK_TYPE_CHOICES)
     hourly_rate = models.DecimalField(max_digits=8, decimal_places=2)
 
@@ -385,7 +385,7 @@ class DocumentTemplate(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='document_templates')
     document_type = models.CharField(max_length=50, choices=TEMPLATE_TYPE_CHOICES)
     work_type = models.CharField(max_length=20, choices=WORK_TYPE_CHOICES, null=True, blank=True)
-    job_title = models.CharField(max_length=30, choices=JOB_TITLE_CHOICES, null=True, blank=True)
+    job_title = models.CharField(max_length=30, null=True, blank=True)
     title = models.CharField(max_length=255)
     file = models.FileField(upload_to='document_templates/%Y/%m/')
     is_active = models.BooleanField(default=True)

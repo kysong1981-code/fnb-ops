@@ -165,7 +165,7 @@ class UserProfile(models.Model):
     work_type = models.CharField(max_length=20, choices=WORK_TYPE_CHOICES, default='FULL_TIME')
 
     # Job title
-    job_title = models.CharField(max_length=30, choices=JOB_TITLE_CHOICES, null=True, blank=True)
+    job_title = models.CharField(max_length=30, null=True, blank=True)
 
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -315,3 +315,21 @@ class StoreApplication(models.Model):
 
     def __str__(self):
         return f"{self.store_name} - {self.applicant_name} ({self.status})"
+
+
+class JobTitle(models.Model):
+    """Dynamic job titles per organization"""
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='job_titles')
+    code = models.CharField(max_length=30)
+    label = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['sort_order', 'label']
+        unique_together = ('organization', 'code')
+
+    def __str__(self):
+        return f"{self.label} ({self.code})"
