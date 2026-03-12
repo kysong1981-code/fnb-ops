@@ -1,11 +1,19 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { safetyAPI } from '../../services/api'
 import Card from '../ui/Card'
 import SectionLabel from '../ui/SectionLabel'
 import { ShieldIcon, CheckCircleIcon, ClockIcon } from '../icons'
 import SafetyRecordForm from './records/SafetyRecordForm'
 
+// Tasks that navigate to a dedicated page instead of quick complete
+const LEGACY_ROUTES = {
+  daily_temperature: '/safety/temperatures/new',
+  daily_cleaning: '/safety/cleaning',
+}
+
 export default function SafetyTasksWidget() {
+  const navigate = useNavigate()
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedTask, setSelectedTask] = useState(null)
@@ -189,10 +197,19 @@ export default function SafetyTasksWidget() {
                   {/* Action */}
                   {!task.is_completed && (
                     <button
-                      onClick={() => hasFields ? handleComplete(task) : handleQuickComplete(task)}
+                      onClick={() => {
+                        const route = LEGACY_ROUTES[rt.code]
+                        if (route) {
+                          navigate(route)
+                        } else if (hasFields) {
+                          handleComplete(task)
+                        } else {
+                          handleQuickComplete(task)
+                        }
+                      }}
                       className="ml-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg transition-colors flex-shrink-0 active:scale-95"
                     >
-                      ✓ Complete
+                      {LEGACY_ROUTES[rt.code] ? 'Open' : '✓ Complete'}
                     </button>
                   )}
                 </div>
