@@ -29,6 +29,7 @@ export default function ManagerDashboard() {
   const [staff, setStaff] = useState([])
   const [weeklyData, setWeeklyData] = useState(null)
   const [pendingClosings, setPendingClosings] = useState([])
+  const [recentClosings, setRecentClosings] = useState([])
   const [approvingId, setApprovingId] = useState(null)
 
   useEffect(() => {
@@ -56,6 +57,14 @@ export default function ManagerDashboard() {
         const res = await closingAPI.list({ status: 'SUBMITTED' })
         const items = res.data?.results || res.data || []
         setPendingClosings(items)
+      } catch {}
+
+      // Load recent closings (all statuses) for history
+      try {
+        const res = await closingAPI.list({})
+        const items = res.data?.results || res.data || []
+        // Sort by date desc, take last 7 days
+        setRecentClosings(items.sort((a, b) => b.closing_date.localeCompare(a.closing_date)).slice(0, 7))
       } catch {}
 
       // Load this week's closing data for chart
@@ -252,6 +261,64 @@ export default function ManagerDashboard() {
                       </button>
                     </div>
                   </div>
+                )
+              })}
+            </div>
+          </Card>
+        </>
+      )}
+
+      {/* Recent Closings */}
+      {recentClosings.length > 0 && (
+        <>
+          <SectionLabel>Recent Closings</SectionLabel>
+          <Card className="overflow-hidden">
+            <div className="divide-y divide-gray-50">
+              {recentClosings.map(c => {
+                const variance = parseFloat(c.total_variance || 0)
+                const statusMap = {
+                  DRAFT: { label: 'Draft', cls: 'bg-gray-100 text-gray-600' },
+                  SUBMITTED: { label: 'Submitted', cls: 'bg-blue-100 text-blue-700' },
+                  APPROVED: { label: 'Approved', cls: 'bg-green-100 text-green-700' },
+                  REJECTED: { label: 'Rejected', cls: 'bg-red-100 text-red-700' },
+                }
+                const st = statusMap[c.status] || { label: c.status, cls: 'bg-gray-100 text-gray-600' }
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => navigate(`/closing/form?date=${c.closing_date}`)}
+                    className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition text-left"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="text-center w-10">
+                        <p className="text-xs text-gray-400">
+                          {new Date(c.closing_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}
+                        </p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {new Date(c.closing_date + 'T00:00:00').getDate()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          POS: {fmt(c.pos_total)} · Actual: {fmt(c.actual_total)}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={`text-xs font-medium ${variance === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            Var: {variance >= 0 ? '+' : ''}{fmt(variance)}
+                          </span>
+                          {c.created_by_name && (
+                            <span className="text-xs text-gray-400">by {c.created_by_name}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${st.cls}`}>
+                        {st.label}
+                      </span>
+                      <ArrowRightIcon size={14} className="text-gray-300" />
+                    </div>
+                  </button>
                 )
               })}
             </div>
