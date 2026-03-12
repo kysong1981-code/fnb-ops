@@ -923,6 +923,7 @@ class TeamViewSet(viewsets.ViewSet):
         data = []
         for p in team:
             data.append({
+                'id': p.id,
                 'profile_id': p.id,
                 'user_id': p.user.id,
                 'name': p.user.get_full_name() or p.user.username,
