@@ -159,6 +159,10 @@ export default function TeamTab() {
                         {/* Basic Info */}
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
+                            <span className="text-xs text-gray-400">Job Title</span>
+                            <p className="text-gray-900">{detail.job_title_display || '-'}</p>
+                          </div>
+                          <div>
                             <span className="text-xs text-gray-400">Employee ID</span>
                             <p className="text-gray-900">{detail.employee_id}</p>
                           </div>
@@ -169,6 +173,10 @@ export default function TeamTab() {
                           <div>
                             <span className="text-xs text-gray-400">Phone</span>
                             <p className="text-gray-900">{detail.phone || '-'}</p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-400">Work Type</span>
+                            <p className="text-gray-900">{detail.work_type_display || '-'}</p>
                           </div>
                           <div>
                             <span className="text-xs text-gray-400">Joined</span>
