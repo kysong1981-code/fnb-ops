@@ -69,7 +69,6 @@ export default function StoreReport() {
     { key: 'cash', label: 'Cash Report' },
     { key: 'sky', label: 'Sky Report' },
     ...(isAdmin ? [{ key: 'cq', label: 'CQ Report' }] : []),
-    ...(isRegional ? [{ key: 'comparison', label: 'Store Comparison' }] : []),
   ]
 
   useEffect(() => {
