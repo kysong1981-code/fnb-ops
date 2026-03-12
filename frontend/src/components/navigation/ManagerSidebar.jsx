@@ -21,15 +21,18 @@ const menuSections = [
       { label: 'Daily Closing', path: '/closing', icon: ClipboardIcon, module: 'CLOSING' },
       { label: 'Cash Up', path: '/cashup', icon: MoneyIcon, module: 'CASHUP' },
       { label: 'Reports', path: '/reports', icon: ChartIcon, module: 'REPORTS' },
-      { label: 'Sky Report', path: '/sky-report', icon: ChartIcon, module: 'REPORTS' },
       { label: 'Sales Analysis', path: '/sales', icon: ChartIcon, module: 'SALES' },
-      { label: 'Roster Management', path: '/manager/roster', icon: CalendarIcon, module: 'ROSTER' },
-      { label: 'Timesheet Review', path: '/manager/timesheet-review', icon: ClockIcon, module: 'TIMESHEET' },
       { label: 'HR Management', path: '/hr', icon: TeamIcon, module: 'HR' },
-      { label: 'Payroll', path: '/manager/payroll', icon: MoneyIcon, module: 'PAYROLL' },
       { label: 'Assign Tasks', path: '/manager/assign-tasks', icon: CheckCircleIcon, module: 'TASKS' },
       { label: 'Safety Records', path: '/safety/inspection', icon: ShieldIcon, module: 'SAFETY' },
-      { label: 'Inquiries', path: '/inquiries', icon: BellIcon, module: 'INQUIRIES' },
+    ]
+  },
+  {
+    title: 'Schedule',
+    items: [
+      { label: 'Roster Management', path: '/manager/roster', icon: CalendarIcon, module: 'ROSTER' },
+      { label: 'Timesheet Review', path: '/manager/timesheet-review', icon: ClockIcon, module: 'TIMESHEET' },
+      { label: 'Payroll', path: '/manager/payroll', icon: MoneyIcon, module: 'PAYROLL' },
     ]
   },
   {
@@ -43,7 +46,6 @@ const menuSections = [
   {
     title: 'Settings',
     items: [
-      { label: 'Store Settings', path: '/store-settings', icon: SettingsIcon },
       { label: 'Documents', path: '/documents', icon: DocumentIcon, module: 'DOCUMENTS' },
     ]
   },

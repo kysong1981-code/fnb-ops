@@ -124,7 +124,7 @@ export default function MyPage() {
 
   const loadInquiries = async () => {
     setInqLoading(true)
-    try { const r = await hrAPI.getInquiries(); setInquiries(r.data) } catch {}
+    try { const r = await hrAPI.getInquiries(); setInquiries(r.data?.results || r.data || []) } catch {}
     setInqLoading(false)
   }
 

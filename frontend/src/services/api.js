@@ -544,6 +544,7 @@ export const adminAPI = {
   submitStoreApplication: (data) => api.post('/auth/store-application/', data),
   getManagerStores: () => api.get('/users/assign-stores/'),
   assignStores: (userId, storeIds) => api.post('/users/assign-stores/', { user_id: userId, store_ids: storeIds }),
+  updateUserRole: (userId, role, storeIds) => api.post('/users/assign-stores/', { user_id: userId, role, store_ids: storeIds || [] }),
 }
 
 export const skyReportAPI = {

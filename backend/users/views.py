@@ -39,7 +39,7 @@ class StoreListView(generics.ListAPIView):
 
 
 class AssignStoresView(APIView):
-    """CEO/HQ: 매니저에게 스토어 배정"""
+    """CEO/HQ: 매니저에게 스토어 배정 + 역할 변경"""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -49,38 +49,59 @@ class AssignStoresView(APIView):
 
         user_id = request.data.get('user_id')
         store_ids = request.data.get('store_ids', [])
+        new_role = request.data.get('role')  # Optional role change
 
         try:
             target_profile = UserProfile.objects.get(id=user_id)
         except UserProfile.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        if target_profile.role not in ('REGIONAL_MANAGER', 'SENIOR_MANAGER'):
-            return Response({'error': 'Can only assign stores to Enterprise/Area Managers'}, status=status.HTTP_400_BAD_REQUEST)
+        # If role change requested
+        if new_role:
+            allowed_roles = ['EMPLOYEE', 'MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER']
+            if new_role not in allowed_roles:
+                return Response({'error': f'Invalid role. Allowed: {allowed_roles}'}, status=status.HTTP_400_BAD_REQUEST)
+            target_profile.role = new_role
+            # Clear managed_stores if demoted to non-manager role
+            if new_role not in ('REGIONAL_MANAGER', 'SENIOR_MANAGER'):
+                target_profile.managed_stores.clear()
+                store_ids = []
+            target_profile.save()
 
-        stores = Organization.objects.filter(id__in=store_ids, level='STORE')
-        target_profile.managed_stores.set(stores)
+        # Assign stores (only for Enterprise/Area Managers)
+        if store_ids and target_profile.role in ('REGIONAL_MANAGER', 'SENIOR_MANAGER'):
+            stores = Organization.objects.filter(id__in=store_ids, level='STORE')
+            target_profile.managed_stores.set(stores)
+        elif not new_role:
+            # If no role change and just store assignment, check role
+            if target_profile.role not in ('REGIONAL_MANAGER', 'SENIOR_MANAGER'):
+                return Response({'error': 'Can only assign stores to Enterprise/Area Managers'}, status=status.HTTP_400_BAD_REQUEST)
+            stores = Organization.objects.filter(id__in=store_ids, level='STORE')
+            target_profile.managed_stores.set(stores)
 
         return Response({
-            'message': f'Assigned {stores.count()} stores to {target_profile.user.get_full_name() or target_profile.user.email}',
-            'managed_stores': OrganizationSerializer(stores, many=True).data
+            'message': f'Updated {target_profile.user.get_full_name() or target_profile.user.email}',
+            'role': target_profile.role,
+            'managed_stores': OrganizationSerializer(target_profile.managed_stores.all(), many=True).data
         })
 
     def get(self, request):
-        """Get managers and their assigned stores"""
+        """Get all staff with their roles and assigned stores"""
         profile = request.user.profile
         if profile.role not in ('CEO', 'HQ', 'ADMIN'):
             return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
 
-        managers = UserProfile.objects.filter(
-            role__in=['REGIONAL_MANAGER', 'SENIOR_MANAGER']
+        # Return all users except CEO/HQ/ADMIN
+        profiles = UserProfile.objects.exclude(
+            role__in=['CEO', 'HQ', 'ADMIN']
         ).select_related('user', 'organization')
 
         result = []
-        for m in managers:
+        for m in profiles:
             result.append({
                 'id': m.id,
                 'name': m.user.get_full_name() or m.user.email,
+                'email': m.user.email,
                 'role': m.role,
                 'role_display': m.get_role_display(),
                 'organization': m.organization.name if m.organization else None,

@@ -34,7 +34,7 @@ export default function InquiriesManager() {
     setLoading(true)
     try {
       const res = await hrAPI.getInquiries()
-      setInquiries(res.data)
+      setInquiries(res.data?.results || res.data || [])
     } catch {}
     setLoading(false)
   }
