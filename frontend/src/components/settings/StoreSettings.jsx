@@ -530,6 +530,39 @@ export default function StoreSettings() {
     }
   }
 
+  const handleDocxToolDownload = async () => {
+    if (!docxTool.file) return
+    try {
+      let fileToDownload = docxTool.file
+
+      // Apply mappings if any
+      const activeMappings = {}
+      Object.entries(docxTool.mappings).forEach(([key, val]) => {
+        if (val && val !== key) activeMappings[key] = val
+      })
+
+      if (Object.keys(activeMappings).length > 0) {
+        const res = await hrAPI.fixPlaceholders(docxTool.file, activeMappings)
+        fileToDownload = new File([res.data], docxTool.file.name, {
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        })
+      }
+
+      // Trigger browser download
+      const url = URL.createObjectURL(fileToDownload)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileToDownload.name
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      showToast('File downloaded — edit in Word then re-upload')
+    } catch (e) {
+      showToast('Error downloading file')
+    }
+  }
+
   // ── HR Document Templates ──
   const handleUploadDocTemplate = async (docType, file, { workType, jobTitle } = {}) => {
     // For DOCX files, extract placeholders and show preview modal
@@ -1257,28 +1290,39 @@ export default function StoreSettings() {
               <p className="text-xs text-gray-500">Upload a .docx template, preview/fix placeholders, then save to a document type</p>
             </div>
             <div className="px-5 py-4 space-y-4">
-              {/* Placeholder Reference */}
-              <details className="group">
-                <summary className="text-xs font-semibold text-blue-800 cursor-pointer select-none hover:text-blue-900">Placeholder Reference (click to expand)</summary>
+              {/* Placeholder Reference — click to copy */}
+              <details className="group" open>
+                <summary className="text-xs font-semibold text-blue-800 cursor-pointer select-none hover:text-blue-900">Placeholder Reference (click code to copy)</summary>
                 <div className="mt-2 p-3 bg-blue-50 rounded-lg space-y-2">
                   <p className="text-[11px] font-semibold text-blue-800">Auto-fill placeholders:</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-xs text-blue-800">
-                    <span><code className="bg-blue-100 px-1 rounded">{'{{employee_name}}'}</code></span>
-                    <span><code className="bg-blue-100 px-1 rounded">{'{{hourly_rate}}'}</code></span>
-                    <span><code className="bg-blue-100 px-1 rounded">{'{{job_title}}'}</code></span>
-                    <span><code className="bg-blue-100 px-1 rounded">{'{{work_type}}'}</code></span>
-                    <span><code className="bg-blue-100 px-1 rounded">{'{{start_date}}'}</code></span>
-                    <span><code className="bg-blue-100 px-1 rounded">{'{{company_name}}'}</code></span>
-                    <span><code className="bg-blue-100 px-1 rounded">{'{{company_address}}'}</code></span>
-                    <span><code className="bg-blue-100 px-1 rounded">{'{{company_phone}}'}</code></span>
-                    <span><code className="bg-blue-100 px-1 rounded">{'{{company_email}}'}</code></span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['{{employee_name}}','{{employee_first_name}}','{{hourly_rate}}','{{holiday_rate}}','{{gross_rate}}','{{hours}}','{{job_title}}','{{position_title}}','{{work_type}}','{{start_date}}','{{commencement_date}}','{{work_location}}','{{min_hours}}','{{max_hours}}','{{reporting_to}}','{{company_name}}','{{company_address}}','{{company_phone}}','{{company_email}}','{{company_ird}}'].map(ph => (
+                      <button
+                        key={ph}
+                        type="button"
+                        onClick={() => { navigator.clipboard.writeText(ph); showToast(`Copied: ${ph}`) }}
+                        className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-mono hover:bg-blue-200 active:bg-blue-300 cursor-pointer transition"
+                        title="Click to copy"
+                      >
+                        {ph}
+                      </button>
+                    ))}
                   </div>
                   <p className="text-[11px] font-semibold text-blue-800 mt-2">Signature markers:</p>
-                  <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs text-blue-800">
-                    <span><code className="bg-orange-100 text-orange-800 px-1 rounded">{'[[SIGNATURE]]'}</code></span>
-                    <span><code className="bg-orange-100 text-orange-800 px-1 rounded">{'[[INITIALS]]'}</code></span>
-                    <span><code className="bg-orange-100 text-orange-800 px-1 rounded">{'[[DATE]]'}</code></span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['[[SIGNATURE]]','[[INITIALS]]','[[DATE]]'].map(ph => (
+                      <button
+                        key={ph}
+                        type="button"
+                        onClick={() => { navigator.clipboard.writeText(ph); showToast(`Copied: ${ph}`) }}
+                        className="px-1.5 py-0.5 bg-orange-100 text-orange-800 rounded text-xs font-mono hover:bg-orange-200 active:bg-orange-300 cursor-pointer transition"
+                        title="Click to copy"
+                      >
+                        {ph}
+                      </button>
+                    ))}
                   </div>
+                  <p className="text-[10px] text-blue-600 mt-1">Click any code above to copy to clipboard, then paste into your Word document.</p>
                 </div>
               </details>
 
@@ -1424,6 +1468,12 @@ export default function StoreSettings() {
                       className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
                     >
                       {docTemplateUploading ? 'Uploading...' : Object.values(docxTool.mappings).some(v => v) ? 'Fix & Upload' : 'Upload'}
+                    </button>
+                    <button
+                      onClick={handleDocxToolDownload}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-200 transition"
+                    >
+                      {Object.values(docxTool.mappings).some(v => v) ? 'Fix & Download' : 'Download'}
                     </button>
                     <button
                       onClick={() => setDocxTool({ file: null, result: null, loading: false, saveTarget: 'CONTRACT', saveWorkType: 'FULL_TIME', saveJobTitle: '', mappings: {} })}
