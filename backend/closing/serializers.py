@@ -12,9 +12,11 @@ from django.contrib.auth.models import User
 
 class SupplierSerializer(serializers.ModelSerializer):
     """공급사 시리얼라이저"""
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+
     class Meta:
         model = Supplier
-        fields = ['id', 'name', 'code', 'contact', 'phone', 'is_active', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'code', 'category', 'category_display', 'contact', 'phone', 'is_active', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 

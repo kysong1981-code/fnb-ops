@@ -1124,7 +1124,7 @@ export default function StoreSettings() {
               <p className="text-xs text-gray-500">Suppliers automatically appear in Daily Closing</p>
             </div>
             <button
-              onClick={() => setSupplierForm({ name: '', code: '', contact: '', phone: '', is_active: true })}
+              onClick={() => setSupplierForm({ name: '', code: '', category: 'COGS', contact: '', phone: '', is_active: true })}
               className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition"
             >
               <PlusIcon size={14} /> Add
@@ -1134,9 +1134,14 @@ export default function StoreSettings() {
           {/* Add/Edit Form */}
           {supplierForm && (
             <div className="px-5 py-4 bg-blue-50 border-b border-blue-100">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
                 <input className={inputCls} placeholder="Name" value={supplierForm.name} onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })} />
                 <input className={inputCls} placeholder="Code" value={supplierForm.code} onChange={(e) => setSupplierForm({ ...supplierForm, code: e.target.value })} />
+                <select className={inputCls} value={supplierForm.category || 'COGS'} onChange={(e) => setSupplierForm({ ...supplierForm, category: e.target.value })}>
+                  <option value="COGS">COGS</option>
+                  <option value="MAINTENANCE">Maintenance</option>
+                  <option value="GENERAL">General</option>
+                </select>
                 <input className={inputCls} placeholder="Contact" value={supplierForm.contact} onChange={(e) => setSupplierForm({ ...supplierForm, contact: e.target.value })} />
                 <input className={inputCls} placeholder="Phone" value={supplierForm.phone} onChange={(e) => setSupplierForm({ ...supplierForm, phone: e.target.value })} />
               </div>
@@ -1154,6 +1159,7 @@ export default function StoreSettings() {
                 <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-400 border-b border-gray-100">
                   <th className="px-5 py-3">Name</th>
                   <th className="px-5 py-3">Code</th>
+                  <th className="px-5 py-3">Category</th>
                   <th className="px-5 py-3 hidden md:table-cell">Contact</th>
                   <th className="px-5 py-3 hidden md:table-cell">Phone</th>
                   <th className="px-5 py-3">Status</th>
@@ -1162,11 +1168,18 @@ export default function StoreSettings() {
               </thead>
               <tbody>
                 {suppliers.length === 0 ? (
-                  <tr><td colSpan={6} className="px-5 py-8 text-center text-gray-400 text-sm">No suppliers yet</td></tr>
+                  <tr><td colSpan={7} className="px-5 py-8 text-center text-gray-400 text-sm">No suppliers yet</td></tr>
                 ) : suppliers.map((s) => (
                   <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="px-5 py-3 font-medium text-gray-900">{s.name}</td>
                     <td className="px-5 py-3 text-gray-500">{s.code}</td>
+                    <td className="px-5 py-3">
+                      <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
+                        s.category === 'COGS' ? 'bg-blue-50 text-blue-700' :
+                        s.category === 'MAINTENANCE' ? 'bg-orange-50 text-orange-700' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>{s.category_display || s.category}</span>
+                    </td>
                     <td className="px-5 py-3 text-gray-500 hidden md:table-cell">{s.contact || '-'}</td>
                     <td className="px-5 py-3 text-gray-500 hidden md:table-cell">{s.phone || '-'}</td>
                     <td className="px-5 py-3">
