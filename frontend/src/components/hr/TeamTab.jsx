@@ -20,6 +20,8 @@ export default function TeamTab() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [newRate, setNewRate] = useState('')
   const [saving, setSaving] = useState(false)
+  const [resettingPw, setResettingPw] = useState(null)
+  const [resetResult, setResetResult] = useState(null)
 
   const loadTeam = async () => {
     setLoading(true)
@@ -50,6 +52,20 @@ export default function TeamTab() {
       loadDetail(member.profile_id)
     }
     setNewRate('')
+  }
+
+  const handleResetPassword = async (profileId) => {
+    if (!confirm('Reset this employee\'s password? A new temporary password will be emailed to them.')) return
+    setResettingPw(profileId)
+    setResetResult(null)
+    try {
+      const res = await hrAPI.resetPassword(profileId)
+      setResetResult(res.data)
+    } catch (err) {
+      setResetResult({ message: 'Failed to reset password', error: true })
+    } finally {
+      setResettingPw(null)
+    }
   }
 
   const handleUpdateSalary = async () => {
@@ -146,6 +162,27 @@ export default function TeamTab() {
                           <div>
                             <span className="text-xs text-gray-400">Joined</span>
                             <p className="text-gray-900">{detail.date_of_joining}</p>
+                          </div>
+                        </div>
+
+                        {/* Password Reset */}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleResetPassword(m.profile_id)}
+                              disabled={resettingPw === m.profile_id}
+                              className="px-3 py-1.5 bg-amber-500 text-white text-xs font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-50 transition"
+                            >
+                              {resettingPw === m.profile_id ? 'Resetting...' : 'Reset Password'}
+                            </button>
+                            {resetResult && selected === m.profile_id && (
+                              <span className={`text-xs ${resetResult.error ? 'text-red-600' : 'text-green-600'}`}>
+                                {resetResult.message}
+                                {resetResult.temp_password && (
+                                  <span className="ml-1 font-mono bg-gray-100 px-1.5 py-0.5 rounded">{resetResult.temp_password}</span>
+                                )}
+                              </span>
+                            )}
                           </div>
                         </div>
 

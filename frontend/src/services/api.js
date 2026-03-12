@@ -280,6 +280,9 @@ export const hrAPI = {
   documentPages: (id) => api.get(`/hr/documents/${id}/pages/`),
   downloadDocument: (id) => api.get(`/hr/documents/${id}/download/`, { responseType: 'blob' }),
 
+  // Password Reset (manager)
+  resetPassword: (id) => api.post(`/hr/team/${id}/reset-password/`),
+
   // Shift Templates
   getShiftTemplates: () => api.get('/hr/shift-templates/'),
   createShiftTemplate: (data) => api.post('/hr/shift-templates/', data),

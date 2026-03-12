@@ -1037,6 +1037,61 @@ class TeamViewSet(viewsets.ViewSet):
             'effective_from': new_salary.effective_from,
         })
 
+    @action(detail=True, methods=['post'], url_path='reset-password')
+    def reset_password(self, request, pk=None):
+        """매니저가 직원 비밀번호 리셋 (임시 비밀번호 생성 후 이메일 발송)"""
+        profile = request.user.profile
+        MANAGER_ROLES = ['MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO']
+        if profile.role not in MANAGER_ROLES:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        org = self._get_org(request)
+        try:
+            member = UserProfile.objects.select_related('user').get(id=pk, organization=org)
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        user = member.user
+        # Generate temporary password
+        temp_password = User.objects.make_random_password(length=10)
+        user.set_password(temp_password)
+        user.save()
+
+        # Send email with new password
+        try:
+            login_url = 'https://oneops.co.nz/login'
+            html_message = render_to_string('hr/password_reset_by_manager.html', {
+                'first_name': user.first_name or user.username,
+                'email': user.email,
+                'temp_password': temp_password,
+                'login_url': login_url,
+                'manager_name': request.user.get_full_name() or request.user.username,
+            })
+            send_mail(
+                subject='[Oneops] Your Password Has Been Reset',
+                message=f'Hi {user.first_name}, your password has been reset. '
+                        f'Login at {login_url} with email: {user.email} and temporary password: {temp_password}. '
+                        f'Please change your password after logging in.',
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                html_message=html_message,
+                fail_silently=False,
+            )
+            logger.info('Password reset email sent to %s by manager %s', user.email, request.user.email)
+        except Exception as e:
+            logger.error('Failed to send password reset email: %s', e)
+            # Password is already changed, so return success but warn about email
+            return Response({
+                'message': f'Password reset successfully. Temporary password: {temp_password} (Email delivery failed, please share manually)',
+                'temp_password': temp_password,
+                'email_sent': False,
+            })
+
+        return Response({
+            'message': f'Password reset email sent to {user.email}',
+            'email_sent': True,
+        })
+
     @action(detail=True, methods=['get'])
     def documents(self, request, pk=None):
         """직원 문서 목록"""

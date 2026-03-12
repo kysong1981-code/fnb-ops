@@ -52,13 +52,16 @@ export default function ManagerDashboard() {
         setStaff(employees.slice(0, 5)) // Show top 5
       } catch {}
 
-      // Load submitted closings (pending approval + recent list)
+      // Load all recent closings (always visible) + pending submitted
       try {
-        const res = await closingAPI.list({ status: 'SUBMITTED' })
-        const items = res.data?.results || res.data || []
-        const sorted = items.sort((a, b) => b.closing_date.localeCompare(a.closing_date))
-        setPendingClosings(sorted)
-        setRecentClosings(sorted.slice(0, 10))
+        const [allRes, submittedRes] = await Promise.all([
+          closingAPI.list({}),
+          closingAPI.list({ status: 'SUBMITTED' }),
+        ])
+        const allItems = allRes.data?.results || allRes.data || []
+        const submittedItems = submittedRes.data?.results || submittedRes.data || []
+        setRecentClosings(allItems.sort((a, b) => b.closing_date.localeCompare(a.closing_date)).slice(0, 10))
+        setPendingClosings(submittedItems.sort((a, b) => b.closing_date.localeCompare(a.closing_date)))
       } catch {}
 
       // Load this week's closing data for chart
@@ -208,52 +211,62 @@ export default function ManagerDashboard() {
         ))}
       </div>
 
-      {/* Submitted Closings (pending approval) */}
-      {recentClosings.length > 0 && (
-        <>
-          <div className="flex items-center justify-between">
-            <SectionLabel>Submitted Closings</SectionLabel>
-            <button
-              onClick={() => navigate('/closing/monthly')}
-              className="text-xs font-medium text-blue-600 flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition"
-            >
-              <CalendarIcon size={14} />
-              Monthly
-            </button>
-          </div>
-          <Card className="overflow-hidden">
-            <div className="divide-y divide-gray-50">
-              {recentClosings.map(c => {
-                const variance = parseFloat(c.total_variance || 0)
-                return (
-                  <div key={c.id} className="flex items-center justify-between px-5 py-3.5">
-                    <button
-                      onClick={() => navigate(`/closing/form?date=${c.closing_date}`)}
-                      className="flex items-center gap-4 text-left flex-1 min-w-0"
-                    >
-                      <div className="text-center w-10 flex-shrink-0">
-                        <p className="text-xs text-gray-400">
-                          {new Date(c.closing_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}
-                        </p>
-                        <p className="text-lg font-bold text-gray-900">
-                          {new Date(c.closing_date + 'T00:00:00').getDate()}
-                        </p>
+      {/* Recent Closings (always visible) */}
+      <div className="flex items-center justify-between">
+        <SectionLabel>Recent Closings</SectionLabel>
+        <button
+          onClick={() => navigate('/closing/monthly')}
+          className="text-xs font-medium text-blue-600 flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition"
+        >
+          <CalendarIcon size={14} />
+          Monthly
+        </button>
+      </div>
+      {recentClosings.length > 0 ? (
+        <Card className="overflow-hidden">
+          <div className="divide-y divide-gray-50">
+            {recentClosings.map(c => {
+              const variance = parseFloat(c.total_variance || 0)
+              const statusMap = {
+                DRAFT: { label: 'Draft', cls: 'bg-gray-100 text-gray-600' },
+                SUBMITTED: { label: 'Submitted', cls: 'bg-blue-100 text-blue-700' },
+                APPROVED: { label: 'Approved', cls: 'bg-green-100 text-green-700' },
+                REJECTED: { label: 'Rejected', cls: 'bg-red-100 text-red-700' },
+              }
+              const st = statusMap[c.status] || { label: c.status, cls: 'bg-gray-100 text-gray-600' }
+              return (
+                <div key={c.id} className="flex items-center justify-between px-5 py-3.5">
+                  <button
+                    onClick={() => navigate(`/closing/form?date=${c.closing_date}`)}
+                    className="flex items-center gap-4 text-left flex-1 min-w-0"
+                  >
+                    <div className="text-center w-10 flex-shrink-0">
+                      <p className="text-xs text-gray-400">
+                        {new Date(c.closing_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}
+                      </p>
+                      <p className="text-lg font-bold text-gray-900">
+                        {new Date(c.closing_date + 'T00:00:00').getDate()}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900">
+                        POS: {fmt(c.pos_total)} · Actual: {fmt(c.actual_total)}
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className={`text-xs font-medium ${variance === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          Var: {variance >= 0 ? '+' : ''}{fmt(variance)}
+                        </span>
+                        {c.created_by_name && (
+                          <span className="text-xs text-gray-400">by {c.created_by_name}</span>
+                        )}
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900">
-                          POS: {fmt(c.pos_total)} · Actual: {fmt(c.actual_total)}
-                        </p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className={`text-xs font-medium ${variance === 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            Var: {variance >= 0 ? '+' : ''}{fmt(variance)}
-                          </span>
-                          {c.created_by_name && (
-                            <span className="text-xs text-gray-400">by {c.created_by_name}</span>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    </div>
+                  </button>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${st.cls}`}>
+                      {st.label}
+                    </span>
+                    {c.status === 'SUBMITTED' && (
                       <button
                         onClick={() => handleApproveClosing(c.id)}
                         disabled={approvingId === c.id}
@@ -261,13 +274,15 @@ export default function ManagerDashboard() {
                       >
                         {approvingId === c.id ? '...' : 'Approve'}
                       </button>
-                    </div>
+                    )}
                   </div>
-                )
-              })}
-            </div>
-          </Card>
-        </>
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      ) : (
+        <Card className="p-5 text-center text-gray-400 text-sm">No closings yet</Card>
       )}
 
       {/* Safety Tasks Widget */}
