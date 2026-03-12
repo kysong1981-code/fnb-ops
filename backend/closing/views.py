@@ -157,7 +157,7 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
-        """클로징 삭제 (DRAFT 상태만 가능)"""
+        """클로징 삭제 (매니저는 모든 상태 삭제 가능, 직원은 DRAFT만)"""
         instance = self.get_object()
 
         if self._is_month_closed(instance.closing_date, instance.organization):
@@ -166,7 +166,9 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if instance.status != 'DRAFT':
+        profile = request.user.profile
+        is_manager = profile.role in self.MANAGER_ROLES
+        if not is_manager and instance.status != 'DRAFT':
             return Response(
                 {'detail': f'DRAFT 상태인 클로징만 삭제할 수 있습니다. 현재 상태: {instance.status}'},
                 status=status.HTTP_400_BAD_REQUEST

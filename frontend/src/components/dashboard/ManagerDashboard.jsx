@@ -52,19 +52,13 @@ export default function ManagerDashboard() {
         setStaff(employees.slice(0, 5)) // Show top 5
       } catch {}
 
-      // Load pending (submitted) closings for approval
+      // Load submitted closings (pending approval + recent list)
       try {
         const res = await closingAPI.list({ status: 'SUBMITTED' })
         const items = res.data?.results || res.data || []
-        setPendingClosings(items)
-      } catch {}
-
-      // Load recent closings (all statuses) for history
-      try {
-        const res = await closingAPI.list({})
-        const items = res.data?.results || res.data || []
-        // Sort by date desc, take last 7 days
-        setRecentClosings(items.sort((a, b) => b.closing_date.localeCompare(a.closing_date)).slice(0, 7))
+        const sorted = items.sort((a, b) => b.closing_date.localeCompare(a.closing_date))
+        setPendingClosings(sorted)
+        setRecentClosings(sorted.slice(0, 10))
       } catch {}
 
       // Load this week's closing data for chart
@@ -214,83 +208,30 @@ export default function ManagerDashboard() {
         ))}
       </div>
 
-      {/* Pending Approvals */}
-      {pendingClosings.length > 0 && (
-        <>
-          <SectionLabel>Pending Approvals</SectionLabel>
-          <Card className="overflow-hidden">
-            <div className="divide-y divide-gray-50">
-              {pendingClosings.map(c => {
-                const variance = parseFloat(c.total_variance || 0)
-                return (
-                  <div key={c.id} className="flex items-center justify-between px-5 py-3.5">
-                    <div className="flex items-center gap-4">
-                      <div className="text-center">
-                        <p className="text-xs text-gray-400">
-                          {new Date(c.closing_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}
-                        </p>
-                        <p className="text-lg font-bold text-gray-900">
-                          {new Date(c.closing_date + 'T00:00:00').getDate()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          POS: {fmt(c.pos_total)} &middot; Actual: {fmt(c.actual_total)}
-                        </p>
-                        <p className={`text-xs font-medium ${variance === 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          Variance: {variance >= 0 ? '+' : ''}{fmt(variance)}
-                        </p>
-                        {c.created_by_name && (
-                          <p className="text-xs text-gray-400 mt-0.5">by {c.created_by_name}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => navigate(`/closing/form?date=${c.closing_date}`)}
-                        className="text-xs font-medium px-3 py-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition"
-                      >
-                        View
-                      </button>
-                      <button
-                        onClick={() => handleApproveClosing(c.id)}
-                        disabled={approvingId === c.id}
-                        className="text-xs font-medium px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
-                      >
-                        {approvingId === c.id ? '...' : 'Approve'}
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </Card>
-        </>
-      )}
-
-      {/* Recent Closings */}
+      {/* Submitted Closings (pending approval) */}
       {recentClosings.length > 0 && (
         <>
-          <SectionLabel>Recent Closings</SectionLabel>
+          <div className="flex items-center justify-between">
+            <SectionLabel>Submitted Closings</SectionLabel>
+            <button
+              onClick={() => navigate('/closing/monthly')}
+              className="text-xs font-medium text-blue-600 flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition"
+            >
+              <CalendarIcon size={14} />
+              Monthly
+            </button>
+          </div>
           <Card className="overflow-hidden">
             <div className="divide-y divide-gray-50">
               {recentClosings.map(c => {
                 const variance = parseFloat(c.total_variance || 0)
-                const statusMap = {
-                  DRAFT: { label: 'Draft', cls: 'bg-gray-100 text-gray-600' },
-                  SUBMITTED: { label: 'Submitted', cls: 'bg-blue-100 text-blue-700' },
-                  APPROVED: { label: 'Approved', cls: 'bg-green-100 text-green-700' },
-                  REJECTED: { label: 'Rejected', cls: 'bg-red-100 text-red-700' },
-                }
-                const st = statusMap[c.status] || { label: c.status, cls: 'bg-gray-100 text-gray-600' }
                 return (
-                  <button
-                    key={c.id}
-                    onClick={() => navigate(`/closing/form?date=${c.closing_date}`)}
-                    className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition text-left"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="text-center w-10">
+                  <div key={c.id} className="flex items-center justify-between px-5 py-3.5">
+                    <button
+                      onClick={() => navigate(`/closing/form?date=${c.closing_date}`)}
+                      className="flex items-center gap-4 text-left flex-1 min-w-0"
+                    >
+                      <div className="text-center w-10 flex-shrink-0">
                         <p className="text-xs text-gray-400">
                           {new Date(c.closing_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}
                         </p>
@@ -298,7 +239,7 @@ export default function ManagerDashboard() {
                           {new Date(c.closing_date + 'T00:00:00').getDate()}
                         </p>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-medium text-gray-900">
                           POS: {fmt(c.pos_total)} · Actual: {fmt(c.actual_total)}
                         </p>
@@ -311,14 +252,17 @@ export default function ManagerDashboard() {
                           )}
                         </div>
                       </div>
+                    </button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleApproveClosing(c.id)}
+                        disabled={approvingId === c.id}
+                        className="text-xs font-medium px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
+                      >
+                        {approvingId === c.id ? '...' : 'Approve'}
+                      </button>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${st.cls}`}>
-                        {st.label}
-                      </span>
-                      <ArrowRightIcon size={14} className="text-gray-300" />
-                    </div>
-                  </button>
+                  </div>
                 )
               })}
             </div>

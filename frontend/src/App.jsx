@@ -7,6 +7,7 @@ import Layout from './components/Layout'
 import Dashboard from './components/dashboard/Dashboard'
 import DailyClosingForm from './components/closing/DailyClosingForm'
 import ClosingList from './components/closing/ClosingList'
+import ClosingMonthlyView from './components/closing/ClosingMonthlyView'
 import CashUpPage from './components/closing/CashUpPage'
 import SalesAnalysis from './components/sales/SalesAnalysis'
 import StoreReport from './components/reports/StoreReport'
@@ -123,6 +124,16 @@ function App() {
             element={
               <ProtectedWithLayout>
                 <DailyClosingForm />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Closing Monthly Calendar */}
+          <Route
+            path="/closing/monthly"
+            element={
+              <ProtectedWithLayout>
+                <ClosingMonthlyView />
               </ProtectedWithLayout>
             }
           />
