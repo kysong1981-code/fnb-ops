@@ -24,19 +24,7 @@ from .serializers import (
     SafetyRecordSerializer, SafetyRecordQuickCompleteSerializer
 )
 from users.permissions import IsManager, IsSeniorManager
-from users.filters import OrganizationFilterBackend
-
-
-def _get_target_org(request):
-    """CEO/HQ가 store_id로 특정 매장 선택 시 해당 매장 반환"""
-    from users.models import Organization
-    store_id = request.query_params.get('store_id')
-    if store_id and request.user.profile.role in ['CEO', 'HQ', 'REGIONAL_MANAGER', 'SENIOR_MANAGER']:
-        try:
-            return Organization.objects.get(id=store_id)
-        except Organization.DoesNotExist:
-            pass
-    return request.user.profile.organization
+from users.filters import OrganizationFilterBackend, get_target_org
 
 
 class TemperatureLocationViewSet(viewsets.ModelViewSet):
@@ -48,7 +36,7 @@ class TemperatureLocationViewSet(viewsets.ModelViewSet):
     pagination_class = None
 
     def perform_create(self, serializer):
-        serializer.save(organization=_get_target_org(self.request))
+        serializer.save(organization=get_target_org(self.request))
 
 
 class CleaningAreaViewSet(viewsets.ModelViewSet):
@@ -60,7 +48,7 @@ class CleaningAreaViewSet(viewsets.ModelViewSet):
     pagination_class = None
 
     def perform_create(self, serializer):
-        serializer.save(organization=_get_target_org(self.request))
+        serializer.save(organization=get_target_org(self.request))
 
 
 class SafetyChecklistTemplateViewSet(viewsets.ModelViewSet):

@@ -66,6 +66,20 @@ class OrganizationFilterBackend(BaseFilterBackend):
         return queryset
 
 
+def get_target_org(request):
+    """CEO/HQ가 store_id로 특정 매장 선택 시 해당 매장 org 반환.
+    Settings에서 항목 생성 시 올바른 매장에 저장되도록 사용."""
+    from users.models import Organization
+    store_id = request.query_params.get('store_id')
+    profile = request.user.profile
+    if store_id and profile.role in ['CEO', 'HQ', 'REGIONAL_MANAGER', 'SENIOR_MANAGER']:
+        try:
+            return Organization.objects.get(id=store_id)
+        except Organization.DoesNotExist:
+            pass
+    return profile.organization
+
+
 def filter_queryset_by_role(profile, queryset):
     """
     사용자의 역할에 따라 쿼리셋을 필터링하는 유틸 함수

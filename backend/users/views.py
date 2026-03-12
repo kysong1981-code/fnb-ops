@@ -14,7 +14,7 @@ from django.utils import timezone
 from .models import Organization, UserProfile, Integration, StoreApplication, JobTitle
 from .serializers import OrganizationSerializer, IntegrationSerializer, StoreApplicationSerializer, JobTitleSerializer
 from .permissions import IsManager
-from .filters import OrganizationFilterBackend
+from .filters import OrganizationFilterBackend, get_target_org
 
 logger = logging.getLogger(__name__)
 
@@ -439,4 +439,4 @@ class JobTitleViewSet(viewsets.ModelViewSet):
     pagination_class = None
 
     def perform_create(self, serializer):
-        serializer.save(organization=self.request.user.profile.organization)
+        serializer.save(organization=get_target_org(self.request))

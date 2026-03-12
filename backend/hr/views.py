@@ -38,7 +38,7 @@ from .serializers import (
 from users.models import UserProfile, ROLE_CHOICES, JOB_TITLE_CHOICES, WORK_TYPE_CHOICES
 from users.serializers import UserProfileDetailSerializer
 from users.permissions import IsManager, IsEmployee
-from users.filters import OrganizationFilterBackend
+from users.filters import OrganizationFilterBackend, get_target_org
 from payroll.models import Salary
 
 
@@ -626,7 +626,7 @@ class ShiftTemplateViewSet(viewsets.ModelViewSet):
         return ShiftTemplate.objects.filter(organization=org, is_active=True)
 
     def perform_create(self, serializer):
-        serializer.save(organization=self.request.user.profile.organization)
+        serializer.save(organization=get_target_org(self.request))
 
 
 class TimesheetViewSet(viewsets.ModelViewSet):
@@ -1524,7 +1524,7 @@ class DocumentTemplateViewSet(viewsets.ModelViewSet):
         return DocumentTemplate.objects.filter(organization=org)
 
     def perform_create(self, serializer):
-        serializer.save(organization=self.request.user.profile.organization)
+        serializer.save(organization=get_target_org(self.request))
 
     # Known placeholders that are auto-filled during invite creation
     KNOWN_PLACEHOLDERS = {
@@ -1692,7 +1692,7 @@ class TrainingModuleViewSet(viewsets.ModelViewSet):
         return TrainingModule.objects.filter(organization=org)
 
     def perform_create(self, serializer):
-        serializer.save(organization=self.request.user.profile.organization)
+        serializer.save(organization=get_target_org(self.request))
 
 
 class IR330ViewSet(viewsets.ModelViewSet):

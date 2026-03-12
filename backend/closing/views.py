@@ -27,7 +27,7 @@ from .serializers import (
     CQAccountBalanceSerializer, CQExpenseSerializer
 )
 from users.permissions import IsEmployee, IsManager, IsSeniorManager, IsRegionalManager, IsHQ
-from users.filters import OrganizationFilterBackend
+from users.filters import OrganizationFilterBackend, get_target_org
 from utils.pdf_generator import DailyClosingPDFGenerator
 
 
@@ -414,19 +414,8 @@ class SupplierViewSet(viewsets.ModelViewSet):
     filter_backends = [OrganizationFilterBackend]
     pagination_class = None
 
-    def _get_target_org(self):
-        """CEO/HQ가 store_id로 특정 매장 선택 시 해당 매장 반환"""
-        from users.models import Organization
-        store_id = self.request.query_params.get('store_id')
-        if store_id and self.request.user.profile.role in ['CEO', 'HQ', 'REGIONAL_MANAGER', 'SENIOR_MANAGER']:
-            try:
-                return Organization.objects.get(id=store_id)
-            except Organization.DoesNotExist:
-                pass
-        return self.request.user.profile.organization
-
     def perform_create(self, serializer):
-        serializer.save(organization=self._get_target_org())
+        serializer.save(organization=get_target_org(self.request))
 
     def perform_update(self, serializer):
         serializer.save()
@@ -440,19 +429,8 @@ class SalesCategoryViewSet(viewsets.ModelViewSet):
     filter_backends = [OrganizationFilterBackend]
     pagination_class = None
 
-    def _get_target_org(self):
-        """CEO/HQ가 store_id로 특정 매장 선택 시 해당 매장 반환"""
-        from users.models import Organization
-        store_id = self.request.query_params.get('store_id')
-        if store_id and self.request.user.profile.role in ['CEO', 'HQ', 'REGIONAL_MANAGER', 'SENIOR_MANAGER']:
-            try:
-                return Organization.objects.get(id=store_id)
-            except Organization.DoesNotExist:
-                pass
-        return self.request.user.profile.organization
-
     def perform_create(self, serializer):
-        serializer.save(organization=self._get_target_org())
+        serializer.save(organization=get_target_org(self.request))
 
 
 class ClosingSupplierCostViewSet(mixins.CreateModelMixin,

@@ -22,7 +22,7 @@ from .calculations import (
 from .holidays import generate_public_holidays, is_public_holiday
 from .payday_filing import generate_filing_data, generate_csv_content, calculate_due_date
 from users.permissions import IsManager
-from users.filters import OrganizationFilterBackend
+from users.filters import OrganizationFilterBackend, get_target_org
 
 
 class SalaryViewSet(viewsets.ModelViewSet):
@@ -36,7 +36,7 @@ class SalaryViewSet(viewsets.ModelViewSet):
         return super().get_queryset().select_related('user__user', 'organization')
 
     def perform_create(self, serializer):
-        serializer.save(organization=self.request.user.profile.organization)
+        serializer.save(organization=get_target_org(self.request))
 
     @action(detail=False, methods=['get'])
     def active(self, request):
@@ -57,7 +57,7 @@ class PayPeriodViewSet(viewsets.ModelViewSet):
         return super().get_queryset().select_related('organization').prefetch_related('pay_slips').order_by('-start_date')
 
     def perform_create(self, serializer):
-        serializer.save(organization=self.request.user.profile.organization)
+        serializer.save(organization=get_target_org(self.request))
 
     @action(detail=True, methods=['post'])
     def generate_payslips(self, request, pk=None):
