@@ -344,10 +344,11 @@ export default function StoreSettings() {
   // ── Suppliers ──
   const handleSaveSupplier = async () => {
     try {
-      if (supplierForm.id) {
-        await storeAPI.updateSupplier(supplierForm.id, supplierForm)
+      const data = { ...supplierForm, code: supplierForm.code || supplierForm.name.trim().toLowerCase().replace(/\s+/g, '_') }
+      if (data.id) {
+        await storeAPI.updateSupplier(data.id, data)
       } else {
-        await storeAPI.createSupplier(supplierForm)
+        await storeAPI.createSupplier(data)
       }
       setSupplierForm(null)
       fetchSuppliers()
@@ -1124,7 +1125,7 @@ export default function StoreSettings() {
               <p className="text-xs text-gray-500">Suppliers automatically appear in Daily Closing</p>
             </div>
             <button
-              onClick={() => setSupplierForm({ name: '', code: '', category: 'COGS', contact: '', phone: '', is_active: true })}
+              onClick={() => setSupplierForm({ name: '', category: 'COGS', is_active: true })}
               className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition"
             >
               <PlusIcon size={14} /> Add
@@ -1134,16 +1135,13 @@ export default function StoreSettings() {
           {/* Add/Edit Form */}
           {supplierForm && (
             <div className="px-5 py-4 bg-blue-50 border-b border-blue-100">
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
-                <input className={inputCls} placeholder="Name" value={supplierForm.name} onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })} />
-                <input className={inputCls} placeholder="Code" value={supplierForm.code} onChange={(e) => setSupplierForm({ ...supplierForm, code: e.target.value })} />
+              <div className="flex items-center gap-3 mb-3">
+                <input className={`${inputCls} flex-1`} placeholder="Supplier name" value={supplierForm.name} onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })} autoFocus />
                 <select className={inputCls} value={supplierForm.category || 'COGS'} onChange={(e) => setSupplierForm({ ...supplierForm, category: e.target.value })}>
                   <option value="COGS">COGS</option>
                   <option value="MAINTENANCE">Maintenance</option>
                   <option value="GENERAL">General</option>
                 </select>
-                <input className={inputCls} placeholder="Contact" value={supplierForm.contact} onChange={(e) => setSupplierForm({ ...supplierForm, contact: e.target.value })} />
-                <input className={inputCls} placeholder="Phone" value={supplierForm.phone} onChange={(e) => setSupplierForm({ ...supplierForm, phone: e.target.value })} />
               </div>
               <div className="flex gap-2">
                 <button onClick={handleSaveSupplier} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700">Save</button>
@@ -1158,21 +1156,17 @@ export default function StoreSettings() {
               <thead>
                 <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-400 border-b border-gray-100">
                   <th className="px-5 py-3">Name</th>
-                  <th className="px-5 py-3">Code</th>
                   <th className="px-5 py-3">Category</th>
-                  <th className="px-5 py-3 hidden md:table-cell">Contact</th>
-                  <th className="px-5 py-3 hidden md:table-cell">Phone</th>
                   <th className="px-5 py-3">Status</th>
                   <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {suppliers.length === 0 ? (
-                  <tr><td colSpan={7} className="px-5 py-8 text-center text-gray-400 text-sm">No suppliers yet</td></tr>
+                  <tr><td colSpan={4} className="px-5 py-8 text-center text-gray-400 text-sm">No suppliers yet</td></tr>
                 ) : suppliers.map((s) => (
                   <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="px-5 py-3 font-medium text-gray-900">{s.name}</td>
-                    <td className="px-5 py-3 text-gray-500">{s.code}</td>
                     <td className="px-5 py-3">
                       <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
                         s.category === 'COGS' ? 'bg-blue-50 text-blue-700' :
@@ -1180,8 +1174,6 @@ export default function StoreSettings() {
                         'bg-gray-100 text-gray-600'
                       }`}>{s.category_display || s.category}</span>
                     </td>
-                    <td className="px-5 py-3 text-gray-500 hidden md:table-cell">{s.contact || '-'}</td>
-                    <td className="px-5 py-3 text-gray-500 hidden md:table-cell">{s.phone || '-'}</td>
                     <td className="px-5 py-3">
                       <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${s.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                         {s.is_active ? 'Active' : 'Inactive'}
