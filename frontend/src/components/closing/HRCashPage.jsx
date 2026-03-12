@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { closingAPI, hrCashAPI } from '../../services/api'
+import { getTodayNZ } from '../../utils/date'
 import Card from '../ui/Card'
 import SectionLabel from '../ui/SectionLabel'
 import { CameraIcon, TrashIcon } from '../icons'
@@ -10,7 +11,7 @@ const API_BASE = 'http://localhost:8000'
 export default function HRCashPage() {
   const { user } = useAuth()
 
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(getTodayNZ())
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
 

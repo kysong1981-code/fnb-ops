@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { hrAPI, closingAPI } from '../../services/api'
+import { getNowNZ, formatDateNZ } from '../../utils/date'
 import Card from '../ui/Card'
 import SectionLabel from '../ui/SectionLabel'
 import Badge from '../ui/Badge'
@@ -76,8 +77,8 @@ export default function ManagerDashboard() {
         const sunday = new Date(monday)
         sunday.setDate(monday.getDate() + 6)
 
-        const startDate = monday.toISOString().split('T')[0]
-        const endDate = sunday.toISOString().split('T')[0]
+        const startDate = formatDateNZ(monday)
+        const endDate = formatDateNZ(sunday)
         const res = await closingAPI.list({ closing_date__gte: startDate, closing_date__lte: endDate })
         const closings = res.data?.results || res.data || []
 

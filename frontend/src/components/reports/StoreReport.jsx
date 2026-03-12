@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { reportsAPI } from '../../services/api'
+import { getTodayNZ } from '../../utils/date'
 import PageHeader from '../ui/PageHeader'
 import Card from '../ui/Card'
 import { ChartIcon } from '../icons'
@@ -53,9 +54,7 @@ export default function StoreReport() {
   const { user } = useAuth()
   const [reportType, setReportType] = useState('daily')
   const [dateMode, setDateMode] = useState('day')
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split('T')[0]
-  )
+  const [selectedDate, setSelectedDate] = useState(getTodayNZ())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [reportData, setReportData] = useState(null)

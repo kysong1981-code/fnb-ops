@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { reportsAPI } from '../../services/api'
+import { getTodayNZ } from '../../utils/date'
 import Card from '../ui/Card'
 import KpiCard from '../ui/KpiCard'
 import Badge from '../ui/Badge'
@@ -38,7 +39,7 @@ function getMonthRange(dateStr) {
 
 export default function HRCashReport() {
   const [dateMode, setDateMode] = useState('month')
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(getTodayNZ())
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [loading, setLoading] = useState(false)

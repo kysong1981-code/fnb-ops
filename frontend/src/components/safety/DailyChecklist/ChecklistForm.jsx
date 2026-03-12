@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../../../services/api'
+import { getTodayNZ } from '../../../utils/date'
 
 export default function ChecklistForm() {
   const navigate = useNavigate()
@@ -10,7 +11,7 @@ export default function ChecklistForm() {
   const [templates, setTemplates] = useState([])
   const [formData, setFormData] = useState({
     template: '',
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayNZ(),
     responses: {},
     notes: ''
   })

@@ -299,7 +299,7 @@ export default function MyPage() {
     const { weeks } = getNoticePeriod()
     const d = new Date()
     d.setDate(d.getDate() + weeks * 7)
-    return d.toISOString().split('T')[0]
+    return d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
   }
 
   const leaveColor = (type) => LEAVE_TYPES.find(t => t.value === type)?.color || 'bg-gray-100 text-gray-600'

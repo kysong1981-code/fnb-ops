@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { closingAPI, hrCashAPI, cashExpenseAPI } from '../../services/api'
+import { getTodayNZ } from '../../utils/date'
 import Card from '../ui/Card'
 import SectionLabel from '../ui/SectionLabel'
 import {
@@ -19,7 +20,7 @@ export default function CashUpPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('cashup')
 
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState(getTodayNZ())
   const [closing, setClosing] = useState(null)
   const [loadingClosing, setLoadingClosing] = useState(true)
 
@@ -66,7 +67,7 @@ export default function CashUpPage() {
         for (let i = 1; i <= 7; i++) {
           const d = new Date(today)
           d.setDate(today.getDate() - i)
-          const dateStr = d.toISOString().split('T')[0]
+          const dateStr = d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
           try {
             const res = await closingAPI.getByDate(dateStr)
             const data = res.data.results || res.data || []

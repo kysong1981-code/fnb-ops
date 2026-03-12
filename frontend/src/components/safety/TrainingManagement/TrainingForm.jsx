@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../../services/api'
+import { getTodayNZ } from '../../../utils/date'
 
 export default function TrainingForm() {
   const navigate = useNavigate()
@@ -9,7 +10,7 @@ export default function TrainingForm() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayNZ(),
     validity_months: 12,
     participants: []
   })

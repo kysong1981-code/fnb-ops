@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { salesAnalysisAPI } from '../../services/api'
+import { getTodayNZ } from '../../utils/date'
 import Card from '../ui/Card'
 import StoreAnalysis from './StoreAnalysis'
 import RegionalAnalysis from './RegionalAnalysis'
@@ -72,7 +73,7 @@ export default function SalesAnalysis() {
   // State
   const [activeView, setActiveView] = useState(defaultView)
   const [dateMode, setDateMode] = useState('month')
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(getTodayNZ())
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
 

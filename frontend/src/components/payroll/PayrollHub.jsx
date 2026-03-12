@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { payrollAPI } from '../../services/api'
+import { getTodayNZ } from '../../utils/date'
 const TABS = [
   { id: 'periods', label: 'Pay Periods' },
   { id: 'payslips', label: 'Payslips' },
@@ -619,7 +620,7 @@ function RatesTab() {
 
   const create = async () => {
     try {
-      await payrollAPI.createSalary({ ...form, is_active: true, effective_from: new Date().toISOString().split('T')[0] })
+      await payrollAPI.createSalary({ ...form, is_active: true, effective_from: getTodayNZ() })
       setShowForm(false)
       setForm({ user: '', hourly_rate: '', overtime_multiplier: '1.5' })
       setMsg('Salary rate created.')

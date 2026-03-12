@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { safetyAPI } from '../../services/api'
+import { getTodayNZ } from '../../utils/date'
 import { useStore } from '../../context/StoreContext'
 import api from '../../services/api'
 import { XIcon, CheckCircleIcon } from '../icons'
@@ -61,7 +62,7 @@ export default function InlineCleaningForm({ onComplete, onClose }) {
     setError('')
 
     try {
-      const dateStr = new Date().toISOString().split('T')[0]
+      const dateStr = getTodayNZ()
 
       // Save cleaning record
       await api.post('/safety/cleaning/', {

@@ -1,14 +1,15 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../../services/api'
+import { getTodayNZ } from '../../../utils/date'
 
 export default function VerificationForm() {
   const navigate = useNavigate()
 
   const [formData, setFormData] = useState({
     frequency: 'weekly',
-    period_start: new Date().toISOString().split('T')[0],
-    period_end: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
+    period_start: getTodayNZ(),
+    period_end: (() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }); })(),
     findings: '',
     corrective_actions: '',
     responses: {}

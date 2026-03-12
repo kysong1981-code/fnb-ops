@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { safetyAPI } from '../../../services/api'
+import { getTodayNZ, formatDateNZ } from '../../../utils/date'
 import PageHeader from '../../ui/PageHeader'
 import Card from '../../ui/Card'
 import { ShieldIcon, CheckCircleIcon, ClockIcon, WarningIcon } from '../../icons'
@@ -26,9 +27,9 @@ export default function InspectionReport() {
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date()
     d.setDate(d.getDate() - 30)
-    return d.toISOString().split('T')[0]
+    return formatDateNZ(d)
   })
-  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0])
+  const [dateTo, setDateTo] = useState(() => getTodayNZ())
   const [categoryFilter, setCategoryFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [expandedCategories, setExpandedCategories] = useState({})

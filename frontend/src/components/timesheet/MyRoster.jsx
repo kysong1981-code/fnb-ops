@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { hrAPI } from '../../services/api'
+import { getTodayNZ, formatDateNZ } from '../../utils/date'
 import Card from '../ui/Card'
 import PageHeader from '../ui/PageHeader'
 import Badge from '../ui/Badge'
@@ -51,14 +52,13 @@ export default function MyRoster() {
   }
 
   const isToday = (dateStr) => {
-    const today = new Date().toISOString().split('T')[0]
-    return dateStr === today
+    return dateStr === getTodayNZ()
   }
 
   const isTomorrow = (dateStr) => {
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
-    return dateStr === tomorrow.toISOString().split('T')[0]
+    return dateStr === formatDateNZ(tomorrow)
   }
 
   const ShiftCard = ({ roster, label, accent }) => {
@@ -176,7 +176,7 @@ export default function MyRoster() {
               const days = Array.from({ length: 7 }, (_, i) => {
                 const d = new Date(weekStart)
                 d.setDate(weekStart.getDate() + i)
-                return d.toISOString().split('T')[0]
+                return formatDateNZ(d)
               })
 
               return days.map(date => {

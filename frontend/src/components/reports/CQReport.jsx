@@ -1,6 +1,7 @@
 import { useState, useEffect, Fragment } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { cqAPI } from '../../services/api'
+import { getTodayNZ } from '../../utils/date'
 import Card from '../ui/Card'
 import { PlusIcon, TrashIcon, CheckCircleIcon, CameraIcon } from '../icons'
 
@@ -46,7 +47,7 @@ export default function CQReport() {
 
   // Date controls
   const [dateMode, setDateMode] = useState('month')
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(getTodayNZ())
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
@@ -161,7 +162,7 @@ export default function CQReport() {
       fd.append('category', form.category || 'EXPENSE')
       fd.append('description', form.description)
       fd.append('amount', form.amount)
-      fd.append('date', new Date().toISOString().split('T')[0])
+      fd.append('date', getTodayNZ())
       if (form.category === 'EXCHANGE' && form.krwAmount) fd.append('krw_amount', form.krwAmount)
       if (form.attachment) fd.append('attachment', form.attachment)
       await cqAPI.createExpense(fd)

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { safetyAPI } from '../../../services/api'
+import { getTodayNZ } from '../../../utils/date'
 import { useStore } from '../../../context/StoreContext'
 import Card from '../../ui/Card'
 
@@ -74,7 +75,7 @@ export default function TemperatureForm() {
     try {
       const now = new Date()
       const timeStr = now.toTimeString().slice(0, 5)
-      const dateStr = now.toISOString().split('T')[0]
+      const dateStr = getTodayNZ()
 
       // Save each temperature record
       const promises = locations.map(loc =>

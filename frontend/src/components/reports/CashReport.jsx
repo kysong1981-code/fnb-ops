@@ -1,6 +1,7 @@
 import { useState, useEffect, Fragment } from 'react'
 import { reportsAPI, monthlyCloseAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
+import { getTodayNZ } from '../../utils/date'
 import Card from '../ui/Card'
 import KpiCard from '../ui/KpiCard'
 import Badge from '../ui/Badge'
@@ -42,7 +43,7 @@ function getMonthRange(dateStr) {
 export default function CashReport() {
   const { user } = useAuth()
   const [dateMode, setDateMode] = useState('day')
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(getTodayNZ())
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [loading, setLoading] = useState(false)

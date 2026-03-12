@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../../services/api'
+import { getTodayNZ, formatDateNZ } from '../../../utils/date'
 
 export default function CleaningSchedule() {
   const navigate = useNavigate()
@@ -23,8 +24,8 @@ export default function CleaningSchedule() {
 
       const response = await api.get('/safety/cleaning/schedule/', {
         params: {
-          date_from: startOfWeek.toISOString().split('T')[0],
-          date_to: endOfWeek.toISOString().split('T')[0]
+          date_from: startOfWeek.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }),
+          date_to: endOfWeek.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
         }
       })
       setSchedule(Array.isArray(response.data) ? response.data : response.data.results || [])
@@ -54,7 +55,7 @@ export default function CleaningSchedule() {
   }
 
   const getScheduleForDate = (date) => {
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = date.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
     return schedule.filter(s => s.date === dateStr)
   }
 
@@ -204,7 +205,7 @@ export default function CleaningSchedule() {
                 {/* Record Button (today or future) */}
                 {!isPast && daySchedule.length > 0 && (
                   <button
-                    onClick={() => navigate(`/safety/cleaning?date=${date.toISOString().split('T')[0]}`)}
+                    onClick={() => navigate(`/safety/cleaning?date=${date.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })}`)}
                     className="mt-2 w-full px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
                   >
                     Record

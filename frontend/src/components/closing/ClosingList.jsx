@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { closingAPI } from '../../services/api'
+import { getTodayNZ } from '../../utils/date'
 import Card from '../ui/Card'
 import { PlusIcon, ArrowRightIcon } from '../icons'
 
@@ -46,7 +47,7 @@ export default function ClosingList() {
   const firstDayOfMonth = new Date(year, month, 1).getDay() // 0=Sun
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const today = new Date()
-  const todayStr = today.toISOString().split('T')[0]
+  const todayStr = getTodayNZ()
 
   // Map closings by date
   const closingMap = {}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { hrAPI } from '../../services/api'
+import { getTodayNZ } from '../../utils/date'
 import Card from '../ui/Card'
 import PageHeader from '../ui/PageHeader'
 import Badge from '../ui/Badge'
@@ -17,7 +18,7 @@ export default function AssignTasks() {
     title: '',
     assigned_to: '',
     priority: 'MEDIUM',
-    due_date: new Date().toISOString().split('T')[0],
+    due_date: getTodayNZ(),
     due_time: '',
     description: '',
   })
@@ -60,7 +61,7 @@ export default function AssignTasks() {
         title: '',
         assigned_to: '',
         priority: 'MEDIUM',
-        due_date: new Date().toISOString().split('T')[0],
+        due_date: getTodayNZ(),
         due_time: '',
         description: '',
       })

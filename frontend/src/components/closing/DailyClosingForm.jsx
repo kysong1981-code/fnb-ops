@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { getTodayNZ } from '../../utils/date'
 import { closingAPI, storeAPI, supplierCostAPI, otherSalesAPI } from '../../services/api'
 import Card from '../ui/Card'
 import SectionLabel from '../ui/SectionLabel'
@@ -16,7 +17,7 @@ export default function DailyClosingForm() {
 
   // If date param provided (from dashboard approval), use it; otherwise today
   const dateParam = searchParams.get('date')
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = getTodayNZ()
   const [closingDate] = useState(dateParam || todayStr)
 
   const [closingId, setClosingId] = useState(null)

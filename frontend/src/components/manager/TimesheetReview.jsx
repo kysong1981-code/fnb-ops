@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { hrAPI } from '../../services/api'
+import { getTodayNZ, formatDateNZ, getNowNZ } from '../../utils/date'
 import Card from '../ui/Card'
 import PageHeader from '../ui/PageHeader'
 import Badge from '../ui/Badge'
@@ -15,12 +16,12 @@ export default function TimesheetReview() {
   const [approving, setApproving] = useState(null) // id or 'all'
 
   const getWeekDate = useCallback(() => {
-    const now = new Date()
+    const now = getNowNZ()
     const day = now.getDay()
     const mondayOffset = day === 0 ? -6 : 1 - day
     const monday = new Date(now)
     monday.setDate(now.getDate() + mondayOffset + weekOffset * 7)
-    return monday.toISOString().split('T')[0]
+    return formatDateNZ(monday)
   }, [weekOffset])
 
   const fetchData = useCallback(async () => {

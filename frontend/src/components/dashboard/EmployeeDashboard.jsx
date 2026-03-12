@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { hrAPI } from '../../services/api'
+import { getTodayNZ, formatDateNZ } from '../../utils/date'
 import Card from '../ui/Card'
 import SectionLabel from '../ui/SectionLabel'
 import SafetyTasksWidget from '../safety/SafetyTasksWidget'
@@ -74,9 +75,9 @@ export default function EmployeeDashboard() {
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(weekStart)
       d.setDate(weekStart.getDate() + i)
-      const dateStr = d.toISOString().split('T')[0]
+      const dateStr = formatDateNZ(d)
       const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 3)
-      const isToday = dateStr === new Date().toISOString().split('T')[0]
+      const isToday = dateStr === getTodayNZ()
       return {
         day: dayLabel,
         date: dateStr,

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../../services/api'
 import { safetyAPI } from '../../../services/api'
+import { getTodayNZ } from '../../../utils/date'
 
 export default function CleaningForm() {
   const navigate = useNavigate()
@@ -9,7 +10,7 @@ export default function CleaningForm() {
   const [formData, setFormData] = useState({
     areas: [],
     notes: '',
-    date: new Date().toISOString().split('T')[0]
+    date: getTodayNZ()
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
