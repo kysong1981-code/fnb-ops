@@ -60,9 +60,8 @@ class ClosingHRCashSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClosingHRCash
         fields = ['id', 'daily_closing', 'amount', 'recipient_name', 'photo', 'notes', 'created_by', 'created_by_name', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by_name']
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'created_by_name']
         extra_kwargs = {
-            'created_by': {'write_only': True},
             'photo': {'required': False, 'allow_null': True},
             'recipient_name': {'required': False},
         }
