@@ -1,25 +1,26 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { safetyAPI } from '../../services/api'
 import { useStore } from '../../context/StoreContext'
 import Card from '../ui/Card'
 import SectionLabel from '../ui/SectionLabel'
 import { ShieldIcon, CheckCircleIcon, ClockIcon } from '../icons'
 import SafetyRecordForm from './records/SafetyRecordForm'
+import InlineTemperatureForm from './InlineTemperatureForm'
+import InlineCleaningForm from './InlineCleaningForm'
 
-// Tasks that navigate to a dedicated page instead of quick complete
-const LEGACY_ROUTES = {
-  daily_temperature: '/safety/temperatures/new',
-  daily_cleaning: '/safety/cleaning',
+// Tasks that have their own inline modal components
+const INLINE_MODALS = {
+  daily_temperature: 'temperature',
+  daily_cleaning: 'cleaning',
 }
 
 export default function SafetyTasksWidget() {
-  const navigate = useNavigate()
   const { selectedStore } = useStore()
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedTask, setSelectedTask] = useState(null)
   const [showForm, setShowForm] = useState(false)
+  const [activeModal, setActiveModal] = useState(null) // 'temperature' | 'cleaning' | null
 
   const storeParams = selectedStore && selectedStore.id !== 'all' ? { store_id: selectedStore.id } : {}
 
@@ -202,9 +203,9 @@ export default function SafetyTasksWidget() {
                   {!task.is_completed && (
                     <button
                       onClick={() => {
-                        const route = LEGACY_ROUTES[rt.code]
-                        if (route) {
-                          navigate(route)
+                        const modal = INLINE_MODALS[rt.code]
+                        if (modal) {
+                          setActiveModal(modal)
                         } else if (hasFields) {
                           handleComplete(task)
                         } else {
@@ -213,7 +214,7 @@ export default function SafetyTasksWidget() {
                       }}
                       className="ml-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg transition-colors flex-shrink-0 active:scale-95"
                     >
-                      {LEGACY_ROUTES[rt.code] ? 'Open' : '✓ Complete'}
+                      ✓ Complete
                     </button>
                   )}
                 </div>
@@ -223,12 +224,28 @@ export default function SafetyTasksWidget() {
         </div>
       </Card>
 
-      {/* Form Modal */}
+      {/* Generic Form Modal */}
       {showForm && selectedTask && (
         <SafetyRecordForm
           recordType={selectedTask.record_type}
           onSubmit={handleFormSubmit}
           onClose={() => { setShowForm(false); setSelectedTask(null) }}
+        />
+      )}
+
+      {/* Temperature Modal */}
+      {activeModal === 'temperature' && (
+        <InlineTemperatureForm
+          onComplete={() => { setActiveModal(null); fetchTasks() }}
+          onClose={() => setActiveModal(null)}
+        />
+      )}
+
+      {/* Cleaning Modal */}
+      {activeModal === 'cleaning' && (
+        <InlineCleaningForm
+          onComplete={() => { setActiveModal(null); fetchTasks() }}
+          onClose={() => setActiveModal(null)}
         />
       )}
     </>
