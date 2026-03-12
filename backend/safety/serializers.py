@@ -263,4 +263,4 @@ class SafetyRecordQuickCompleteSerializer(serializers.Serializer):
         queryset=SafetyRecordType.objects.filter(is_active=True)
     )
     data = serializers.JSONField(default=dict)
-    notes = serializers.CharField(required=False, default='')
+    notes = serializers.CharField(required=False, default='', allow_blank=True)

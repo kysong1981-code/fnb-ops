@@ -709,8 +709,19 @@ class SafetyRecordViewSet(viewsets.ModelViewSet):
         user_profile = request.user.profile
         record_type = serializer.validated_data['record_type']
 
+        # Resolve organization: CEO/HQ can use store_id param
+        org = user_profile.organization
+        if user_profile.role in ['CEO', 'HQ', 'REGIONAL_MANAGER', 'SENIOR_MANAGER']:
+            store_id = request.query_params.get('store_id')
+            if store_id:
+                from users.models import Organization
+                try:
+                    org = Organization.objects.get(id=store_id)
+                except Organization.DoesNotExist:
+                    pass
+
         record = SafetyRecord.objects.create(
-            organization=user_profile.organization,
+            organization=org,
             record_type=record_type,
             date=date.today(),
             time=datetime.now().time(),
