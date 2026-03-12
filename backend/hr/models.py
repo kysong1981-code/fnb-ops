@@ -340,6 +340,13 @@ class EmployeeInvite(models.Model):
     work_type = models.CharField(max_length=20, choices=WORK_TYPE_CHOICES)
     hourly_rate = models.DecimalField(max_digits=8, decimal_places=2)
 
+    # IEA (Individual Employment Agreement) fields
+    commencement_date = models.DateField(null=True, blank=True)
+    work_location = models.CharField(max_length=255, blank=True, default='')
+    min_hours = models.PositiveIntegerField(null=True, blank=True)
+    max_hours = models.PositiveIntegerField(null=True, blank=True)
+    reporting_to = models.CharField(max_length=100, blank=True, default='Director/Management')
+
     status = models.CharField(max_length=20, choices=INVITE_STATUS_CHOICES, default='PENDING')
     invited_by = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='sent_invites')
     accepted_by = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='accepted_invite')

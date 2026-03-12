@@ -199,7 +199,9 @@ class EmployeeInviteSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'invite_code', 'email', 'first_name', 'last_name',
             'role', 'job_title', 'job_title_display', 'work_type', 'work_type_display',
-            'hourly_rate', 'status', 'is_expired',
+            'hourly_rate',
+            'commencement_date', 'work_location', 'min_hours', 'max_hours', 'reporting_to',
+            'status', 'is_expired',
             'invited_by', 'invited_by_name', 'accepted_by', 'accepted_by_name',
             'created_at', 'expires_at',
         ]

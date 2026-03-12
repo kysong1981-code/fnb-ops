@@ -45,7 +45,15 @@ export default function InviteTab() {
     job_title: 'BARISTA',
     work_type: 'FULL_TIME',
     hourly_rate: '',
+    // IEA fields (Visa Full Time)
+    commencement_date: '',
+    work_location: '',
+    min_hours: '30',
+    max_hours: '50',
+    reporting_to: 'Director/Management',
   })
+
+  const isVisa = form.work_type === 'VISA_FULL_TIME'
 
   const loadInvites = async () => {
     setLoading(true)
@@ -82,7 +90,7 @@ export default function InviteTab() {
           invite_code: data.invite_code,
         })
       }
-      setForm({ first_name: '', last_name: '', email: '', job_title: 'BARISTA', work_type: 'FULL_TIME', hourly_rate: '' })
+      setForm({ first_name: '', last_name: '', email: '', job_title: 'BARISTA', work_type: 'FULL_TIME', hourly_rate: '', commencement_date: '', work_location: '', min_hours: '30', max_hours: '50', reporting_to: 'Director/Management' })
       loadInvites()
       showMsg('Invite sent — account created')
     } catch (err) {
@@ -208,6 +216,37 @@ export default function InviteTab() {
             <label className="text-xs text-gray-500 mb-1 block">Hourly Rate *</label>
             <input type="number" step="0.01" value={form.hourly_rate} onChange={(e) => setForm({ ...form, hourly_rate: e.target.value })} placeholder="0.00" className={inputCls} />
           </div>
+
+          {/* IEA fields for Visa Full Time */}
+          {isVisa && (
+            <div className="space-y-3 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
+              <p className="text-xs font-semibold text-blue-700">IEA Contract Details</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Commencement Date</label>
+                  <input type="date" value={form.commencement_date} onChange={(e) => setForm({ ...form, commencement_date: e.target.value })} className={inputCls} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Reporting To</label>
+                  <input type="text" value={form.reporting_to} onChange={(e) => setForm({ ...form, reporting_to: e.target.value })} className={inputCls} />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Work Location</label>
+                <input type="text" value={form.work_location} onChange={(e) => setForm({ ...form, work_location: e.target.value })} placeholder="Store address" className={inputCls} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Min Hours/Week</label>
+                  <input type="number" value={form.min_hours} onChange={(e) => setForm({ ...form, min_hours: e.target.value })} className={inputCls} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Max Hours/Week</label>
+                  <input type="number" value={form.max_hours} onChange={(e) => setForm({ ...form, max_hours: e.target.value })} className={inputCls} />
+                </div>
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"
