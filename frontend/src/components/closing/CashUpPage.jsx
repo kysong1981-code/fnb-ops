@@ -344,6 +344,66 @@ export default function CashUpPage() {
       ) : activeTab === 'cashup' ? (
         /* ============ CASH UP TAB ============ */
         <>
+          {/* Cash Summary from Daily Closing */}
+          <Card className="p-5 bg-gray-900 border-gray-800">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Daily Closing Summary</p>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">POS Cash</span>
+                <span className="text-white font-medium">{fmt(closing.pos_cash)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">POS Card</span>
+                <span className="text-white font-medium">{fmt(closing.pos_card)}</span>
+              </div>
+              <div className="border-t border-gray-700 pt-2 mt-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-300 font-medium">POS Total</span>
+                  <span className="text-white font-bold">{fmt(closing.pos_total)}</span>
+                </div>
+              </div>
+              <div className="border-t border-gray-700 pt-2 mt-1" />
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Actual Cash</span>
+                <span className="text-white font-medium">{fmt(closing.actual_cash)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Actual Card</span>
+                <span className="text-white font-medium">{fmt(closing.actual_card)}</span>
+              </div>
+              <div className="border-t border-gray-700 pt-2 mt-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-300 font-medium">Actual Total</span>
+                  <span className="text-white font-bold">{fmt(closing.actual_total)}</span>
+                </div>
+              </div>
+              {parseFloat(closing.total_variance || 0) !== 0 && (
+                <div className="border-t border-gray-700 pt-2 mt-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-300 font-medium">Variance</span>
+                    <span className={`font-bold ${parseFloat(closing.total_variance || 0) === 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {fmt(closing.total_variance)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="mt-3 pt-2 border-t border-gray-700">
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                  closing.status === 'APPROVED' ? 'bg-green-900 text-green-300' :
+                  closing.status === 'SUBMITTED' ? 'bg-blue-900 text-blue-300' :
+                  'bg-gray-700 text-gray-300'
+                }`}>
+                  {closing.status}
+                </span>
+                {closing.created_by_name && (
+                  <span className="text-xs text-gray-500">by {closing.created_by_name}</span>
+                )}
+              </div>
+            </div>
+          </Card>
+
           {/* Bank Deposit */}
           <Card className="p-5">
             <SectionLabel>Bank Deposit</SectionLabel>
@@ -354,6 +414,7 @@ export default function CashUpPage() {
               onChange={(e) => setBankDeposit(e.target.value)}
               placeholder="0.00"
               className={inputCls}
+              disabled={closing.status === 'APPROVED'}
             />
           </Card>
 
@@ -368,9 +429,45 @@ export default function CashUpPage() {
                 onChange={(e) => setHrCashAmount(e.target.value)}
                 placeholder="0.00"
                 className={inputCls}
+                disabled={closing.status === 'APPROVED'}
               />
             </Card>
           )}
+
+          {/* Cash Reconciliation */}
+          <Card className="p-5">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Cash Reconciliation</p>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Actual Cash</span>
+                <span className="font-medium text-gray-900">{fmt(closing.actual_cash)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Bank Deposit</span>
+                <span className="font-medium text-gray-900">-{fmt(deposit)}</span>
+              </div>
+              {hrCashTotal > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">HR Cash</span>
+                  <span className="font-medium text-gray-900">-{fmt(hrCashTotal)}</span>
+                </div>
+              )}
+              {expenseTotal > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Expenses</span>
+                  <span className="font-medium text-gray-900">-{fmt(expenseTotal)}</span>
+                </div>
+              )}
+              <div className="border-t pt-2">
+                <div className="flex justify-between">
+                  <span className="font-semibold text-gray-700">Remaining Cash</span>
+                  <span className={`font-bold text-lg ${cashVariance === 0 ? 'text-green-600' : cashVariance > 0 ? 'text-amber-600' : 'text-red-600'}`}>
+                    {fmt(cashVariance)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </Card>
 
           {/* Actions */}
           <div className="space-y-3 pb-6">
@@ -381,21 +478,21 @@ export default function CashUpPage() {
                 className="w-full flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition"
               >
                 <CheckCircleIcon size={18} />
-                {saving ? 'Saving...' : 'Save & Submit'}
+                {saving ? 'Saving...' : 'Save & Approve'}
               </button>
             )}
 
             {closing.status === 'APPROVED' && (
               <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-center">
-                <p className="text-sm text-green-700 font-medium">This closing has been approved</p>
+                <p className="text-sm text-green-700 font-medium">✓ Approved</p>
               </div>
             )}
 
             <button
-              onClick={() => navigate('/closing')}
+              onClick={() => navigate(`/closing/form?date=${selectedDate}`)}
               className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
             >
-              Back to List
+              View Daily Closing
               <ArrowRightIcon size={14} />
             </button>
           </div>
