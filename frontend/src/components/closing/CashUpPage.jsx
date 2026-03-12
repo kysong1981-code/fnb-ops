@@ -455,7 +455,106 @@ export default function CashUpPage() {
       ) : (
         /* ============ HR CASH TAB ============ */
         <>
-          {/* Expense Input — always visible */}
+          {/* Date & Balance */}
+          <Card className="p-5 space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-500">Date</span>
+              <span className="text-sm font-semibold text-gray-900">{selectedDate}</span>
+            </div>
+
+            <div className="border-t border-gray-100" />
+
+            {/* Current Balance + Add */}
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-gray-500">Balance</span>
+                <span className="text-xl font-bold text-gray-900">{fmt(hrCashTotal)}</span>
+              </div>
+              {!showHrForm ? (
+                <button
+                  onClick={() => setShowHrForm(true)}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 bg-blue-50 text-blue-600 rounded-xl text-sm font-medium hover:bg-blue-100 transition"
+                >
+                  <PlusIcon size={16} />
+                  Add HR Cash
+                </button>
+              ) : (
+                <form onSubmit={handleAddHrCash} className="space-y-2">
+                  <input
+                    type="text"
+                    value={hrForm.recipient_name}
+                    onChange={(e) => setHrForm(p => ({ ...p, recipient_name: e.target.value }))}
+                    placeholder="Recipient name"
+                    className={inputCls}
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={hrForm.amount}
+                    onChange={(e) => setHrForm(p => ({ ...p, amount: e.target.value }))}
+                    placeholder="Amount"
+                    className={inputCls}
+                  />
+                  <input
+                    type="text"
+                    value={hrForm.notes}
+                    onChange={(e) => setHrForm(p => ({ ...p, notes: e.target.value }))}
+                    placeholder="Notes (optional)"
+                    className={inputCls}
+                  />
+                  <label className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition">
+                    <CameraIcon size={18} className="text-gray-400" />
+                    <span className="text-sm text-gray-500">
+                      {hrForm.photo ? hrForm.photo.name : 'Attach photo'}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.pdf"
+                      onChange={(e) => setHrForm(p => ({ ...p, photo: e.target.files[0] }))}
+                      className="hidden"
+                    />
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setShowHrForm(false); setHrForm({ recipient_name: '', amount: '', notes: '', photo: null }) }}
+                      className="flex-1 py-2 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving || !hrForm.amount}
+                      className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-40 transition"
+                    >
+                      {saving ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </form>
+              )}
+              {/* HR Cash entries list */}
+              {hrCashEntries.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {hrCashEntries.map((entry) => (
+                    <div key={entry.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">{entry.recipient_name || 'HR Cash'}</span>
+                        {entry.notes && <p className="text-xs text-gray-400">{entry.notes}</p>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-900">{fmt(entry.amount)}</span>
+                        <button onClick={() => handleDeleteHrCash(entry.id)} className="text-red-400 hover:text-red-600">
+                          <TrashIcon size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Expense */}
           <Card className="p-5">
             <SectionLabel>Expense</SectionLabel>
             <form onSubmit={handleAddExpense} className="space-y-3">
@@ -506,33 +605,34 @@ export default function CashUpPage() {
                 {saving ? 'Saving...' : 'Save'}
               </button>
             </form>
+            {/* Expense entries list */}
+            {expenses.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {expenses.map((exp) => (
+                  <div key={exp.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                    <div>
+                      <span className="text-sm font-medium text-gray-700">{exp.reason}</span>
+                      <span className="text-xs text-gray-400 ml-2">{exp.category}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-red-600">-{fmt(exp.amount)}</span>
+                      <button onClick={() => handleDeleteExpense(exp.id)} className="text-red-400 hover:text-red-600">
+                        <TrashIcon size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
 
-          {/* Balance */}
-          <Card className="p-5 bg-gray-900 border-gray-800">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">HR Cash</span>
-                <span className="text-white font-medium">{fmt(hrCashTotal)}</span>
-              </div>
-              <div className="border-t border-gray-700 pt-2 mt-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-300 font-medium">Balance</span>
-                  <span className="text-white font-bold">{fmt(hrCashTotal)}</span>
-                </div>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Expenses</span>
-                <span className="text-red-400 font-medium">-{fmt(expenseTotal)}</span>
-              </div>
-              <div className="border-t border-gray-700 pt-2 mt-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-300 font-medium">Net Balance</span>
-                  <span className={`text-lg font-bold ${(hrCashTotal - expenseTotal) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {fmt(hrCashTotal - expenseTotal)}
-                  </span>
-                </div>
-              </div>
+          {/* Net Balance */}
+          <Card className="p-5">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-semibold text-gray-700">Net Balance</span>
+              <span className={`text-xl font-bold ${(hrCashTotal - expenseTotal) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {fmt(hrCashTotal - expenseTotal)}
+              </span>
             </div>
           </Card>
         </>
