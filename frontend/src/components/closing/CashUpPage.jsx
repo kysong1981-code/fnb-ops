@@ -360,49 +360,12 @@ export default function CashUpPage() {
       ) : activeTab === 'cashup' ? (
         /* ============ CASH UP TAB ============ */
         <>
-          {/* Cash Summary from Daily Closing */}
+          {/* Actual Cash from Daily Closing */}
           <Card className="p-5 bg-gray-900 border-gray-800">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Daily Closing Summary</p>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">POS Cash</span>
-                <span className="text-white font-medium">{fmt(closing.pos_cash)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">POS Card</span>
-                <span className="text-white font-medium">{fmt(closing.pos_card)}</span>
-              </div>
-              <div className="border-t border-gray-700 pt-2 mt-1">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-300 font-medium">POS Total</span>
-                  <span className="text-white font-bold">{fmt(closing.pos_total)}</span>
-                </div>
-              </div>
-              <div className="border-t border-gray-700 pt-2 mt-1" />
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Actual Cash</span>
-                <span className="text-white font-medium">{fmt(closing.actual_cash)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Actual Card</span>
-                <span className="text-white font-medium">{fmt(closing.actual_card)}</span>
-              </div>
-              <div className="border-t border-gray-700 pt-2 mt-1">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-300 font-medium">Actual Total</span>
-                  <span className="text-white font-bold">{fmt(closing.actual_total)}</span>
-                </div>
-              </div>
-              {parseFloat(closing.total_variance || 0) !== 0 && (
-                <div className="border-t border-gray-700 pt-2 mt-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-300 font-medium">Variance</span>
-                    <span className={`font-bold ${parseFloat(closing.total_variance || 0) === 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {fmt(closing.total_variance)}
-                    </span>
-                  </div>
-                </div>
-              )}
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Daily Closing</p>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-300 font-medium">Actual Cash</span>
+              <span className="text-white font-bold text-lg">{fmt(closing.actual_cash)}</span>
             </div>
             <div className="mt-3 pt-2 border-t border-gray-700">
               <div className="flex items-center gap-2">
