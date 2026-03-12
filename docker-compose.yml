@@ -63,4 +63,8 @@ services:
 volumes:
   backend_media:
   certbot_etc:
+    name: fnb-ops_certbot-etc
+    external: true
   certbot_var:
+    name: fnb-ops_certbot-var
+    external: true
