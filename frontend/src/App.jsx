@@ -57,12 +57,24 @@ import ForgotPassword from './components/auth/ForgotPassword'
 import ResetPassword from './components/auth/ResetPassword'
 import StoreApplications from './components/admin/StoreApplications'
 import StoreAssignment from './components/admin/StoreAssignment'
+import ManagerRoute from './components/auth/ManagerRoute'
 
 // Helper component to wrap protected routes with Layout
 function ProtectedWithLayout({ children }) {
   return (
     <ProtectedRoute>
       <Layout>{children}</Layout>
+    </ProtectedRoute>
+  )
+}
+
+// Manager-only routes (redirects Employee to dashboard)
+function ManagerWithLayout({ children }) {
+  return (
+    <ProtectedRoute>
+      <ManagerRoute>
+        <Layout>{children}</Layout>
+      </ManagerRoute>
     </ProtectedRoute>
   )
 }
@@ -330,9 +342,9 @@ function App() {
           <Route
             path="/admin/applications"
             element={
-              <ProtectedWithLayout>
+              <ManagerWithLayout>
                 <StoreApplications />
-              </ProtectedWithLayout>
+              </ManagerWithLayout>
             }
           />
 
@@ -340,9 +352,9 @@ function App() {
           <Route
             path="/admin/store-assignment"
             element={
-              <ProtectedWithLayout>
+              <ManagerWithLayout>
                 <StoreAssignment />
-              </ProtectedWithLayout>
+              </ManagerWithLayout>
             }
           />
 

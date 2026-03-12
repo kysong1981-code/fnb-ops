@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { closingAPI, storeAPI, supplierCostAPI, otherSalesAPI, hrCashAPI } from '../../services/api'
 import Card from '../ui/Card'
 import SectionLabel from '../ui/SectionLabel'
 import { PlusIcon, TrashIcon, CheckCircleIcon, ArrowRightIcon } from '../icons'
 
+const MANAGER_ROLES = ['MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO']
+
 export default function DailyClosingForm() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user } = useAuth()
+  const isManager = user && MANAGER_ROLES.includes(user.role)
 
-  const [closingDate, setClosingDate] = useState(new Date().toISOString().split('T')[0])
+  const [closingDate, setClosingDate] = useState(searchParams.get('date') || new Date().toISOString().split('T')[0])
   const [closingId, setClosingId] = useState(null)
   const [closingStatus, setClosingStatus] = useState('DRAFT')
 
@@ -51,7 +55,8 @@ export default function DailyClosingForm() {
   const totalVariance = cardVariance + cashVariance
 
   const fmt = (v) => `$${parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  const isReadOnly = closingStatus !== 'DRAFT'
+  // Managers can edit any status, non-managers can only edit DRAFT
+  const isReadOnly = isManager ? false : closingStatus !== 'DRAFT'
 
   // Load suppliers + sales categories
   useEffect(() => {

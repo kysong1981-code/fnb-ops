@@ -7,10 +7,16 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
+from django.conf import settings
+from django.core.mail import send_mail
 from django.db import transaction
 from django.http import HttpResponse
+from django.template.loader import render_to_string
 from django.utils import timezone
 from datetime import timedelta
+import logging
+
+logger = logging.getLogger(__name__)
 
 from utils.docx_filler import fill_docx_template
 from utils.docx_to_pdf import convert_docx_to_pdf
@@ -1063,6 +1069,33 @@ class TeamViewSet(viewsets.ViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
+def send_invite_email(invite, temp_password, org_name):
+    """초대 이메일 발송"""
+    try:
+        login_url = 'https://oneops.co.nz/login'
+        html_message = render_to_string('hr/invite_email.html', {
+            'first_name': invite.first_name,
+            'organization': org_name,
+            'email': invite.email,
+            'temp_password': temp_password,
+            'login_url': login_url,
+        })
+        send_mail(
+            subject=f'[Oneops] Welcome to {org_name} - Your Account is Ready',
+            message=f'Hi {invite.first_name}, you have been invited to join {org_name} on Oneops. '
+                    f'Login at {login_url} with email: {invite.email} and password: {temp_password}',
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[invite.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        logger.info(f'Invitation email sent to {invite.email}')
+        return True
+    except Exception as e:
+        logger.error(f'Failed to send invitation email to {invite.email}: {e}')
+        return False
+
+
 class EmployeeInviteViewSet(viewsets.ModelViewSet):
     """직원 초대 관리"""
     serializer_class = EmployeeInviteSerializer
@@ -1249,24 +1282,41 @@ class EmployeeInviteViewSet(viewsets.ModelViewSet):
             invite.accepted_by = user_profile
             invite.save()
 
+        # Send invitation email
+        email_sent = send_invite_email(invite, temp_password, org.name)
+
         # Return invite data + generated credentials
         response_data = self.get_serializer(invite).data
         response_data['generated_credentials'] = {
             'email': email,
             'password': temp_password,
         }
+        response_data['email_sent'] = email_sent
         return Response(response_data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
     def resend(self, request, pk=None):
-        """초대 재발급 (새 code + 새 만료)"""
+        """초대 재발급 (새 code + 새 만료) + 이메일 재발송"""
+        from hr.utils import generate_temp_password
         invite = self.get_object()
         invite.invite_code = uuid.uuid4()
         invite.status = 'PENDING'
         invite.expires_at = timezone.now() + timedelta(days=7)
         invite.save()
-        serializer = self.get_serializer(invite)
-        return Response(serializer.data)
+
+        # Reset password and resend email
+        temp_password = generate_temp_password()
+        user = User.objects.filter(email=invite.email).first()
+        if user:
+            user.set_password(temp_password)
+            user.save()
+
+        org = request.user.profile.organization
+        email_sent = send_invite_email(invite, temp_password, org.name)
+
+        response_data = self.get_serializer(invite).data
+        response_data['email_sent'] = email_sent
+        return Response(response_data)
 
 
 class AcceptInviteView(APIView):

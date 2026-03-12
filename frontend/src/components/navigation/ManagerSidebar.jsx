@@ -7,6 +7,9 @@ import {
   LogoutIcon, MenuIcon, XIcon, MoneyIcon, BellIcon
 } from '../icons'
 
+// Roles that can access manager-level features
+const MANAGER_ROLES = ['CEO', 'HQ', 'ADMIN', 'REGIONAL_MANAGER', 'SENIOR_MANAGER', 'MANAGER']
+
 const menuSections = [
   {
     title: null,
@@ -16,7 +19,18 @@ const menuSections = [
     ]
   },
   {
+    title: 'My Work',
+    roles: ['EMPLOYEE'],
+    items: [
+      { label: 'My Roster', path: '/roster', icon: CalendarIcon },
+      { label: 'My Tasks', path: '/tasks', icon: CheckCircleIcon },
+      { label: 'Food Safety', path: '/safety', icon: ShieldIcon },
+      { label: 'Documents', path: '/documents', icon: DocumentIcon },
+    ]
+  },
+  {
     title: 'Manager',
+    roles: MANAGER_ROLES,
     items: [
       { label: 'Daily Closing', path: '/closing', icon: ClipboardIcon, module: 'CLOSING' },
       { label: 'Cash Up', path: '/cashup', icon: MoneyIcon, module: 'CASHUP' },
@@ -29,6 +43,7 @@ const menuSections = [
   },
   {
     title: 'Schedule',
+    roles: MANAGER_ROLES,
     items: [
       { label: 'Roster Management', path: '/manager/roster', icon: CalendarIcon, module: 'ROSTER' },
       { label: 'Timesheet Review', path: '/manager/timesheet-review', icon: ClockIcon, module: 'TIMESHEET' },
@@ -45,6 +60,7 @@ const menuSections = [
   },
   {
     title: 'Settings',
+    roles: MANAGER_ROLES,
     items: [
       { label: 'Store Settings', path: '/store-settings', icon: SettingsIcon },
       { label: 'Documents', path: '/documents', icon: DocumentIcon, module: 'DOCUMENTS' },

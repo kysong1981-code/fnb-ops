@@ -133,7 +133,7 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
         serializer.save(created_by_id=self.request.user.id, status='DRAFT')
 
     def update(self, request, *args, **kwargs):
-        """클로징 수정 (DRAFT 상태만 가능)"""
+        """클로징 수정 (매니저는 모든 상태 수정 가능, 직원은 DRAFT만)"""
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
 
@@ -143,7 +143,9 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if instance.status != 'DRAFT':
+        profile = request.user.profile
+        is_manager = profile.role in self.MANAGER_ROLES
+        if not is_manager and instance.status != 'DRAFT':
             return Response(
                 {'detail': f'DRAFT 상태인 클로징만 수정할 수 있습니다. 현재 상태: {instance.status}'},
                 status=status.HTTP_400_BAD_REQUEST
