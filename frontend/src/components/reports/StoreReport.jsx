@@ -64,12 +64,12 @@ export default function StoreReport() {
   const isAdmin = user && ADMIN_ROLES.includes(user.role)
   const tabs = [
     { key: 'daily', label: 'Daily Report' },
-    { key: 'cash', label: 'Cash Report' },
     { key: 'sales', label: 'Sales Report' },
-    { key: 'supply', label: 'Supply Report' },
-    ...(isRegional ? [{ key: 'comparison', label: 'Store Comparison' }] : []),
-    ...(isAdmin ? [{ key: 'cq', label: 'CQ Report' }] : []),
+    { key: 'supply', label: 'Expense Report' },
+    { key: 'cash', label: 'Cash Report' },
     { key: 'sky', label: 'Sky Report' },
+    ...(isAdmin ? [{ key: 'cq', label: 'CQ Report' }] : []),
+    ...(isRegional ? [{ key: 'comparison', label: 'Store Comparison' }] : []),
   ]
 
   useEffect(() => {
