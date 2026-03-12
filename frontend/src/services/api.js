@@ -343,10 +343,13 @@ export const safetyAPI = {
   deleteTemplate: (id) => api.delete(`/safety/checklist-templates/${id}/`),
 
   // Temperature Locations
-  getTemperatureLocations: () => api.get('/safety/temperature-locations/'),
+  getTemperatureLocations: (params) => api.get('/safety/temperature-locations/', { params }),
   createTemperatureLocation: (data) => api.post('/safety/temperature-locations/', data),
   updateTemperatureLocation: (id, data) => api.patch(`/safety/temperature-locations/${id}/`, data),
   deleteTemperatureLocation: (id) => api.delete(`/safety/temperature-locations/${id}/`),
+
+  // Temperature Records
+  createTemperatureRecord: (data, params) => api.post('/safety/temperatures/', data, { params }),
 
   // MPI Record Types (카탈로그)
   getRecordTypes: (params) => api.get('/safety/record-types/', { params }),

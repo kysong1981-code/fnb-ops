@@ -129,17 +129,27 @@ class TemperatureLogViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """사용자의 조직의 온도 기록만 조회"""
-        user = self.request.user
-        user_profile = user.profile
         return TemperatureRecord.objects.filter(
-            organization=user_profile.organization
+            organization=self._resolve_org()
         )
+
+    def _resolve_org(self):
+        profile = self.request.user.profile
+        if profile.role in ['CEO', 'HQ', 'REGIONAL_MANAGER', 'SENIOR_MANAGER']:
+            store_id = self.request.query_params.get('store_id')
+            if store_id:
+                from users.models import Organization
+                try:
+                    return Organization.objects.get(id=store_id)
+                except Organization.DoesNotExist:
+                    pass
+        return profile.organization
 
     def perform_create(self, serializer):
         """온도 기록 생성"""
         user_profile = self.request.user.profile
         serializer.save(
-            organization=user_profile.organization,
+            organization=self._resolve_org(),
             recorded_by=user_profile
         )
 

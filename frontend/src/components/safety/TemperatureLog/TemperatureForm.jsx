@@ -1,278 +1,218 @@
-import React, { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api from '../../../services/api'
+import { safetyAPI } from '../../../services/api'
+import { useStore } from '../../../context/StoreContext'
+import Card from '../../ui/Card'
 
 export default function TemperatureForm() {
   const navigate = useNavigate()
+  const { selectedStore } = useStore()
+  const storeParams = selectedStore && selectedStore.id !== 'all' ? { store_id: selectedStore.id } : {}
 
-  const [formData, setFormData] = useState({
-    location: '',
-    temperature: '',
-    time: new Date().toTimeString().slice(0, 5),
-    notes: ''
-  })
-  const [loading, setLoading] = useState(false)
+  const [locations, setLocations] = useState([])
+  const [readings, setReadings] = useState({})
+  const [notes, setNotes] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [status, setStatus] = useState(null)
 
-  const locations = [
-    { value: '냉동실', label: '냉동실 (Freezer)', standard: -18 },
-    { value: '냉장실', label: '냉장실 (Fridge)', standard: 4 },
-    { value: '조리용', label: '조리용 (Cooking)', standard: 75 }
-  ]
-
-  const selectedLocation = locations.find(l => l.value === formData.location)
-  const standard = selectedLocation?.standard || 0
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-
-    // 온도가 입력되면 상태 판별
-    if (name === 'temperature') {
-      const temp = parseFloat(value)
-      const standardTemp = standard
-
-      if (isNaN(temp)) {
-        setStatus(null)
-      } else {
-        const diff = Math.abs(temp - standardTemp)
-        if (diff <= 2) {
-          setStatus({ type: 'normal', message: '정상 범위' })
-        } else if (diff <= 4) {
-          setStatus({ type: 'warning', message: '경고 범위' })
-        } else {
-          setStatus({ type: 'critical', message: '위험 범위' })
-        }
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const res = await safetyAPI.getTemperatureLocations(storeParams)
+        setLocations(res.data)
+        // Initialize readings for each location
+        const initial = {}
+        res.data.forEach(loc => {
+          initial[loc.id] = ''
+        })
+        setReadings(initial)
+      } catch (err) {
+        console.error('Failed to fetch temperature locations:', err)
+        setError('Failed to load equipment list')
+      } finally {
+        setLoading(false)
       }
     }
+    fetchLocations()
+  }, [selectedStore])
+
+  const getStatus = (temp, loc) => {
+    if (temp === '' || temp === null || isNaN(parseFloat(temp))) return null
+    const t = parseFloat(temp)
+    const min = parseFloat(loc.standard_min)
+    const max = parseFloat(loc.standard_max)
+    if (t >= min && t <= max) return 'normal'
+    const diff = t < min ? min - t : t - max
+    if (diff <= 2) return 'warning'
+    return 'critical'
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
+  const statusStyle = {
+    normal: 'border-emerald-300 bg-emerald-50',
+    warning: 'border-amber-300 bg-amber-50',
+    critical: 'border-red-300 bg-red-50',
+  }
+
+  const statusLabel = {
+    normal: { text: 'OK', color: 'text-emerald-600' },
+    warning: { text: 'Warning', color: 'text-amber-600' },
+    critical: { text: 'Critical', color: 'text-red-600' },
+  }
+
+  const handleSubmit = async () => {
+    // Check all locations have readings
+    const hasEmpty = locations.some(loc => !readings[loc.id] && readings[loc.id] !== 0)
+    if (hasEmpty) {
+      setError('Please enter temperature for all equipment')
+      return
+    }
+
+    setSaving(true)
     setError('')
 
     try {
-      // 시간을 전체 datetime으로 변환
-      const today = new Date().toISOString().split('T')[0]
-      const datetime = `${today}T${formData.time}:00Z`
+      const now = new Date()
+      const timeStr = now.toTimeString().slice(0, 5)
+      const dateStr = now.toISOString().split('T')[0]
 
-      const data = {
-        location: formData.location,
-        temperature: parseFloat(formData.temperature),
-        time: datetime,
-        notes: formData.notes
+      // Save each temperature record
+      const promises = locations.map(loc =>
+        safetyAPI.createTemperatureRecord({
+          location: loc.name,
+          temperature: parseFloat(readings[loc.id]),
+          standard_temperature: loc.standard_max,
+          date: dateStr,
+          time: timeStr,
+          notes: notes,
+        }, storeParams)
+      )
+      await Promise.all(promises)
+
+      // Also mark the safety task as complete
+      try {
+        await safetyAPI.quickComplete({
+          record_type: 'daily_temperature',
+          data: { readings: Object.fromEntries(locations.map(loc => [loc.name, parseFloat(readings[loc.id])])) },
+          notes: notes,
+        }, storeParams)
+      } catch (e) {
+        // Non-critical - task completion is nice-to-have
+        console.warn('Could not mark safety task complete:', e)
       }
 
-      await api.post('/safety/temperatures/', data)
-      setSuccess('온도 기록이 저장되었습니다.')
-
-      // 폼 초기화
-      setFormData({
-        location: '',
-        temperature: '',
-        time: new Date().toTimeString().slice(0, 5),
-        notes: ''
-      })
-      setStatus(null)
-
-      setTimeout(() => {
-        navigate('/safety/temperatures')
-      }, 1500)
+      navigate('/dashboard')
     } catch (err) {
-      setError(err.response?.data?.detail || '저장에 실패했습니다.')
+      setError(err.response?.data?.detail || 'Failed to save temperature records')
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
-  const getStatusColor = () => {
-    if (!status) return 'text-gray-600'
-    switch (status.type) {
-      case 'normal':
-        return 'text-green-600'
-      case 'warning':
-        return 'text-yellow-600'
-      case 'critical':
-        return 'text-red-600'
-      default:
-        return 'text-gray-600'
-    }
+  const filledCount = locations.filter(loc => readings[loc.id] !== '' && readings[loc.id] !== undefined).length
+
+  if (loading) {
+    return (
+      <div className="p-4">
+        <Card className="p-5 text-center text-gray-400">Loading equipment...</Card>
+      </div>
+    )
   }
 
-  const getStatusBgColor = () => {
-    if (!status) return 'bg-gray-50'
-    switch (status.type) {
-      case 'normal':
-        return 'bg-green-50 border-green-200'
-      case 'warning':
-        return 'bg-yellow-50 border-yellow-200'
-      case 'critical':
-        return 'bg-red-50 border-red-200'
-      default:
-        return 'bg-gray-50'
-    }
+  if (locations.length === 0) {
+    return (
+      <div className="p-4 space-y-4">
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate(-1)} className="text-gray-500 hover:text-gray-700">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          </button>
+          <h1 className="text-xl font-bold text-gray-900">Daily Temperature Check</h1>
+        </div>
+        <Card className="p-5 text-center">
+          <p className="text-gray-500">No equipment registered for this store.</p>
+          <p className="text-sm text-gray-400 mt-1">Add equipment in Store Settings first.</p>
+        </Card>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-6">
-      {/* 페이지 제목 */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">온도 기록</h1>
-        <p className="text-gray-600 mt-1">냉장고, 냉동고, 조리 온도를 기록합니다.</p>
+    <div className="p-4 space-y-4 pb-24">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <button onClick={() => navigate(-1)} className="text-gray-500 hover:text-gray-700">
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+        </button>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Daily Temperature Check</h1>
+          <p className="text-sm text-gray-400">{filledCount}/{locations.length} recorded</p>
+        </div>
       </div>
 
-      {/* 에러 표시 */}
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-4 rounded">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
           {error}
         </div>
       )}
 
-      {/* 성공 메시지 */}
-      {success && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-4 rounded">
-          {success}
-        </div>
-      )}
+      {/* Equipment cards */}
+      {locations.map(loc => {
+        const status = getStatus(readings[loc.id], loc)
+        const borderClass = status ? statusStyle[status] : 'border-gray-200 bg-white'
 
-      {/* 폼 */}
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* 기본 정보 */}
-        <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">온도 정보</h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* 위치 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                위치 <span className="text-red-600">*</span>
-              </label>
-              <select
-                name="location"
-                value={formData.location}
-                onChange={handleInputChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">위치를 선택하세요</option>
-                {locations.map(loc => (
-                  <option key={loc.value} value={loc.value}>
-                    {loc.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* 시간 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                시간 <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="time"
-                name="time"
-                value={formData.time}
-                onChange={handleInputChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* 온도 입력 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              온도 (°C) <span className="text-red-600">*</span>
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                name="temperature"
-                value={formData.temperature}
-                onChange={handleInputChange}
-                step="0.1"
-                required
-                placeholder="온도를 입력하세요"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              {selectedLocation && (
-                <div className="px-4 py-2 bg-blue-50 rounded-lg border border-blue-200 text-sm font-medium text-blue-700 whitespace-nowrap">
-                  표준: {selectedLocation.standard}°C
-                </div>
+        return (
+          <Card key={loc.id} className={`p-4 border-2 ${borderClass}`}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="font-semibold text-gray-900">{loc.name}</p>
+                <p className="text-xs text-gray-400">
+                  Range: {loc.standard_min}°C ~ {loc.standard_max}°C
+                </p>
+              </div>
+              {status && (
+                <span className={`text-sm font-bold ${statusLabel[status].color}`}>
+                  {statusLabel[status].text}
+                </span>
               )}
             </div>
-          </div>
-
-          {/* 비고 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">비고</label>
-            <textarea
-              name="notes"
-              value={formData.notes}
-              onChange={handleInputChange}
-              rows="3"
-              placeholder="추가 사항이나 특이사항을 입력하세요."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-
-        {/* 상태 표시 */}
-        {status && (
-          <div className={`p-6 rounded-lg border-2 ${getStatusBgColor()}`}>
-            <div className="flex items-center gap-4">
-              <div
-                className={`flex-shrink-0 h-12 w-12 rounded-full flex items-center justify-center ${
-                  status.type === 'normal'
-                    ? 'bg-green-100 text-green-600'
-                    : status.type === 'warning'
-                    ? 'bg-yellow-100 text-yellow-600'
-                    : 'bg-red-100 text-red-600'
-                }`}
-              >
-                {status.type === 'normal' && '✓'}
-                {status.type === 'warning' && '!'}
-                {status.type === 'critical' && '×'}
-              </div>
-              <div className="flex-1">
-                <h4 className={`text-lg font-semibold ${getStatusColor()}`}>
-                  {status.message}
-                </h4>
-                {formData.temperature && selectedLocation && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    입력: {formData.temperature}°C | 표준: {selectedLocation.standard}°C |
-                    편차: {Math.abs(formData.temperature - selectedLocation.standard).toFixed(1)}°C
-                  </p>
-                )}
-              </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="0.1"
+                inputMode="decimal"
+                value={readings[loc.id] || ''}
+                onChange={(e) => setReadings(prev => ({ ...prev, [loc.id]: e.target.value }))}
+                placeholder="Enter °C"
+                className="flex-1 px-3 py-3 border border-gray-300 rounded-xl text-lg font-semibold text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <span className="text-gray-400 text-lg font-medium">°C</span>
             </div>
-          </div>
-        )}
+          </Card>
+        )
+      })}
 
-        {/* 액션 버튼 */}
-        <div className="flex gap-4 justify-end">
-          <button
-            type="button"
-            onClick={() => navigate('/safety/temperatures')}
-            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition font-medium"
-          >
-            취소
-          </button>
-          <button
-            type="submit"
-            disabled={loading || !formData.location || !formData.temperature}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? '저장 중...' : '저장'}
-          </button>
-        </div>
-      </form>
+      {/* Notes */}
+      <Card className="p-4">
+        <label className="block text-sm font-medium text-gray-500 mb-2">Notes (optional)</label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows="2"
+          placeholder="Any issues or observations..."
+          className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        />
+      </Card>
+
+      {/* Submit button - fixed at bottom */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 safe-area-bottom">
+        <button
+          onClick={handleSubmit}
+          disabled={saving || filledCount === 0}
+          className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+        >
+          {saving ? 'Saving...' : `Save All (${filledCount}/${locations.length})`}
+        </button>
+      </div>
     </div>
   )
 }
