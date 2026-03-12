@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { safetyAPI } from '../../services/api'
 import { useStore } from '../../context/StoreContext'
 import Card from '../ui/Card'
@@ -14,7 +15,17 @@ const INLINE_MODALS = {
   daily_cleaning: 'cleaning',
 }
 
+// Tasks that should navigate to a specific page
+const TASK_ROUTES = {
+  open_checklist: '/safety/checklists/new',
+  daily_checklist: '/safety/checklists/new',
+  self_verification: '/safety/verifications',
+  training: '/safety/training',
+  food_safety_inspection: '/safety/inspection',
+}
+
 export default function SafetyTasksWidget() {
+  const navigate = useNavigate()
   const { selectedStore } = useStore()
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
@@ -83,7 +94,7 @@ export default function SafetyTasksWidget() {
             <ShieldIcon size={20} className="text-emerald-600" />
           </div>
           <div>
-            <p className="font-semibold text-gray-900">Today's Safety Tasks</p>
+            <p className="font-semibold text-gray-900">Today's FCP Tasks</p>
             <p className="text-xs text-gray-400">Loading...</p>
           </div>
         </div>
@@ -131,7 +142,7 @@ export default function SafetyTasksWidget() {
               } />
             </div>
             <div>
-              <p className="font-semibold text-gray-900">Today's Safety Tasks</p>
+              <p className="font-semibold text-gray-900">Today's FCP Tasks</p>
               <p className="text-xs text-gray-400">
                 {completedCount}/{totalCount} completed
               </p>
@@ -204,8 +215,11 @@ export default function SafetyTasksWidget() {
                     <button
                       onClick={() => {
                         const modal = INLINE_MODALS[rt.code]
+                        const route = TASK_ROUTES[rt.code]
                         if (modal) {
                           setActiveModal(modal)
+                        } else if (route) {
+                          navigate(route)
                         } else if (hasFields) {
                           handleComplete(task)
                         } else {
