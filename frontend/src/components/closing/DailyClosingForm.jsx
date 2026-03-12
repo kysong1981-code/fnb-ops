@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { closingAPI, storeAPI, supplierCostAPI, otherSalesAPI, hrCashAPI } from '../../services/api'
+import { closingAPI, storeAPI, supplierCostAPI, otherSalesAPI } from '../../services/api'
 import Card from '../ui/Card'
 import SectionLabel from '../ui/SectionLabel'
 import { PlusIcon, TrashIcon, CheckCircleIcon, ArrowRightIcon } from '../icons'
@@ -37,10 +37,6 @@ export default function DailyClosingForm() {
   // Variance note
   const [varianceNote, setVarianceNote] = useState('')
 
-  // HR Cash
-  const [hrCashAmount, setHrCashAmount] = useState('')
-  const [hrCashEntryId, setHrCashEntryId] = useState(null)
-  const [hrCashEnabled, setHrCashEnabled] = useState(false)
 
   // Other Sales
   const [salesCategories, setSalesCategories] = useState([])
@@ -108,15 +104,6 @@ export default function DailyClosingForm() {
           setActualCard(c.actual_card || '')
           setActualCash(c.actual_cash || '')
           setVarianceNote(c.variance_note || '')
-          setHrCashEnabled(c.hr_cash_enabled || false)
-          const hrEntries = c.hr_cash_entries || []
-          if (hrEntries.length > 0) {
-            setHrCashAmount(hrEntries[0].amount || '')
-            setHrCashEntryId(hrEntries[0].id)
-          } else {
-            setHrCashAmount('')
-            setHrCashEntryId(null)
-          }
         } else {
           setClosingId(null)
           setClosingStatus(null)
@@ -126,8 +113,6 @@ export default function DailyClosingForm() {
           setActualCard('')
           setActualCash('')
           setVarianceNote('')
-          setHrCashAmount('')
-          setHrCashEntryId(null)
           setSupplierCosts([])
           setExistingOtherSales([])
           setOtherSaleAmounts({})
@@ -178,24 +163,6 @@ export default function DailyClosingForm() {
     } catch { /* ignore */ }
   }
 
-  // Sync HR Cash
-  const syncHrCash = async (cId) => {
-    const val = parseFloat(hrCashAmount)
-    if (val && val > 0) {
-      const formData = new FormData()
-      formData.append('daily_closing', cId)
-      formData.append('amount', val)
-      if (hrCashEntryId) {
-        await hrCashAPI.update(hrCashEntryId, formData)
-      } else {
-        const res = await hrCashAPI.create(formData)
-        setHrCashEntryId(res.data.id)
-      }
-    } else if (hrCashEntryId) {
-      await hrCashAPI.delete(hrCashEntryId)
-      setHrCashEntryId(null)
-    }
-  }
 
   // Ensure closing exists (auto-create for mid-shift invoice add)
   const ensureClosing = async () => {
@@ -212,7 +179,6 @@ export default function DailyClosingForm() {
       })
       setClosingId(res.data.id)
       setClosingStatus(res.data.status)
-      setHrCashEnabled(res.data.hr_cash_enabled || false)
       return res.data.id
     } catch (err) {
       setError(err.response?.data?.detail || err.response?.data?.closing_date?.[0] || 'Failed to create closing')
@@ -253,9 +219,8 @@ export default function DailyClosingForm() {
         setClosingStatus(res.data.status)
       }
 
-      // Sync other sales + HR cash
+      // Sync other sales
       await syncOtherSales(cId)
-      await syncHrCash(cId)
 
       // Submit if still draft
       if (!closingStatus || closingStatus === 'DRAFT') {
@@ -304,9 +269,8 @@ export default function DailyClosingForm() {
         setClosingId(cId)
       }
 
-      // Sync other sales + HR cash
+      // Sync other sales
       await syncOtherSales(cId)
-      await syncHrCash(cId)
 
       // Submit then approve
       try { await closingAPI.submit(cId) } catch { /* may already be submitted */ }
@@ -604,13 +568,6 @@ export default function DailyClosingForm() {
         </Card>
       )}
 
-      {/* ──────── HR Cash ──────── */}
-      {hrCashEnabled && (
-        <Card className="p-5">
-          <SectionLabel>HR Cash</SectionLabel>
-          <input type="number" step="0.01" value={hrCashAmount} onChange={(e) => setHrCashAmount(e.target.value)} disabled={isReadOnly} placeholder="0.00" className={inputCls} />
-        </Card>
-      )}
 
       {/* ──────── Actions ──────── */}
       <div className="space-y-3 pb-6">
