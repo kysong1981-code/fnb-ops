@@ -93,7 +93,7 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(organization=org)
             else:
                 # 직원은 자기가 만든 것만
-                queryset = queryset.filter(organization=org, created_by=user)
+                queryset = queryset.filter(organization=org, created_by=profile)
         except Exception:
             queryset = queryset.none()
 
@@ -130,7 +130,7 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """created_by를 현재 사용자로 설정"""
-        serializer.save(created_by_id=self.request.user.id, status='DRAFT')
+        serializer.save(created_by=self.request.user.profile, status='DRAFT')
 
     def update(self, request, *args, **kwargs):
         """클로징 수정 (매니저는 모든 상태 수정 가능, 직원은 DRAFT만)"""
