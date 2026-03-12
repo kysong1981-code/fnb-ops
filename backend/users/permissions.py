@@ -36,6 +36,9 @@ class IsManager(BaseRolePermission):
 
         try:
             profile = request.user.profile
+            # CEO/HQ can access all organizations
+            if profile.role in ['CEO', 'HQ']:
+                return True
             # obj에 organization 필드가 있는지 확인
             if hasattr(obj, 'organization'):
                 return obj.organization == profile.organization
@@ -147,8 +150,11 @@ class IsOwnerOrManager(BasePermission):
             if hasattr(obj, 'user') and obj.user == request.user:
                 return True
 
-            # MANAGER 이상의 역할이고 같은 조직인 경우
+            # MANAGER 이상의 역할
             if profile.role in ['MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO']:
+                # CEO/HQ can access all organizations
+                if profile.role in ['CEO', 'HQ']:
+                    return True
                 if hasattr(obj, 'organization'):
                     return obj.organization == profile.organization
 
