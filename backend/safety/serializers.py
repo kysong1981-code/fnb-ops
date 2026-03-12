@@ -78,7 +78,7 @@ class TemperatureRecordSerializer(serializers.ModelSerializer):
             'standard_temperature', 'recorded_by', 'recorded_by_name', 'notes',
             'status', 'is_within_standard', 'created_at'
         ]
-        read_only_fields = ['created_at', 'recorded_by_name', 'status', 'is_within_standard']
+        read_only_fields = ['created_at', 'recorded_by_name', 'status', 'is_within_standard', 'organization', 'recorded_by']
 
     def get_status(self, obj):
         """온도 상태 판별 (정상/경고/위험)"""
