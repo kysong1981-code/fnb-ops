@@ -652,6 +652,15 @@ class SafetyRecordViewSet(viewsets.ModelViewSet):
         """오늘 해야 할 데일리 태스크 + 완료 상태 (직원 대시보드용)"""
         user_profile = request.user.profile
         org = user_profile.organization
+        # CEO/HQ can use store_id param
+        if user_profile.role in ['CEO', 'HQ', 'REGIONAL_MANAGER', 'SENIOR_MANAGER']:
+            store_id = request.query_params.get('store_id')
+            if store_id:
+                from users.models import Organization
+                try:
+                    org = Organization.objects.get(id=store_id)
+                except Organization.DoesNotExist:
+                    pass
         today = date.today()
         current_weekday = today.weekday()  # 0=Mon, 6=Sun
 
