@@ -466,18 +466,10 @@ export default function CashUpPage() {
       ) : (
         /* ============ HR CASH TAB ============ */
         <>
-          {/* Date & Balance */}
-          <Card className="p-5 space-y-4">
+          {/* Balance */}
+          <Card className="p-5">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-500">Date</span>
-              <span className="text-sm font-semibold text-gray-900">{selectedDate}</span>
-            </div>
-
-            <div className="border-t border-gray-100" />
-
-            {/* Current Balance */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-500">Balance</span>
+              <span className="text-sm font-medium text-gray-500">HR Cash Balance</span>
               <span className="text-xl font-bold text-gray-900">{fmt(hrCashTotal)}</span>
             </div>
           </Card>
