@@ -46,6 +46,7 @@ const menuSections = [
   {
     title: 'Settings',
     items: [
+      { label: 'Store Settings', path: '/store-settings', icon: SettingsIcon },
       { label: 'Documents', path: '/documents', icon: DocumentIcon, module: 'DOCUMENTS' },
     ]
   },
