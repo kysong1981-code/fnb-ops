@@ -130,18 +130,20 @@ export default function ClosingMonthlyView() {
                   const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
                   const closing = closings[dateStr]
                   const isToday = dateStr === todayStr
+                  const isFuture = dateStr > todayStr
                   const sc = closing ? STATUS_COLORS[closing.status] : null
 
                   return (
                     <button
                       key={di}
-                      onClick={() => navigate(`/closing/form?date=${dateStr}`)}
+                      onClick={() => !isFuture && navigate(`/closing/form?date=${dateStr}`)}
+                      disabled={isFuture}
                       className={`aspect-square rounded-lg flex flex-col items-center justify-center relative transition
                         ${isToday ? 'ring-2 ring-blue-400' : ''}
-                        ${closing ? 'hover:opacity-80' : 'hover:bg-gray-50'}
+                        ${isFuture ? 'opacity-30 cursor-not-allowed' : closing ? 'hover:opacity-80' : 'hover:bg-gray-50'}
                       `}
                     >
-                      <span className={`text-sm font-medium ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
+                      <span className={`text-sm font-medium ${isFuture ? 'text-gray-300' : isToday ? 'text-blue-600' : 'text-gray-700'}`}>
                         {day}
                       </span>
                       {closing && (
