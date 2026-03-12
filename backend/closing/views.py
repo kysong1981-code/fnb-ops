@@ -59,7 +59,7 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
         if self.action in ['update', 'partial_update', 'destroy']:
             return [IsAuthenticated(), IsManager()]
         if self.action in ['approve', 'reject', 'generate_pdf']:
-            return [IsAuthenticated(), IsSeniorManager()]
+            return [IsAuthenticated(), IsManager()]
         # list, create, retrieve, submit → IsEmployee
         return [IsAuthenticated(), IsEmployee()]
 
@@ -175,9 +175,9 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsSeniorManager])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsManager])
     def approve(self, request, pk=None):
-        """클로징 승인 (Senior Manager 이상만 가능)"""
+        """클로징 승인 (Manager 이상 가능)"""
         closing = self.get_object()
 
         if self._is_month_closed(closing.closing_date, closing.organization):
@@ -193,7 +193,7 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
             )
 
         closing.status = 'APPROVED'
-        closing.approved_by_id = request.user.id
+        closing.approved_by = request.user.profile
         closing.approved_at = timezone.now()
         closing.save()
 

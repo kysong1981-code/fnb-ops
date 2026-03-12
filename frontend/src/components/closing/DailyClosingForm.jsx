@@ -14,7 +14,11 @@ export default function DailyClosingForm() {
   const { user } = useAuth()
   const isManager = user && MANAGER_ROLES.includes(user.role)
 
-  const [closingDate, setClosingDate] = useState(searchParams.get('date') || new Date().toISOString().split('T')[0])
+  // If date param provided (from dashboard approval), use it; otherwise today
+  const dateParam = searchParams.get('date')
+  const todayStr = new Date().toISOString().split('T')[0]
+  const [closingDate] = useState(dateParam || todayStr)
+
   const [closingId, setClosingId] = useState(null)
   const [closingStatus, setClosingStatus] = useState(null)
 
@@ -29,6 +33,9 @@ export default function DailyClosingForm() {
   // Actual
   const [actualCard, setActualCard] = useState('')
   const [actualCash, setActualCash] = useState('')
+
+  // Variance note
+  const [varianceNote, setVarianceNote] = useState('')
 
   // HR Cash
   const [hrCashAmount, setHrCashAmount] = useState('')
@@ -56,15 +63,13 @@ export default function DailyClosingForm() {
   const cardVariance = (parseFloat(actualCard) || 0) - (parseFloat(posCard) || 0)
   const cashVariance = (parseFloat(actualCash) || 0) - (parseFloat(posCash) || 0)
   const totalVariance = cardVariance + cashVariance
+  const hasVariance = totalVariance !== 0
 
   const fmt = (v) => `$${parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-  // Read-only logic:
-  // - No existing closing (new entry) → editable
-  // - Existing + DRAFT → editable
-  // - Existing + SUBMITTED/APPROVED → read-only unless manager enables edit mode
+  // Read-only logic
   const isReadOnly = (() => {
-    if (!closingId) return false // New entry
+    if (!closingId) return false
     if (closingStatus === 'DRAFT') return false
     if (isManager && editMode) return false
     return true
@@ -100,6 +105,7 @@ export default function DailyClosingForm() {
           setTabCount(c.tab_count || '')
           setActualCard(c.actual_card || '')
           setActualCash(c.actual_cash || '')
+          setVarianceNote(c.variance_note || '')
           setHrCashEnabled(c.hr_cash_enabled || false)
           const hrEntries = c.hr_cash_entries || []
           if (hrEntries.length > 0) {
@@ -117,6 +123,7 @@ export default function DailyClosingForm() {
           setTabCount('')
           setActualCard('')
           setActualCash('')
+          setVarianceNote('')
           setHrCashAmount('')
           setHrCashEntryId(null)
           setSupplierCosts([])
@@ -213,6 +220,12 @@ export default function DailyClosingForm() {
 
   // Save (create or update) + Submit
   const handleSave = async () => {
+    // Variance note required if there's a variance
+    if (hasVariance && !varianceNote.trim()) {
+      setError('Please enter a reason for the variance before submitting.')
+      return
+    }
+
     setSaving(true)
     setError('')
     try {
@@ -224,6 +237,7 @@ export default function DailyClosingForm() {
         tab_count: tabCount || 0,
         actual_card: actualCard || 0,
         actual_cash: actualCash || 0,
+        variance_note: varianceNote || '',
       }
 
       let cId = closingId
@@ -250,9 +264,57 @@ export default function DailyClosingForm() {
       }
 
       setEditMode(false)
-      showMsg('Saved successfully')
+      showMsg('Saved & Submitted successfully')
     } catch (err) {
       setError(err.response?.data?.detail || err.response?.data?.closing_date?.[0] || 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Manager: Submit + Approve in one go
+  const handleSubmitAndApprove = async () => {
+    if (hasVariance && !varianceNote.trim()) {
+      setError('Please enter a reason for the variance before submitting.')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+    try {
+      const payload = {
+        organization: user?.organization,
+        closing_date: closingDate,
+        pos_card: posCard || 0,
+        pos_cash: posCash || 0,
+        tab_count: tabCount || 0,
+        actual_card: actualCard || 0,
+        actual_cash: actualCash || 0,
+        variance_note: varianceNote || '',
+      }
+
+      let cId = closingId
+      if (closingId) {
+        await closingAPI.update(closingId, payload)
+      } else {
+        const res = await closingAPI.create(payload)
+        cId = res.data.id
+        setClosingId(cId)
+      }
+
+      // Sync other sales + HR cash
+      await syncOtherSales(cId)
+      await syncHrCash(cId)
+
+      // Submit then approve
+      try { await closingAPI.submit(cId) } catch { /* may already be submitted */ }
+      const res = await closingAPI.approve(cId)
+      setClosingStatus(res.data.status)
+
+      setEditMode(false)
+      showMsg('Submitted & Approved!')
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to submit & approve')
     } finally {
       setSaving(false)
     }
@@ -281,14 +343,14 @@ export default function DailyClosingForm() {
     }
   }
 
-  // Approve
+  // Approve (for manager reviewing employee submissions)
   const handleApprove = async () => {
     setSaving(true)
     setError('')
     try {
       const res = await closingAPI.approve(closingId)
       setClosingStatus(res.data.status)
-      showMsg('Approved')
+      showMsg('Approved!')
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to approve')
     } finally {
@@ -316,13 +378,18 @@ export default function DailyClosingForm() {
   const supplierCostTotal = supplierCosts.reduce((s, c) => s + parseFloat(c.amount || 0), 0)
   const otherSaleTotal = Object.values(otherSaleAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0)
 
+  // Format date for display
+  const displayDate = new Date(closingDate + 'T00:00:00').toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  })
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Daily Closing</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Record daily sales, invoices & cash up</p>
+          <p className="text-sm text-gray-400 mt-0.5">{displayDate}</p>
         </div>
         <div className="flex items-center gap-2">
           {closingId && closingStatus && statusLabel[closingStatus] && (
@@ -330,26 +397,45 @@ export default function DailyClosingForm() {
               {statusLabel[closingStatus]}
             </span>
           )}
-          {canEdit && (
+          {canEdit ? (
             <button
               onClick={() => setEditMode(true)}
               className="text-xs font-medium px-3 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition"
             >
               Edit
             </button>
-          )}
+          ) : editMode ? (
+            <button
+              onClick={() => setEditMode(false)}
+              className="text-xs font-medium px-3 py-1.5 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition"
+            >
+              Cancel Edit
+            </button>
+          ) : null}
         </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card className="p-3 text-center">
+          <p className="text-xs text-gray-400">POS Total</p>
+          <p className="text-sm font-bold text-gray-900 mt-0.5">{fmt(posTotal)}</p>
+        </Card>
+        <Card className="p-3 text-center">
+          <p className="text-xs text-gray-400">Actual Total</p>
+          <p className="text-sm font-bold text-gray-900 mt-0.5">{fmt(actualTotal)}</p>
+        </Card>
+        <Card className="p-3 text-center">
+          <p className="text-xs text-gray-400">Variance</p>
+          <p className={`text-sm font-bold mt-0.5 ${totalVariance === 0 ? 'text-green-600' : Math.abs(totalVariance) > 10 ? 'text-red-600' : 'text-amber-600'}`}>
+            {totalVariance >= 0 ? '+' : ''}{fmt(totalVariance)}
+          </p>
+        </Card>
       </div>
 
       {/* Messages */}
       {error && <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>}
       {success && <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">{success}</div>}
-
-      {/* ──────── Closing Date ──────── */}
-      <Card className="p-5">
-        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Closing Date</label>
-        <input type="date" value={closingDate} onChange={(e) => setClosingDate(e.target.value)} disabled={closingId && isReadOnly} className={`${inputCls} mt-2`} />
-      </Card>
 
       {/* ──────── POS ──────── */}
       <Card className="p-5">
@@ -363,10 +449,6 @@ export default function DailyClosingForm() {
             <label className="text-xs text-gray-500 mb-1 block">Cash</label>
             <input type="number" step="0.01" value={posCash} onChange={(e) => setPosCash(e.target.value)} disabled={isReadOnly} placeholder="0.00" className={inputCls} />
           </div>
-        </div>
-        <div className="bg-blue-50 rounded-xl px-4 py-2.5 flex items-center justify-between">
-          <span className="text-xs text-blue-600 font-medium">POS Total</span>
-          <span className="text-sm font-bold text-blue-700">{fmt(posTotal)}</span>
         </div>
       </Card>
 
@@ -382,10 +464,6 @@ export default function DailyClosingForm() {
             <label className="text-xs text-gray-500 mb-1 block">Cash</label>
             <input type="number" step="0.01" value={actualCash} onChange={(e) => setActualCash(e.target.value)} disabled={isReadOnly} placeholder="0.00" className={inputCls} />
           </div>
-        </div>
-        <div className="bg-blue-50 rounded-xl px-4 py-2.5 flex items-center justify-between">
-          <span className="text-xs text-blue-600 font-medium">Actual Total</span>
-          <span className="text-sm font-bold text-blue-700">{fmt(actualTotal)}</span>
         </div>
       </Card>
 
@@ -410,6 +488,23 @@ export default function DailyClosingForm() {
             <span className={`text-xs font-semibold ${cashVariance === 0 ? 'text-green-600' : 'text-red-600'}`}>{fmt(cashVariance)}</span>
           </div>
         </div>
+
+        {/* Variance Note - required when variance exists */}
+        {hasVariance && (
+          <div className="mt-3 pt-3 border-t border-black/5">
+            <label className="text-xs text-gray-500 font-medium mb-1 block">
+              Variance Reason <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={varianceNote}
+              onChange={(e) => setVarianceNote(e.target.value)}
+              disabled={isReadOnly}
+              placeholder="Please explain the reason for the variance..."
+              rows={2}
+              className={`${inputCls} resize-none`}
+            />
+          </div>
+        )}
       </Card>
 
       {/* ──────── Tab Count ──────── */}
@@ -517,17 +612,43 @@ export default function DailyClosingForm() {
 
       {/* ──────── Actions ──────── */}
       <div className="space-y-3 pb-6">
-        {!isReadOnly && (
+        {/* Employee: Save & Submit */}
+        {!isReadOnly && !isManager && (
           <button
             onClick={handleSave}
             disabled={saving}
             className="w-full flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition"
           >
             <CheckCircleIcon size={18} />
-            {saving ? 'Saving...' : editMode ? 'Save Changes' : 'Save & Submit'}
+            {saving ? 'Saving...' : 'Save & Submit'}
           </button>
         )}
 
+        {/* Manager: Save Changes (edit mode) */}
+        {!isReadOnly && isManager && editMode && (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition"
+          >
+            <CheckCircleIcon size={18} />
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        )}
+
+        {/* Manager: Submit & Approve (new entry or draft) */}
+        {!isReadOnly && isManager && !editMode && (!closingId || closingStatus === 'DRAFT') && (
+          <button
+            onClick={handleSubmitAndApprove}
+            disabled={saving}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
+          >
+            <CheckCircleIcon size={18} />
+            {saving ? 'Processing...' : 'Submit & Approve'}
+          </button>
+        )}
+
+        {/* Manager: Approve submitted entries */}
         {canApprove && (
           <button
             onClick={handleApprove}
@@ -539,20 +660,12 @@ export default function DailyClosingForm() {
           </button>
         )}
 
-        {editMode && (
-          <button
-            onClick={() => setEditMode(false)}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
-          >
-            Cancel Edit
-          </button>
-        )}
-
+        {/* Back to Dashboard */}
         <button
-          onClick={() => navigate('/closing')}
+          onClick={() => navigate('/dashboard')}
           className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
         >
-          Back to List
+          Back to Dashboard
           <ArrowRightIcon size={14} />
         </button>
       </div>

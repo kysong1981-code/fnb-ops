@@ -28,6 +28,8 @@ export default function ManagerDashboard() {
   const [rosterInfo, setRosterInfo] = useState(null)
   const [staff, setStaff] = useState([])
   const [weeklyData, setWeeklyData] = useState(null)
+  const [pendingClosings, setPendingClosings] = useState([])
+  const [approvingId, setApprovingId] = useState(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -47,6 +49,13 @@ export default function ManagerDashboard() {
         const res = await hrAPI.getEmployees()
         const employees = res.data?.results || res.data || []
         setStaff(employees.slice(0, 5)) // Show top 5
+      } catch {}
+
+      // Load pending (submitted) closings for approval
+      try {
+        const res = await closingAPI.list({ status: 'SUBMITTED' })
+        const items = res.data?.results || res.data || []
+        setPendingClosings(items)
       } catch {}
 
       // Load this week's closing data for chart
@@ -111,6 +120,18 @@ export default function ManagerDashboard() {
   } else if (clockInfo?.status === 'CLOCKED_OUT') {
     clockStatusText = `Done — ${clockInfo.timesheet?.worked_hours?.toFixed(1) || 0}h`
     clockStatusColor = 'text-gray-500'
+  }
+
+  const handleApproveClosing = async (id) => {
+    setApprovingId(id)
+    try {
+      await closingAPI.approve(id)
+      setPendingClosings(prev => prev.filter(c => c.id !== id))
+    } catch (err) {
+      console.error('Approve failed:', err)
+    } finally {
+      setApprovingId(null)
+    }
   }
 
   const todayShift = rosterInfo?.today
@@ -183,6 +204,60 @@ export default function ManagerDashboard() {
           </button>
         ))}
       </div>
+
+      {/* Pending Approvals */}
+      {pendingClosings.length > 0 && (
+        <>
+          <SectionLabel>Pending Approvals</SectionLabel>
+          <Card className="overflow-hidden">
+            <div className="divide-y divide-gray-50">
+              {pendingClosings.map(c => {
+                const variance = parseFloat(c.total_variance || 0)
+                return (
+                  <div key={c.id} className="flex items-center justify-between px-5 py-3.5">
+                    <div className="flex items-center gap-4">
+                      <div className="text-center">
+                        <p className="text-xs text-gray-400">
+                          {new Date(c.closing_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}
+                        </p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {new Date(c.closing_date + 'T00:00:00').getDate()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          POS: {fmt(c.pos_total)} &middot; Actual: {fmt(c.actual_total)}
+                        </p>
+                        <p className={`text-xs font-medium ${variance === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          Variance: {variance >= 0 ? '+' : ''}{fmt(variance)}
+                        </p>
+                        {c.created_by_name && (
+                          <p className="text-xs text-gray-400 mt-0.5">by {c.created_by_name}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => navigate(`/closing/form?date=${c.closing_date}`)}
+                        className="text-xs font-medium px-3 py-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition"
+                      >
+                        View
+                      </button>
+                      <button
+                        onClick={() => handleApproveClosing(c.id)}
+                        disabled={approvingId === c.id}
+                        className="text-xs font-medium px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
+                      >
+                        {approvingId === c.id ? '...' : 'Approve'}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
+        </>
+      )}
 
       {/* Safety Tasks Widget */}
       <SafetyTasksWidget />

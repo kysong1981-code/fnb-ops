@@ -69,6 +69,9 @@ class DailyClosing(models.Model):
         help_text="Xero sync status"
     )
 
+    # Variance note (required when variance exists)
+    variance_note = models.TextField(null=True, blank=True, help_text="Variance reason/explanation")
+
     # 상태
     status = models.CharField(max_length=20, choices=CLOSING_STATUS_CHOICES, default='DRAFT')
 

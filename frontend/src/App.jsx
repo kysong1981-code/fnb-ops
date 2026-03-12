@@ -113,7 +113,7 @@ function App() {
             path="/closing"
             element={
               <ProtectedWithLayout>
-                <ClosingList />
+                <DailyClosingForm />
               </ProtectedWithLayout>
             }
           />

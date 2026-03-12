@@ -183,6 +183,7 @@ class DailyClosingDetailSerializer(serializers.ModelSerializer):
             'pos_card', 'pos_cash', 'tab_count', 'pos_total',
             'actual_card', 'actual_cash', 'bank_deposit', 'actual_total',
             'card_variance', 'cash_variance', 'total_variance',
+            'variance_note',
             'hr_cash_enabled', 'hr_cash_entries', 'cash_expenses',
             'supplier_costs', 'other_sales',
             'status', 'created_by', 'created_by_name',
@@ -231,19 +232,15 @@ class DailyClosingDetailSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, data):
-        """상태별 검증"""
-        # 업데이트 시 DRAFT 상태만 수정 가능
-        if self.instance and self.instance.status != 'DRAFT':
-            raise serializers.ValidationError(
-                f"DRAFT 상태인 클로징만 수정할 수 있습니다. 현재 상태: {self.instance.status}"
-            )
+        """상태별 검증 - 매니저는 모든 상태 수정 가능"""
+        # Manager check is handled in the view layer
         return data
 
     def create(self, validated_data):
-        # Auto-set created_by to current user
+        # Auto-set created_by to current user's profile
         request = self.context.get('request')
         if request and request.user:
-            validated_data['created_by_id'] = request.user.id
+            validated_data['created_by'] = request.user.profile
         return super().create(validated_data)
 
 
