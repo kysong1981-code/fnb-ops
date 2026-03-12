@@ -281,12 +281,29 @@ export default function DailyClosingForm() {
     }
   }
 
+  // Approve
+  const handleApprove = async () => {
+    setSaving(true)
+    setError('')
+    try {
+      const res = await closingAPI.approve(closingId)
+      setClosingStatus(res.data.status)
+      showMsg('Approved')
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to approve')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleDeleteCost = async (id) => {
     try {
       await supplierCostAPI.delete(id)
       setSupplierCosts(prev => prev.filter(c => c.id !== id))
     } catch { setError('Failed to delete') }
   }
+
+  const canApprove = closingId && isManager && closingStatus === 'SUBMITTED' && !editMode
 
   const statusBadge = {
     SUBMITTED: 'bg-blue-100 text-blue-700',
@@ -508,6 +525,17 @@ export default function DailyClosingForm() {
           >
             <CheckCircleIcon size={18} />
             {saving ? 'Saving...' : editMode ? 'Save Changes' : 'Save & Submit'}
+          </button>
+        )}
+
+        {canApprove && (
+          <button
+            onClick={handleApprove}
+            disabled={saving}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
+          >
+            <CheckCircleIcon size={18} />
+            {saving ? 'Processing...' : 'Approve'}
           </button>
         )}
 
