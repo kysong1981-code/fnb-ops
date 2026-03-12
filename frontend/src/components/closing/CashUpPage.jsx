@@ -242,17 +242,27 @@ export default function CashUpPage() {
     }
   }
 
+  const getErrorMsg = (err) => {
+    const d = err.response?.data
+    if (!d) return err.message || 'Network error'
+    if (typeof d === 'string') return d
+    if (d.detail) return d.detail
+    // Validation errors: { field: ["error"] }
+    const msgs = Object.entries(d).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+    return msgs.join('; ') || 'Failed to save'
+  }
+
   // Save cash up only (bank deposit + HR cash, no status change)
   const handleSaveCashUp = async () => {
     if (!closing) return
     setSaving(true)
     setError('')
     try {
-      await closingAPI.patch(closing.id, { bank_deposit: bankDeposit || 0 })
+      await closingAPI.patch(closing.id, { bank_deposit: parseFloat(bankDeposit) || 0 })
       await syncHrCash(closing.id)
       showMsg('Cash up saved')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to save')
+      setError(getErrorMsg(err))
     } finally {
       setSaving(false)
     }
@@ -264,13 +274,13 @@ export default function CashUpPage() {
     setSaving(true)
     setError('')
     try {
-      await closingAPI.patch(closing.id, { bank_deposit: bankDeposit || 0 })
+      await closingAPI.patch(closing.id, { bank_deposit: parseFloat(bankDeposit) || 0 })
       await syncHrCash(closing.id)
       const res = await closingAPI.approve(closing.id)
       setClosing(res.data)
       showMsg('Saved & Approved')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to save')
+      setError(getErrorMsg(err))
     } finally {
       setSaving(false)
     }
