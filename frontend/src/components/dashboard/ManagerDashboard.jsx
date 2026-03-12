@@ -1,29 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { hrAPI } from '../../services/api'
+import { hrAPI, closingAPI } from '../../services/api'
 import Card from '../ui/Card'
-import KpiCard from '../ui/KpiCard'
 import SectionLabel from '../ui/SectionLabel'
 import Badge from '../ui/Badge'
 import SafetyTasksWidget from '../safety/SafetyTasksWidget'
 import {
   CalendarIcon, ClockIcon, CheckCircleIcon, ClipboardIcon,
-  ChartIcon, TeamIcon, ShieldIcon, WarningIcon, ArrowRightIcon,
+  ChartIcon, TeamIcon, ShieldIcon, ArrowRightIcon,
   DocumentIcon, MoneyIcon
 } from '../icons'
-
-// Placeholder data — replace with API calls later
-const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const revenues = [420, 380, 490, 510, 620, 890, 530]
-const labours = [120, 100, 140, 140, 160, 200, 130]
-
-const staff = [
-  { name: 'Sara Kim', role: 'SUPERVISOR', hours: 40, status: 'active' },
-  { name: 'John Smith', role: 'STAFF', hours: 24, status: 'active' },
-  { name: 'Hikari Q.', role: 'SENIOR_STAFF', hours: 38, status: 'active' },
-  { name: 'Tom Lee', role: 'STAFF', hours: 0, status: 'inactive' },
-]
 
 const roleBadge = {
   ADMIN: 'purple',
@@ -36,10 +23,11 @@ const roleBadge = {
 export default function ManagerDashboard() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const maxRev = Math.max(...revenues)
 
   const [clockInfo, setClockInfo] = useState(null)
   const [rosterInfo, setRosterInfo] = useState(null)
+  const [staff, setStaff] = useState([])
+  const [weeklyData, setWeeklyData] = useState(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -53,6 +41,42 @@ export default function ManagerDashboard() {
       } catch (err) {
         console.error('Dashboard fetch error:', err)
       }
+
+      // Load staff list
+      try {
+        const res = await hrAPI.getEmployees()
+        const employees = res.data?.results || res.data || []
+        setStaff(employees.slice(0, 5)) // Show top 5
+      } catch {}
+
+      // Load this week's closing data for chart
+      try {
+        const today = new Date()
+        const dayOfWeek = today.getDay()
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+        const monday = new Date(today)
+        monday.setDate(today.getDate() + mondayOffset)
+        const sunday = new Date(monday)
+        sunday.setDate(monday.getDate() + 6)
+
+        const startDate = monday.toISOString().split('T')[0]
+        const endDate = sunday.toISOString().split('T')[0]
+        const res = await closingAPI.list({ closing_date__gte: startDate, closing_date__lte: endDate })
+        const closings = res.data?.results || res.data || []
+
+        if (closings.length > 0) {
+          const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+          const revenues = [0, 0, 0, 0, 0, 0, 0]
+          closings.forEach(c => {
+            const d = new Date(c.closing_date)
+            const idx = (d.getDay() + 6) % 7 // Mon=0, Sun=6
+            const total = (parseFloat(c.pos_card) || 0) + (parseFloat(c.pos_cash) || 0)
+            revenues[idx] = total
+          })
+          const totalRevenue = revenues.reduce((s, v) => s + v, 0)
+          setWeeklyData({ weekDays, revenues, totalRevenue })
+        }
+      } catch {}
     }
     fetchData()
   }, [])
@@ -73,6 +97,8 @@ export default function ManagerDashboard() {
     return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
   }
 
+  const fmt = (v) => `$${parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+
   // Clock status
   let clockStatusText = 'Not clocked in'
   let clockStatusColor = 'text-gray-400'
@@ -88,6 +114,7 @@ export default function ManagerDashboard() {
   }
 
   const todayShift = rosterInfo?.today
+  const maxRev = weeklyData ? Math.max(...weeklyData.revenues, 1) : 1
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
@@ -160,129 +187,88 @@ export default function ManagerDashboard() {
       {/* Safety Tasks Widget */}
       <SafetyTasksWidget />
 
-      {/* KPI Cards */}
-      <SectionLabel>Store Overview</SectionLabel>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Today's Revenue" value="$2,840" sub="vs $2,500 yesterday" />
-        <KpiCard label="This Week" value="$12,400" sub="Feb 24 – Mar 2" />
-        <KpiCard label="Labour Cost" value="$680" alert="24% labour cost" sub="Today" />
-        <KpiCard label="Rev / Labour Hr" value="$101" sub="Today" />
-      </div>
-
-      {/* Alerts */}
-      <div className="flex flex-wrap gap-3">
-        <button onClick={() => navigate('/manager/timesheet-review')} className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium px-3 py-2 rounded-xl hover:bg-amber-100 transition">
-          <WarningIcon size={14} />
-          3 timesheets pending approval
-        </button>
-        <button onClick={() => navigate('/manager/assign-tasks')} className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium px-3 py-2 rounded-xl hover:bg-amber-100 transition">
-          <WarningIcon size={14} />
-          2 pending tasks
-        </button>
-        <button onClick={() => navigate('/safety')} className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium px-3 py-2 rounded-xl hover:bg-amber-100 transition">
-          <WarningIcon size={14} />
-          Food Safety incomplete today
-        </button>
-      </div>
-
       {/* Chart + Weekly KPI */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Revenue vs Labour Chart */}
-        <Card className="lg:col-span-2 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-semibold text-gray-700">Weekly Revenue vs Labour</p>
-            <div className="flex gap-3 text-xs text-gray-400">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-blue-500 inline-block" />Revenue</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-rose-300 inline-block" />Labour</span>
-            </div>
-          </div>
-          <div className="flex items-end gap-2 h-32">
-            {weekDays.map((d, i) => (
-              <div key={d} className="flex-1 flex flex-col items-center gap-1">
-                <div className="w-full flex items-end gap-0.5 h-24">
-                  <div className="flex-1 bg-blue-500 rounded-t-sm transition-all" style={{ height: `${(revenues[i] / maxRev) * 100}%` }} />
-                  <div className="flex-1 bg-rose-300 rounded-t-sm transition-all" style={{ height: `${(labours[i] / maxRev) * 100}%` }} />
-                </div>
-                <span className="text-xs text-gray-400">{d}</span>
+      {weeklyData && (
+        <>
+          <SectionLabel>Store Overview</SectionLabel>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Revenue Chart */}
+            <Card className="lg:col-span-2 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-semibold text-gray-700">Weekly Revenue</p>
               </div>
-            ))}
-          </div>
-        </Card>
+              <div className="flex items-end gap-2 h-32">
+                {weeklyData.weekDays.map((d, i) => (
+                  <div key={d} className="flex-1 flex flex-col items-center gap-1">
+                    <div className="w-full flex items-end gap-0.5 h-24">
+                      <div className="flex-1 bg-blue-500 rounded-t-sm transition-all" style={{ height: `${(weeklyData.revenues[i] / maxRev) * 100}%` }} />
+                    </div>
+                    <span className="text-xs text-gray-400">{d}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
 
-        {/* Weekly KPI */}
-        <Card className="p-5">
-          <p className="text-sm font-semibold text-gray-700 mb-4">Weekly KPI</p>
-          {[
-            { label: 'Total Revenue', value: '$3,840' },
-            { label: 'Total Labour', value: '$990' },
-            { label: 'Labour %', value: '25.7%', highlight: true },
-            { label: 'Rev/Labour Hr', value: '$112' },
-            { label: 'Trading Hours', value: '70h' },
-          ].map(k => (
-            <div key={k.label} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-              <span className="text-xs text-gray-400">{k.label}</span>
-              <span className={`text-sm font-semibold ${k.highlight ? 'text-emerald-600' : 'text-gray-900'}`}>{k.value}</span>
-            </div>
-          ))}
-        </Card>
-      </div>
+            {/* Weekly KPI */}
+            <Card className="p-5">
+              <p className="text-sm font-semibold text-gray-700 mb-4">Weekly KPI</p>
+              {[
+                { label: 'Total Revenue', value: fmt(weeklyData.totalRevenue) },
+              ].map(k => (
+                <div key={k.label} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                  <span className="text-xs text-gray-400">{k.label}</span>
+                  <span className="text-sm font-semibold text-gray-900">{k.value}</span>
+                </div>
+              ))}
+            </Card>
+          </div>
+        </>
+      )}
 
       {/* Staff Table */}
-      <Card className="overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-          <p className="text-sm font-semibold text-gray-700">Staff</p>
-          <button onClick={() => navigate('/hr')} className="text-xs text-blue-600 font-medium flex items-center gap-1">
-            View all <ArrowRightIcon size={14} />
-          </button>
-        </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-gray-400 border-b border-gray-50">
-              <th className="text-left px-5 py-3 font-medium">Name</th>
-              <th className="text-left px-5 py-3 font-medium">Role</th>
-              <th className="text-left px-5 py-3 font-medium">This Week</th>
-              <th className="text-left px-5 py-3 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {staff.map(s => (
-              <tr key={s.name} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                <td className="px-5 py-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                      {s.name[0]}
-                    </div>
-                    <span className="font-medium text-gray-900">{s.name}</span>
-                  </div>
-                </td>
-                <td className="px-5 py-3">
-                  <Badge variant={roleBadge[s.role] || 'neutral'}>
-                    {s.role.replace('_', ' ')}
-                  </Badge>
-                </td>
-                <td className="px-5 py-3">
-                  <div className="flex items-center gap-1.5">
-                    <div className="flex-1 bg-gray-100 rounded-full h-1.5 w-16">
-                      <div
-                        className={`h-1.5 rounded-full ${s.hours >= 40 ? 'bg-amber-500' : 'bg-blue-500'}`}
-                        style={{ width: `${Math.min(s.hours / 40 * 100, 100)}%` }}
-                      />
-                    </div>
-                    <span className={`text-xs font-medium ${s.hours >= 40 ? 'text-amber-600' : 'text-gray-600'}`}>
-                      {s.hours}h
-                    </span>
-                  </div>
-                </td>
-                <td className="px-5 py-3">
-                  <Badge variant={s.status === 'active' ? 'success' : 'neutral'}>
-                    {s.status}
-                  </Badge>
-                </td>
+      {staff.length > 0 && (
+        <Card className="overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+            <p className="text-sm font-semibold text-gray-700">Staff</p>
+            <button onClick={() => navigate('/hr')} className="text-xs text-blue-600 font-medium flex items-center gap-1">
+              View all <ArrowRightIcon size={14} />
+            </button>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-400 border-b border-gray-50">
+                <th className="text-left px-5 py-3 font-medium">Name</th>
+                <th className="text-left px-5 py-3 font-medium">Role</th>
+                <th className="text-left px-5 py-3 font-medium">Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+            </thead>
+            <tbody>
+              {staff.map(s => (
+                <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                        {(s.first_name || s.name || '?')[0].toUpperCase()}
+                      </div>
+                      <span className="font-medium text-gray-900">{s.first_name || s.name} {s.last_name || ''}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <Badge variant={roleBadge[s.role] || 'neutral'}>
+                      {(s.role_display || s.role || '').replace('_', ' ')}
+                    </Badge>
+                  </td>
+                  <td className="px-5 py-3">
+                    <Badge variant={s.is_active !== false ? 'success' : 'neutral'}>
+                      {s.is_active !== false ? 'active' : 'inactive'}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
 
       {/* Manager Actions */}
       <SectionLabel>Manager</SectionLabel>

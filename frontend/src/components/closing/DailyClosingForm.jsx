@@ -24,7 +24,6 @@ export default function DailyClosingForm() {
   const [actualCash, setActualCash] = useState('')
 
   // Cash Up
-  const [bankDeposit, setBankDeposit] = useState('')
   const [hrCashAmount, setHrCashAmount] = useState('')
   const [hrCashEntryId, setHrCashEntryId] = useState(null)
   const [hrCashEnabled, setHrCashEnabled] = useState(false)
@@ -80,7 +79,6 @@ export default function DailyClosingForm() {
           setTabCount(c.tab_count || '')
           setActualCard(c.actual_card || '')
           setActualCash(c.actual_cash || '')
-          setBankDeposit(c.bank_deposit || '')
           setHrCashEnabled(c.hr_cash_enabled || false)
           // HR Cash entry
           const hrEntries = c.hr_cash_entries || []
@@ -99,7 +97,6 @@ export default function DailyClosingForm() {
           setTabCount('')
           setActualCard('')
           setActualCash('')
-          setBankDeposit('')
           setHrCashAmount('')
           setHrCashEntryId(null)
           setSupplierCosts([])
@@ -184,7 +181,6 @@ export default function DailyClosingForm() {
         tab_count: tabCount || 0,
         actual_card: actualCard || 0,
         actual_cash: actualCash || 0,
-        bank_deposit: bankDeposit || 0,
       })
       setClosingId(res.data.id)
       setClosingStatus(res.data.status)
@@ -209,7 +205,6 @@ export default function DailyClosingForm() {
         tab_count: tabCount || 0,
         actual_card: actualCard || 0,
         actual_cash: actualCash || 0,
-        bank_deposit: bankDeposit || 0,
       }
 
       let cId = closingId
@@ -462,22 +457,13 @@ export default function DailyClosingForm() {
         </Card>
       )}
 
-      {/* ──────── Cash Up ──────── */}
-      <Card className="p-5">
-        <SectionLabel>Cash Up</SectionLabel>
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">Bank Deposit</label>
-            <input type="number" step="0.01" value={bankDeposit} onChange={(e) => setBankDeposit(e.target.value)} disabled={isReadOnly} placeholder="0.00" className={inputCls} />
-          </div>
-          {hrCashEnabled && (
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">HR Cash</label>
-              <input type="number" step="0.01" value={hrCashAmount} onChange={(e) => setHrCashAmount(e.target.value)} disabled={isReadOnly} placeholder="0.00" className={inputCls} />
-            </div>
-          )}
-        </div>
-      </Card>
+      {/* ──────── HR Cash ──────── */}
+      {hrCashEnabled && (
+        <Card className="p-5">
+          <SectionLabel>HR Cash</SectionLabel>
+          <input type="number" step="0.01" value={hrCashAmount} onChange={(e) => setHrCashAmount(e.target.value)} disabled={isReadOnly} placeholder="0.00" className={inputCls} />
+        </Card>
+      )}
 
       {/* ──────── Actions ──────── */}
       <div className="space-y-3 pb-6">
