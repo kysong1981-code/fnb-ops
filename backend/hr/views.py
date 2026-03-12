@@ -419,12 +419,24 @@ class RosterViewSet(viewsets.ModelViewSet):
         if existing:
             serializer = self.get_serializer(existing, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
-            serializer.save()
+            serializer.save(organization=self._resolve_org())
             return Response(serializer.data, status=status.HTTP_200_OK)
         return super().create(request, *args, **kwargs)
 
+    def _resolve_org(self):
+        profile = self.request.user.profile
+        if profile.role in ['CEO', 'HQ', 'REGIONAL_MANAGER', 'SENIOR_MANAGER']:
+            store_id = self.request.query_params.get('store_id')
+            if store_id:
+                from users.models import Organization
+                try:
+                    return Organization.objects.get(id=store_id)
+                except Organization.DoesNotExist:
+                    pass
+        return profile.organization
+
     def perform_create(self, serializer):
-        serializer.save(organization=self.request.user.profile.organization)
+        serializer.save(organization=self._resolve_org())
 
     def update(self, request, *args, **kwargs):
         """Update: user/date 변경 시 충돌하면 기존 것 삭제 후 이동"""
