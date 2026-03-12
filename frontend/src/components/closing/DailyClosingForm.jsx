@@ -97,7 +97,9 @@ export default function DailyClosingForm() {
         const res = await closingAPI.getByDate(closingDate)
         const data = res.data.results || res.data || []
         if (data.length > 0) {
-          const c = data[0]
+          // Fetch full detail (list endpoint doesn't include pos_card, pos_cash, etc.)
+          const detailRes = await closingAPI.get(data[0].id)
+          const c = detailRes.data
           setClosingId(c.id)
           setClosingStatus(c.status)
           setPosCard(c.pos_card || '')

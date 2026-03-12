@@ -241,6 +241,22 @@ export default function CashUpPage() {
     }
   }
 
+  // Save cash up only (bank deposit + HR cash, no status change)
+  const handleSaveCashUp = async () => {
+    if (!closing) return
+    setSaving(true)
+    setError('')
+    try {
+      await closingAPI.patch(closing.id, { bank_deposit: bankDeposit || 0 })
+      await syncHrCash(closing.id)
+      showMsg('Cash up saved')
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // Save & Submit (save bank_deposit + HR cash, then approve)
   const handleSaveAndSubmit = async () => {
     if (!closing) return
@@ -414,7 +430,6 @@ export default function CashUpPage() {
               onChange={(e) => setBankDeposit(e.target.value)}
               placeholder="0.00"
               className={inputCls}
-              disabled={closing.status === 'APPROVED'}
             />
           </Card>
 
@@ -429,7 +444,6 @@ export default function CashUpPage() {
                 onChange={(e) => setHrCashAmount(e.target.value)}
                 placeholder="0.00"
                 className={inputCls}
-                disabled={closing.status === 'APPROVED'}
               />
             </Card>
           )}
@@ -471,7 +485,7 @@ export default function CashUpPage() {
 
           {/* Actions */}
           <div className="space-y-3 pb-6">
-            {closing.status !== 'APPROVED' && (
+            {closing.status !== 'APPROVED' ? (
               <button
                 onClick={handleSaveAndSubmit}
                 disabled={saving}
@@ -480,12 +494,20 @@ export default function CashUpPage() {
                 <CheckCircleIcon size={18} />
                 {saving ? 'Saving...' : 'Save & Approve'}
               </button>
-            )}
-
-            {closing.status === 'APPROVED' && (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-center">
-                <p className="text-sm text-green-700 font-medium">✓ Approved</p>
-              </div>
+            ) : (
+              <>
+                <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-center">
+                  <p className="text-sm text-green-700 font-medium">✓ Approved</p>
+                </div>
+                <button
+                  onClick={handleSaveCashUp}
+                  disabled={saving}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
+                >
+                  <CheckCircleIcon size={18} />
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+              </>
             )}
 
             <button

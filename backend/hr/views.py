@@ -1055,6 +1055,7 @@ class TeamViewSet(viewsets.ViewSet):
         # Generate temporary password
         temp_password = User.objects.make_random_password(length=10)
         user.set_password(temp_password)
+        user.is_active = True  # Activate account if not yet active
         user.save()
 
         # Send email with new password
