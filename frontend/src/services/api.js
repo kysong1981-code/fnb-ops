@@ -364,8 +364,8 @@ export const safetyAPI = {
   updateRecord: (id, data) => api.patch(`/safety/records/${id}/`, data),
 
   // Custom Actions
-  getTodayTasks: () => api.get('/safety/records/today_tasks/'),
-  quickComplete: (data) => api.post('/safety/records/quick_complete/', data),
+  getTodayTasks: (params) => api.get('/safety/records/today_tasks/', { params }),
+  quickComplete: (data, params) => api.post('/safety/records/quick_complete/', data, { params }),
   reviewRecord: (id, data) => api.post(`/safety/records/${id}/review/`, data),
   getInspectionReport: (params) => api.get('/safety/records/inspection_report/', { params }),
   getWeeklySummary: () => api.get('/safety/records/weekly_summary/'),

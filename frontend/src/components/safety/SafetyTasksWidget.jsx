@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { safetyAPI } from '../../services/api'
+import { useStore } from '../../context/StoreContext'
 import Card from '../ui/Card'
 import SectionLabel from '../ui/SectionLabel'
 import { ShieldIcon, CheckCircleIcon, ClockIcon } from '../icons'
@@ -14,14 +15,17 @@ const LEGACY_ROUTES = {
 
 export default function SafetyTasksWidget() {
   const navigate = useNavigate()
+  const { selectedStore } = useStore()
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedTask, setSelectedTask] = useState(null)
   const [showForm, setShowForm] = useState(false)
 
+  const storeParams = selectedStore && selectedStore.id !== 'all' ? { store_id: selectedStore.id } : {}
+
   const fetchTasks = async () => {
     try {
-      const res = await safetyAPI.getTodayTasks()
+      const res = await safetyAPI.getTodayTasks(storeParams)
       setTasks(res.data)
     } catch (err) {
       console.error('Failed to fetch today tasks:', err)
@@ -32,7 +36,7 @@ export default function SafetyTasksWidget() {
 
   useEffect(() => {
     fetchTasks()
-  }, [])
+  }, [selectedStore])
 
   const handleComplete = (task) => {
     setSelectedTask(task)
@@ -45,7 +49,7 @@ export default function SafetyTasksWidget() {
         record_type: selectedTask.record_type.code,
         data: formData,
         notes: formData._notes || '',
-      })
+      }, storeParams)
       setShowForm(false)
       setSelectedTask(null)
       fetchTasks()
@@ -60,7 +64,7 @@ export default function SafetyTasksWidget() {
         record_type: task.record_type.code,
         data: {},
         notes: '',
-      })
+      }, storeParams)
       fetchTasks()
     } catch (err) {
       console.error('Failed to quick complete:', err)
