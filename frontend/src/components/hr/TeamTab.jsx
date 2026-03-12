@@ -22,6 +22,7 @@ export default function TeamTab() {
   const [saving, setSaving] = useState(false)
   const [resettingPw, setResettingPw] = useState(null)
   const [resetResult, setResetResult] = useState(null)
+  const [permSaving, setPermSaving] = useState(false)
 
   const loadTeam = async () => {
     setLoading(true)
@@ -66,6 +67,16 @@ export default function TeamTab() {
     } finally {
       setResettingPw(null)
     }
+  }
+
+  const handleTogglePermission = async (field) => {
+    if (!selected || !detail) return
+    setPermSaving(true)
+    try {
+      const res = await hrAPI.updatePermissions(selected, { [field]: !detail[field] })
+      setDetail({ ...detail, ...res.data })
+    } catch {}
+    finally { setPermSaving(false) }
   }
 
   const handleUpdateSalary = async () => {
@@ -208,6 +219,34 @@ export default function TeamTab() {
                             >
                               {saving ? '...' : 'Update'}
                             </button>
+                          </div>
+                        </div>
+
+                        {/* Permissions */}
+                        <div>
+                          <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Permissions</h4>
+                          <div className="flex gap-3">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={detail.can_daily_close || false}
+                                onChange={() => handleTogglePermission('can_daily_close')}
+                                disabled={permSaving}
+                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Daily Close</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={detail.can_safety_tasks || false}
+                                onChange={() => handleTogglePermission('can_safety_tasks')}
+                                disabled={permSaving}
+                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">Safety Tasks</span>
+                            </label>
+                            {permSaving && <span className="text-xs text-gray-400">Saving...</span>}
                           </div>
                         </div>
 

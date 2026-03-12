@@ -7,7 +7,8 @@ from django.utils import timezone
 from django.db.models import Q, F, Value, DecimalField as DjDecimalField
 from django.http import FileResponse
 
-from datetime import date as date_type, timedelta
+from datetime import date as date_type, datetime, timedelta
+import zoneinfo
 from decimal import Decimal
 from django.db.models import Sum, Count, Avg
 from django.db.models.functions import Coalesce
@@ -110,11 +111,34 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         """신규 클로징 생성 (DRAFT 상태)"""
+        profile = request.user.profile
+        org = profile.organization
+        is_manager = profile.role in self.MANAGER_ROLES
+
+        # 직원 권한 체크 (매니저는 항상 가능)
+        if not is_manager and not profile.can_daily_close:
+            return Response(
+                {'detail': 'Daily Close 권한이 없습니다. 매니저에게 문의하세요.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 클로징 시간 제한 체크 (매니저는 제한 없음)
+        if not is_manager and org.closing_time:
+            nz_tz = zoneinfo.ZoneInfo('Pacific/Auckland')
+            now_nz = datetime.now(nz_tz).time()
+            closing_dt = datetime.combine(date_type.today(), org.closing_time)
+            earliest_dt = closing_dt - timedelta(minutes=30)
+            earliest_time = earliest_dt.time()
+            if now_nz < earliest_time:
+                return Response(
+                    {'detail': f'Daily Close는 마감 30분 전부터 가능합니다 ({earliest_time.strftime("%H:%M")} 이후)'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
         closing_date_str = request.data.get('closing_date')
         if closing_date_str:
             try:
                 cd = date_type.fromisoformat(closing_date_str)
-                org = request.user.profile.organization
                 if self._is_month_closed(cd, org):
                     return Response(
                         {'detail': f'Cannot create closing: {cd.strftime("%B %Y")} is closed.'},

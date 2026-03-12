@@ -119,7 +119,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'employment_status', 'employment_status_display',
             'tax_file_number', 'kiwisaver_status', 'kiwisaver_rate', 'bank_account',
             'work_type', 'work_type_display',
-            'is_active', 'user_permissions',
+            'is_active', 'can_daily_close', 'can_safety_tasks',
+            'user_permissions',
             'created_at', 'updated_at'
         ]
         read_only_fields = [

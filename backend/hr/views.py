@@ -1013,6 +1013,8 @@ class TeamViewSet(viewsets.ViewSet):
             'salary_history': salary_history,
             'documents': doc_serializer.data,
             'onboarding_status': onboarding_status,
+            'can_daily_close': member.can_daily_close,
+            'can_safety_tasks': member.can_safety_tasks,
         }
         return Response(data)
 
@@ -1048,6 +1050,35 @@ class TeamViewSet(viewsets.ViewSet):
             'message': 'Salary updated',
             'hourly_rate': str(new_salary.hourly_rate),
             'effective_from': new_salary.effective_from,
+        })
+
+    @action(detail=True, methods=['post'], url_path='update-permissions')
+    def update_permissions(self, request, pk=None):
+        """직원 태스크 권한 업데이트 (매니저 전용)"""
+        profile = request.user.profile
+        MANAGER_ROLES = ['MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO']
+        if profile.role not in MANAGER_ROLES:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        org = self._get_org(request)
+        try:
+            member = UserProfile.objects.get(id=pk, organization=org)
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        updated = []
+        for field in ['can_daily_close', 'can_safety_tasks']:
+            if field in request.data:
+                setattr(member, field, bool(request.data[field]))
+                updated.append(field)
+
+        if updated:
+            member.save(update_fields=updated + ['updated_at'])
+
+        return Response({
+            'message': 'Permissions updated',
+            'can_daily_close': member.can_daily_close,
+            'can_safety_tasks': member.can_safety_tasks,
         })
 
     @action(detail=True, methods=['post'], url_path='reset-password')

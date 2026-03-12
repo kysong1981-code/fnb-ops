@@ -695,6 +695,9 @@ class SafetyRecordViewSet(viewsets.ModelViewSet):
         # 역할 기반 필터 (직원이면 EMPLOYEE/BOTH만, 매니저면 전부)
         is_manager = user_profile.role in ['MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO']
         if not is_manager:
+            # 직원 권한 체크: can_safety_tasks=False이면 빈 목록
+            if not user_profile.can_safety_tasks:
+                return Response([])
             configs = configs.filter(assigned_role__in=['EMPLOYEE', 'BOTH'])
 
         # 오늘 날짜 기준으로 보여줄 태스크 결정

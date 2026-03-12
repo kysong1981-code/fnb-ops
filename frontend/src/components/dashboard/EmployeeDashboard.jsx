@@ -182,11 +182,11 @@ export default function EmployeeDashboard() {
       <SectionLabel>Quick Actions</SectionLabel>
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: 'Closing', path: '/closing', icon: ClipboardIcon, bg: 'bg-indigo-50', color: 'text-indigo-600' },
+          user?.can_daily_close && { label: 'Closing', path: '/closing', icon: ClipboardIcon, bg: 'bg-indigo-50', color: 'text-indigo-600' },
           { label: 'My Roster', path: '/roster', icon: CalendarIcon, bg: 'bg-blue-50', color: 'text-blue-600' },
           { label: 'My Tasks', path: '/tasks', icon: CheckCircleIcon, bg: 'bg-amber-50', color: 'text-amber-600' },
           { label: 'Food Safety', path: '/safety', icon: ShieldIcon, bg: 'bg-green-50', color: 'text-green-600' },
-        ].map(item => (
+        ].filter(Boolean).map(item => (
           <button key={item.path} onClick={() => navigate(item.path)} className="text-left">
             <Card className="p-3">
               <div className="flex flex-col items-center gap-2 text-center">

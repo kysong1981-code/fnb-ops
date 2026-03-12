@@ -168,6 +168,11 @@ class UserProfile(models.Model):
     job_title = models.CharField(max_length=30, null=True, blank=True)
 
     is_active = models.BooleanField(default=True)
+
+    # Task permissions (매니저가 HR에서 설정)
+    can_daily_close = models.BooleanField(default=False, help_text="Daily Close 수행 권한")
+    can_safety_tasks = models.BooleanField(default=False, help_text="Safety Tasks 수행 권한")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
