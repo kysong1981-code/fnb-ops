@@ -35,6 +35,7 @@ export default function CashUpPage() {
   // HR Cash entries (for HR Cash tab balance calc)
   const [hrCashEntries, setHrCashEntries] = useState([])
   const [hrCashBalance, setHrCashBalance] = useState(0)
+  const [hrNetBalance, setHrNetBalance] = useState(0)
   const [showHrForm, setShowHrForm] = useState(false)
   const [hrForm, setHrForm] = useState({ recipient_name: '', amount: '', notes: '', photo: null })
 
@@ -92,6 +93,7 @@ export default function CashUpPage() {
     try {
       const res = await hrCashAPI.balance()
       setHrCashBalance(parseFloat(res.data.balance) || 0)
+      setHrNetBalance(parseFloat(res.data.net_balance) || 0)
     } catch { /* ignore */ }
   }
 
@@ -619,8 +621,8 @@ export default function CashUpPage() {
           <Card className="p-5">
             <div className="flex justify-between items-center">
               <span className="text-sm font-semibold text-gray-700">Net Balance</span>
-              <span className={`text-xl font-bold ${(hrCashTotal - expenseTotal) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {fmt(hrCashTotal - expenseTotal)}
+              <span className={`text-xl font-bold ${hrNetBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {fmt(hrNetBalance)}
               </span>
             </div>
           </Card>

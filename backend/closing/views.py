@@ -403,7 +403,19 @@ class ClosingHRCashViewSet(mixins.CreateModelMixin,
         ).aggregate(total=Coalesce(Sum('remaining'), Decimal('0')))['total']
 
         total = explicit_total + implicit_total
-        return Response({'balance': str(total)})
+
+        # 3. Cumulative cash expenses
+        from closing.models import ClosingCashExpense
+        total_expenses = ClosingCashExpense.objects.filter(
+            daily_closing__organization=org
+        ).aggregate(total=Coalesce(Sum('amount'), Decimal('0')))['total']
+
+        net_balance = total - total_expenses
+        return Response({
+            'balance': str(total),
+            'expenses': str(total_expenses),
+            'net_balance': str(net_balance),
+        })
 
 
 class ClosingCashExpenseViewSet(mixins.CreateModelMixin,
