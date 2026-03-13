@@ -275,7 +275,8 @@ export default function DailyClosingForm() {
 
       // Submit then approve
       try { await closingAPI.submit(cId) } catch { /* may already be submitted */ }
-      await closingAPI.approve(cId)
+      const approveRes = await closingAPI.approve(cId)
+      setClosingStatus(approveRes.data?.status || 'APPROVED')
       navigate('/closing')
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to submit & approve')
@@ -312,9 +313,16 @@ export default function DailyClosingForm() {
     setSaving(true)
     setError('')
     try {
-      await closingAPI.approve(closingId)
+      const res = await closingAPI.approve(closingId)
+      setClosingStatus(res.data?.status || 'APPROVED')
       navigate('/closing')
     } catch (err) {
+      // If already approved, just navigate back
+      if (err.response?.status === 400 && err.response?.data?.detail?.includes('APPROVED')) {
+        setClosingStatus('APPROVED')
+        navigate('/closing')
+        return
+      }
       setError(err.response?.data?.detail || 'Failed to approve')
     } finally {
       setSaving(false)
