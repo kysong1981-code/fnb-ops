@@ -525,33 +525,22 @@ export default function CashUpPage() {
       ) : (
         /* ============ HR CASH TAB ============ */
         <>
-          {/* Balance Summary */}
-          <Card className="p-5 space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-500">Today</span>
-              <span className="text-sm font-semibold text-gray-900">{selectedDate}</span>
-            </div>
-            <div className="border-t border-gray-100" />
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-500">HR Cash (Total)</span>
-              <span className="text-sm font-semibold text-gray-900">{fmt(hrCashBalance)}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-500">Expenses (Total)</span>
-              <span className="text-sm font-semibold text-red-600">-{fmt(hrTotalExpenses)}</span>
-            </div>
-            <div className="border-t border-gray-200" />
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-semibold text-gray-700">Net Balance</span>
-              <span className={`text-xl font-bold ${hrNetBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {fmt(hrNetBalance)}
-              </span>
+          {/* Net Balance - Hero */}
+          <Card className={`p-5 ${hrNetBalance >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+            <p className="text-xs font-medium text-gray-500 mb-1">Net Balance</p>
+            <p className={`text-2xl font-bold ${hrNetBalance >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+              {fmt(hrNetBalance)}
+            </p>
+            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+              <span>HR Cash {fmt(hrCashBalance)}</span>
+              <span>−</span>
+              <span>Expenses {fmt(hrTotalExpenses)}</span>
             </div>
           </Card>
 
-          {/* Expense */}
+          {/* Expense Form */}
           <Card className="p-5">
-            <SectionLabel>Expense</SectionLabel>
+            <SectionLabel>Add Expense</SectionLabel>
             <form onSubmit={handleAddExpense} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -610,11 +599,20 @@ export default function CashUpPage() {
                 {saving ? 'Saving...' : 'Save'}
               </button>
             </form>
-            {/* Expense entries list */}
-            {expenses.length > 0 && (
-              <div className="mt-3 space-y-2">
+          </Card>
+
+          {/* Today's Expense List */}
+          {expenses.length > 0 && (
+            <Card className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <SectionLabel>Today's Expenses</SectionLabel>
+                <span className="text-sm font-semibold text-red-600">
+                  -{fmt(expenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0))}
+                </span>
+              </div>
+              <div className="space-y-2">
                 {expenses.map((exp) => (
-                  <div key={exp.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                  <div key={exp.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
                     <div>
                       <span className="text-sm font-medium text-gray-700">{exp.reason}</span>
                       <span className="text-xs text-gray-400 ml-2">{exp.category}</span>
@@ -629,9 +627,8 @@ export default function CashUpPage() {
                   </div>
                 ))}
               </div>
-            )}
-          </Card>
-
+            </Card>
+          )}
         </>
       )}
     </div>
