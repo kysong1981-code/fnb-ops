@@ -8,7 +8,7 @@ import Card from '../../ui/Card'
 export default function TemperatureForm() {
   const navigate = useNavigate()
   const { selectedStore } = useStore()
-  const storeParams = selectedStore && selectedStore.id !== 'all' ? { store_id: selectedStore.id } : {}
+  const storeParams = selectedStore ? { store_id: selectedStore.id } : {}
 
   const [locations, setLocations] = useState([])
   const [readings, setReadings] = useState({})

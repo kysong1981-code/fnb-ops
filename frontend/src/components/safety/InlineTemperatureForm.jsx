@@ -10,7 +10,7 @@ import { XIcon, CheckCircleIcon } from '../icons'
  */
 export default function InlineTemperatureForm({ onComplete, onClose }) {
   const { selectedStore } = useStore()
-  const storeParams = selectedStore && selectedStore.id !== 'all' ? { store_id: selectedStore.id } : {}
+  const storeParams = selectedStore ? { store_id: selectedStore.id } : {}
 
   const [locations, setLocations] = useState([])
   const [readings, setReadings] = useState({})

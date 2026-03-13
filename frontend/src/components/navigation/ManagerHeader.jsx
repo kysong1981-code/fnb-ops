@@ -2,11 +2,11 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useStore } from '../../context/StoreContext'
-import { BellIcon, SunIcon, UserIcon, LogoutIcon, HomeIcon, BuildingIcon } from '../icons'
+import { BellIcon, SunIcon, UserIcon, LogoutIcon, HomeIcon } from '../icons'
 
 export default function ManagerHeader() {
   const { user, logout } = useAuth()
-  const { stores, selectedStore, selectStore, allStoresOption } = useStore()
+  const { stores, selectedStore, selectStore } = useStore()
   const navigate = useNavigate()
   const [avatarOpen, setAvatarOpen] = useState(false)
   const [storeOpen, setStoreOpen] = useState(false)
@@ -23,8 +23,7 @@ export default function ManagerHeader() {
   const firstName = user?.user?.first_name || user?.user?.username || ''
   const initials = firstName.charAt(0).toUpperCase()
   const role = user?.role?.replace('_', ' ') || ''
-  const isAllStores = selectedStore?.id === 'all'
-  const hasMultipleStores = stores.length > 1 || allStoresOption
+  const hasMultipleStores = stores.length > 1
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -61,37 +60,19 @@ export default function ManagerHeader() {
             <div className="relative hidden sm:block" ref={storeRef}>
               <button
                 onClick={() => setStoreOpen(!storeOpen)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                  isAllStores ? 'bg-purple-50 hover:bg-purple-100' : 'bg-blue-50 hover:bg-blue-100'
-                }`}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer bg-blue-50 hover:bg-blue-100"
               >
-                {isAllStores ? (
-                  <BuildingIcon size={14} className="text-purple-500" />
-                ) : (
-                  <HomeIcon size={14} className="text-blue-500" />
-                )}
-                <span className={`text-sm font-medium ${isAllStores ? 'text-purple-700' : 'text-blue-700'}`}>
+                <HomeIcon size={14} className="text-blue-500" />
+                <span className="text-sm font-medium text-blue-700">
                   {selectedStore.name}
                 </span>
-                <svg className={`w-3.5 h-3.5 transition-transform ${storeOpen ? 'rotate-180' : ''} ${isAllStores ? 'text-purple-400' : 'text-blue-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-3.5 h-3.5 transition-transform ${storeOpen ? 'rotate-180' : ''} text-blue-400`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
 
               {storeOpen && (
                 <div className="absolute left-0 mt-1 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
-                  {allStoresOption && (
-                    <button
-                      onClick={() => handleStoreSelect(allStoresOption)}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition ${
-                        isAllStores ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      <BuildingIcon size={14} />
-                      <span className="truncate">{allStoresOption.name}</span>
-                      {isAllStores && <span className="ml-auto text-purple-500 text-xs">✓</span>}
-                    </button>
-                  )}
                   <div className="max-h-48 overflow-y-auto">
                     {stores.map((store) => (
                       <button

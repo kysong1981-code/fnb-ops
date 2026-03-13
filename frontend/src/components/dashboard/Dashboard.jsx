@@ -1,20 +1,12 @@
 import { useAuth } from '../../context/AuthContext'
-import { useStore } from '../../context/StoreContext'
 import EmployeeDashboard from './EmployeeDashboard'
 import ManagerDashboard from './ManagerDashboard'
-import RegionalDashboard from './RegionalDashboard'
 
 export default function Dashboard() {
   const { user } = useAuth()
-  const { isAllStores } = useStore()
 
   const renderDashboard = () => {
     if (!user) return null
-
-    // When "All Stores" is selected, always show RegionalDashboard
-    if (isAllStores) {
-      return <RegionalDashboard />
-    }
 
     switch (user.role) {
       case 'EMPLOYEE':

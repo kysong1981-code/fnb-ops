@@ -81,7 +81,7 @@ export default function StoreAssignment() {
     )
   }
 
-  const allStores = stores.filter(s => s.id !== 'all')
+  const allStores = stores
   const filtered = filter === 'ALL' ? users
     : filter === 'MANAGERS' ? users.filter(u => MANAGER_ROLES.includes(u.role))
     : users.filter(u => !MANAGER_ROLES.includes(u.role))

@@ -11,7 +11,7 @@ import { XIcon, CheckCircleIcon } from '../icons'
  */
 export default function InlineCleaningForm({ onComplete, onClose }) {
   const { selectedStore } = useStore()
-  const storeParams = selectedStore && selectedStore.id !== 'all' ? { store_id: selectedStore.id } : {}
+  const storeParams = selectedStore ? { store_id: selectedStore.id } : {}
 
   const [areas, setAreas] = useState([])
   const [selectedAreas, setSelectedAreas] = useState([])

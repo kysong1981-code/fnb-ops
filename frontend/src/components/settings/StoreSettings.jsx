@@ -82,7 +82,7 @@ const TRAINING_MODULE_TYPES = [
 export default function StoreSettings() {
   const { refreshProfile } = useAuth()
   const { selectedStore } = useStore()
-  const storeParams = selectedStore && selectedStore.id !== 'all' ? { store_id: selectedStore.id } : {}
+  const storeParams = selectedStore ? { store_id: selectedStore.id } : {}
   const [tab, setTab] = useState('modules')
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)

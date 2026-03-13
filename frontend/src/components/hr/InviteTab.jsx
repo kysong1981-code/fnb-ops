@@ -17,7 +17,7 @@ const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-x
 
 export default function InviteTab() {
   const { selectedStore } = useStore()
-  const storeParams = selectedStore && selectedStore.id !== 'all' ? { store_id: selectedStore.id } : {}
+  const storeParams = selectedStore ? { store_id: selectedStore.id } : {}
   const [invites, setInvites] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

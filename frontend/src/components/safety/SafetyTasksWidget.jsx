@@ -33,7 +33,7 @@ export default function SafetyTasksWidget() {
   const [showForm, setShowForm] = useState(false)
   const [activeModal, setActiveModal] = useState(null) // 'temperature' | 'cleaning' | null
 
-  const storeParams = selectedStore && selectedStore.id !== 'all' ? { store_id: selectedStore.id } : {}
+  const storeParams = selectedStore ? { store_id: selectedStore.id } : {}
 
   const fetchTasks = async () => {
     try {
