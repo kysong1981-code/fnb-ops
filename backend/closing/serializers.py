@@ -40,11 +40,12 @@ class UserSimpleSerializer(serializers.ModelSerializer):
 class ClosingSupplierCostSerializer(serializers.ModelSerializer):
     """공급사 비용 시리얼라이저"""
     supplier_name = serializers.CharField(source='supplier.name', read_only=True)
+    closing_date = serializers.DateField(source='closing.closing_date', read_only=True)
 
     class Meta:
         model = ClosingSupplierCost
-        fields = ['id', 'closing', 'supplier', 'supplier_name', 'amount', 'description', 'invoice_number', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at', 'supplier_name']
+        fields = ['id', 'closing', 'closing_date', 'supplier', 'supplier_name', 'amount', 'description', 'invoice_number', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'closing_date', 'created_at', 'updated_at', 'supplier_name']
 
 
 class ClosingOtherSaleSerializer(serializers.ModelSerializer):

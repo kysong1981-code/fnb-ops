@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { closingAPI } from '../../services/api'
+import { closingAPI, supplierCostAPI } from '../../services/api'
 import { getTodayNZ } from '../../utils/date'
 import Card from '../ui/Card'
+import SectionLabel from '../ui/SectionLabel'
 import { PlusIcon, ArrowRightIcon } from '../icons'
 
 const MANAGER_ROLES = ['MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO']
@@ -13,6 +14,9 @@ export default function ClosingList() {
   const { user } = useAuth()
   const [closings, setClosings] = useState([])
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('calendar') // 'calendar' | 'cogs'
+  const [cogsCosts, setCogsCosts] = useState([])
+  const [cogsLoading, setCogsLoading] = useState(false)
 
   const isManager = user && MANAGER_ROLES.includes(user.role)
 
@@ -39,6 +43,22 @@ export default function ClosingList() {
       setLoading(false)
     }
   }
+
+  const fetchCogs = async () => {
+    setCogsLoading(true)
+    try {
+      const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`
+      const lastDay = new Date(year, month + 1, 0).getDate()
+      const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+      const res = await supplierCostAPI.list({ date_from: startDate, date_to: endDate })
+      setCogsCosts(res.data.results || res.data || [])
+    } catch { setCogsCosts([]) }
+    finally { setCogsLoading(false) }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'cogs') fetchCogs()
+  }, [activeTab, year, month])
 
   const prevMonth = () => setViewDate(new Date(year, month - 1, 1))
   const nextMonth = () => setViewDate(new Date(year, month + 1, 1))
@@ -85,6 +105,19 @@ export default function ClosingList() {
         </button>
       </div>
 
+      {/* Tabs */}
+      <div className="bg-gray-100 rounded-xl p-1 flex gap-1">
+        {[{ key: 'calendar', label: 'Calendar' }, { key: 'cogs', label: 'COGS' }].map(t => (
+          <button key={t.key} onClick={() => setActiveTab(t.key)}
+            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition ${
+              activeTab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'calendar' && <>
       {/* Incomplete dates for current month */}
       {(() => {
         const incompleteDates = []
@@ -231,6 +264,102 @@ export default function ClosingList() {
           </div>
         )}
       </Card>
+      </>}
+
+      {/* COGS Tab */}
+      {activeTab === 'cogs' && (
+        <>
+          {/* Month Navigation */}
+          <div className="flex items-center justify-between">
+            <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-lg transition text-gray-500">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <h2 className="text-base font-semibold text-gray-900">{monthName}</h2>
+            <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-lg transition text-gray-500">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
+
+          {cogsLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : cogsCosts.length === 0 ? (
+            <Card className="p-8 text-center">
+              <p className="text-gray-400 text-sm">No invoices for this month</p>
+            </Card>
+          ) : (
+            <>
+              {/* COGS Total */}
+              <Card className="p-4 text-center">
+                <p className="text-xs text-gray-400">Total COGS</p>
+                <p className="text-xl font-bold text-gray-900 mt-0.5">
+                  {fmt(cogsCosts.reduce((s, c) => s + parseFloat(c.amount || 0), 0))}
+                </p>
+              </Card>
+
+              {/* By Supplier */}
+              <Card className="p-5">
+                <SectionLabel>By Supplier</SectionLabel>
+                <div className="space-y-3 mt-3">
+                  {(() => {
+                    const bySupplier = {}
+                    cogsCosts.forEach(c => {
+                      const name = c.supplier_name || 'Unknown'
+                      if (!bySupplier[name]) bySupplier[name] = { total: 0, items: [] }
+                      bySupplier[name].total += parseFloat(c.amount || 0)
+                      bySupplier[name].items.push(c)
+                    })
+                    return Object.entries(bySupplier)
+                      .sort((a, b) => b[1].total - a[1].total)
+                      .map(([name, data]) => (
+                        <div key={name} className="border border-gray-100 rounded-xl overflow-hidden">
+                          <div className="flex items-center justify-between p-3 bg-gray-50">
+                            <span className="text-sm font-semibold text-gray-900">{name}</span>
+                            <span className="text-sm font-bold text-gray-700">{fmt(data.total)}</span>
+                          </div>
+                          <div className="px-3 py-1">
+                            {data.items.map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                                <span className="text-xs text-gray-500">{item.closing_date || item.closing?.closing_date || '—'}</span>
+                                <span className="text-xs font-medium text-gray-700">{fmt(item.amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                  })()}
+                </div>
+              </Card>
+
+              {/* Daily breakdown */}
+              <Card className="p-5">
+                <SectionLabel>Daily Breakdown</SectionLabel>
+                <div className="space-y-2 mt-3">
+                  {(() => {
+                    const byDate = {}
+                    cogsCosts.forEach(c => {
+                      const date = c.closing_date || c.closing?.closing_date || 'Unknown'
+                      if (!byDate[date]) byDate[date] = 0
+                      byDate[date] += parseFloat(c.amount || 0)
+                    })
+                    return Object.entries(byDate)
+                      .sort((a, b) => a[0].localeCompare(b[0]))
+                      .map(([date, total]) => (
+                        <div key={date} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                          <span className="text-sm text-gray-600">
+                            {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })}
+                          </span>
+                          <span className="text-sm font-semibold text-gray-900">{fmt(total)}</span>
+                        </div>
+                      ))
+                  })()}
+                </div>
+              </Card>
+            </>
+          )}
+        </>
+      )}
     </div>
   )
 }

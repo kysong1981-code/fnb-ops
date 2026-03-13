@@ -454,7 +454,7 @@ class ClosingSupplierCostViewSet(mixins.CreateModelMixin,
     def get_queryset(self):
         queryset = super().get_queryset()
         try:
-            org = self.request.user.profile.organization
+            org = get_target_org(self.request)
             queryset = queryset.filter(closing__organization=org)
         except Exception:
             queryset = queryset.none()
@@ -462,6 +462,14 @@ class ClosingSupplierCostViewSet(mixins.CreateModelMixin,
         closing_id = self.request.query_params.get('closing_id')
         if closing_id:
             queryset = queryset.filter(closing_id=closing_id)
+
+        # Date range filter for COGS view
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+        if date_from:
+            queryset = queryset.filter(closing__closing_date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(closing__closing_date__lte=date_to)
 
         return queryset.select_related('closing', 'supplier')
 

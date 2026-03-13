@@ -533,8 +533,10 @@ export const otherSalesAPI = {
 
 // Supplier Cost API
 export const supplierCostAPI = {
-  list: (closingId) =>
-    api.get('/closing/supplier-costs/', { params: { closing_id: closingId } }),
+  list: (closingIdOrParams) =>
+    typeof closingIdOrParams === 'object'
+      ? api.get('/closing/supplier-costs/', { params: closingIdOrParams })
+      : api.get('/closing/supplier-costs/', { params: { closing_id: closingIdOrParams } }),
   create: (data) => api.post('/closing/supplier-costs/', data),
   update: (id, data) => api.patch(`/closing/supplier-costs/${id}/`, data),
   delete: (id) => api.delete(`/closing/supplier-costs/${id}/`),
