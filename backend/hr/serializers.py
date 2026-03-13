@@ -190,7 +190,7 @@ class EmployeeInviteSerializer(serializers.ModelSerializer):
     """직원 초대 시리얼라이저"""
     invited_by_name = serializers.CharField(source='invited_by.user.get_full_name', read_only=True)
     accepted_by_name = serializers.CharField(source='accepted_by.user.get_full_name', read_only=True, allow_null=True)
-    job_title_display = serializers.CharField(source='get_job_title_display', read_only=True)
+    job_title_display = serializers.CharField(source='job_title', read_only=True)
     work_type_display = serializers.CharField(source='get_work_type_display', read_only=True)
     is_expired = serializers.BooleanField(read_only=True)
 
@@ -215,7 +215,7 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
     """문서 템플릿 시리얼라이저"""
     document_type_display = serializers.CharField(source='get_document_type_display', read_only=True)
     work_type_display = serializers.CharField(source='get_work_type_display', read_only=True)
-    job_title_display = serializers.CharField(source='get_job_title_display', read_only=True)
+    job_title_display = serializers.CharField(source='job_title', read_only=True)
 
     class Meta:
         model = DocumentTemplate

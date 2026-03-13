@@ -1299,8 +1299,8 @@ class EmployeeInviteViewSet(viewsets.ModelViewSet):
                 'holiday_rate': str(round(float(invite.hourly_rate) * 0.08, 2)),
                 'gross_rate': str(round(float(invite.hourly_rate) * 1.08, 2)),
                 'hours': str(invite.min_hours or 30),
-                'job_title': invite.get_job_title_display(),
-                'position_title': invite.get_job_title_display(),
+                'job_title': invite.job_title or '',
+                'position_title': invite.job_title or '',
                 'work_type': invite.get_work_type_display(),
                 'start_date': timezone.now().strftime('%d/%m/%Y'),
                 'commencement_date': invite.commencement_date.strftime('%d/%m/%Y') if invite.commencement_date else 'TBC',
@@ -1459,7 +1459,7 @@ class AcceptInviteView(APIView):
             'last_name': invite.last_name,
             'email': invite.email,
             'organization_name': invite.organization.name,
-            'job_title': invite.get_job_title_display(),
+            'job_title': invite.job_title or '',
             'role': invite.get_role_display(),
         })
 
