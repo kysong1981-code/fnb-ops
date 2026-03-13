@@ -5,10 +5,8 @@ import Card from '../ui/Card'
 import { ChevronLeftIcon, ChevronRightIcon, ArrowRightIcon } from '../icons'
 
 const STATUS_COLORS = {
-  DRAFT: { bg: 'bg-gray-200', ring: 'ring-gray-300', text: 'text-gray-600', label: 'Draft' },
   SUBMITTED: { bg: 'bg-blue-500', ring: 'ring-blue-300', text: 'text-blue-700', label: 'Submitted' },
   APPROVED: { bg: 'bg-green-500', ring: 'ring-green-300', text: 'text-green-700', label: 'Approved' },
-  REJECTED: { bg: 'bg-red-500', ring: 'ring-red-300', text: 'text-red-700', label: 'Rejected' },
 }
 
 export default function ClosingMonthlyView() {
@@ -182,7 +180,7 @@ export default function ClosingMonthlyView() {
             {Object.entries(closings)
               .sort(([a], [b]) => b.localeCompare(a))
               .map(([dateStr, c]) => {
-                const sc = STATUS_COLORS[c.status] || STATUS_COLORS.DRAFT
+                const sc = STATUS_COLORS[c.status] || STATUS_COLORS.SUBMITTED
                 const variance = parseFloat(c.total_variance || 0)
                 return (
                   <button
