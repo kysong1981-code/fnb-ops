@@ -31,7 +31,7 @@ class StoreListView(generics.ListAPIView):
     def get_queryset(self):
         profile = self.request.user.profile
         if profile.role in ('CEO', 'HQ', 'ADMIN'):
-            return Organization.objects.filter(level='STORE').order_by('name')
+            return Organization.objects.filter(level__in=['STORE', 'HQ']).order_by('name')
         if profile.role in ('REGIONAL_MANAGER', 'SENIOR_MANAGER'):
             managed = profile.managed_stores.all()
             if managed.exists():
