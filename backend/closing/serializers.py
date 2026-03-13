@@ -132,19 +132,21 @@ class DailyClosingListSerializer(serializers.ModelSerializer):
     organization_name = serializers.CharField(source='organization.name', read_only=True)
     created_by_name = serializers.CharField(source='created_by.user.get_full_name', read_only=True)
     approved_by_name = serializers.CharField(source='approved_by.user.get_full_name', read_only=True, allow_null=True)
+    card_variance = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    cash_variance = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
     class Meta:
         model = DailyClosing
         fields = [
             'id', 'organization', 'organization_name', 'closing_date',
-            'pos_total', 'actual_total', 'total_variance',
+            'pos_total', 'actual_total', 'card_variance', 'cash_variance', 'total_variance',
             'status', 'created_by_name', 'approved_by_name',
             'created_at', 'updated_at', 'approved_at'
         ]
         read_only_fields = [
             'id', 'created_at', 'updated_at',
             'organization_name', 'created_by_name', 'approved_by_name',
-            'pos_total', 'actual_total', 'total_variance'
+            'pos_total', 'actual_total', 'card_variance', 'cash_variance', 'total_variance'
         ]
 
 

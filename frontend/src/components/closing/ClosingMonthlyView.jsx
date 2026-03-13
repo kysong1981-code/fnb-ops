@@ -198,10 +198,20 @@ export default function ClosingMonthlyView() {
                         <p className="text-sm font-medium text-gray-900">
                           POS: {fmt(c.pos_total)} · Actual: {fmt(c.actual_total)}
                         </p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className={`text-xs font-medium ${variance === 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            Var: {variance >= 0 ? '+' : ''}{fmt(variance)}
-                          </span>
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          {parseFloat(c.cash_variance || 0) !== 0 && (
+                            <span className={`text-xs font-medium ${parseFloat(c.cash_variance) > 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                              Cash: {parseFloat(c.cash_variance) >= 0 ? '+' : ''}{fmt(c.cash_variance)}
+                            </span>
+                          )}
+                          {parseFloat(c.card_variance || 0) !== 0 && (
+                            <span className={`text-xs font-medium ${parseFloat(c.card_variance) > 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                              Card: {parseFloat(c.card_variance) >= 0 ? '+' : ''}{fmt(c.card_variance)}
+                            </span>
+                          )}
+                          {variance === 0 && (
+                            <span className="text-xs font-medium text-green-600">No variance</span>
+                          )}
                           {c.created_by_name && (
                             <span className="text-xs text-gray-400">by {c.created_by_name}</span>
                           )}
