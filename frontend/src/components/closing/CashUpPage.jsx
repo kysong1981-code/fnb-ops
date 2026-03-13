@@ -34,6 +34,7 @@ export default function CashUpPage() {
 
   // HR Cash entries (for HR Cash tab balance calc)
   const [hrCashEntries, setHrCashEntries] = useState([])
+  const [hrCashBalance, setHrCashBalance] = useState(0)
   const [showHrForm, setShowHrForm] = useState(false)
   const [hrForm, setHrForm] = useState({ recipient_name: '', amount: '', notes: '', photo: null })
 
@@ -84,6 +85,18 @@ export default function CashUpPage() {
       }
     }
     checkMissingDays()
+  }, [])
+
+  // Load total HR Cash balance (cumulative across all dates)
+  const loadHrCashBalance = async () => {
+    try {
+      const res = await hrCashAPI.balance()
+      setHrCashBalance(parseFloat(res.data.balance) || 0)
+    } catch { /* ignore */ }
+  }
+
+  useEffect(() => {
+    loadHrCashBalance()
   }, [])
 
   // Load closing for selected date
@@ -287,6 +300,7 @@ export default function CashUpPage() {
       await closingAPI.patch(closing.id, { bank_deposit: parseFloat(bankDeposit) || 0 })
       await syncHrCash(closing.id)
       await loadHrCash(closing.id)
+      loadHrCashBalance()
       showMsg('Cash up saved')
     } catch (err) {
       setError(getErrorMsg(err))
@@ -304,6 +318,7 @@ export default function CashUpPage() {
       await closingAPI.patch(closing.id, { bank_deposit: parseFloat(bankDeposit) || 0 })
       await syncHrCash(closing.id)
       await loadHrCash(closing.id)
+      loadHrCashBalance()
       const res = await closingAPI.approve(closing.id)
       setClosing(res.data)
       showMsg('Saved & Approved')
@@ -527,8 +542,8 @@ export default function CashUpPage() {
             </div>
             <div className="border-t border-gray-100" />
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-500">HR Cash Balance</span>
-              <span className="text-xl font-bold text-gray-900">{fmt(hrCashTotal)}</span>
+              <span className="text-sm font-medium text-gray-500">HR Cash Balance (Total)</span>
+              <span className="text-xl font-bold text-gray-900">{fmt(hrCashBalance)}</span>
             </div>
           </Card>
 

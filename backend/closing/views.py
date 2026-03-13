@@ -364,6 +364,16 @@ class ClosingHRCashViewSet(mixins.CreateModelMixin,
         """created_by를 현재 사용자로 설정"""
         serializer.save(created_by=self.request.user)
 
+    @action(detail=False, methods=['get'])
+    def balance(self, request):
+        """전체 HR Cash 누적 합계 반환"""
+        from users.filters import get_target_org
+        org = get_target_org(request)
+        total = ClosingHRCash.objects.filter(
+            daily_closing__organization=org
+        ).aggregate(total=Coalesce(Sum('amount'), 0))['total']
+        return Response({'balance': str(total)})
+
 
 class ClosingCashExpenseViewSet(mixins.CreateModelMixin,
                                  mixins.ListModelMixin,

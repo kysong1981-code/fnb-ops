@@ -165,6 +165,7 @@ export const hrCashAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
   delete: (id) => api.delete(`/closing/hr-cash/${id}/`),
+  balance: () => api.get('/closing/hr-cash/balance/'),
 }
 
 // Cash Expense API (매니저 전용)
