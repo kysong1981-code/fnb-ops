@@ -415,6 +415,19 @@ class ReportViewSet(viewsets.ModelViewSet):
                         'photo': request.build_absolute_uri(entry.photo.url) if entry.photo else None,
                     })
 
+                # Implicit HR Cash: if no entries, treat remaining cash as HR cash
+                if not hr_entries:
+                    implicit_hr = closing.actual_cash - closing.bank_deposit
+                    if implicit_hr > 0:
+                        hr_total = implicit_hr
+                        hr_entries.append({
+                            'id': None,
+                            'recipient_name': 'Unallocated',
+                            'amount': float(implicit_hr),
+                            'notes': 'Auto-calculated (actual cash − bank deposit)',
+                            'photo': None,
+                        })
+
                 # Cash Expense 항목
                 expense_entries = []
                 expenses_total = Decimal('0')
@@ -537,6 +550,22 @@ class ReportViewSet(viewsets.ModelViewSet):
                         'notes': entry.notes or '',
                         'photo': request.build_absolute_uri(entry.photo.url) if entry.photo else None,
                     })
+
+                # Implicit HR Cash: if no entries, treat remaining cash as HR cash
+                if not hr_entries:
+                    implicit_hr = closing.actual_cash - closing.bank_deposit
+                    if implicit_hr > 0:
+                        hr_total_day = implicit_hr
+                        entry_count += 1
+                        recipient_agg['Unallocated']['total_amount'] += implicit_hr
+                        recipient_agg['Unallocated']['count'] += 1
+                        hr_entries.append({
+                            'id': None,
+                            'recipient_name': 'Unallocated',
+                            'amount': float(implicit_hr),
+                            'notes': 'Auto-calculated',
+                            'photo': None,
+                        })
 
                 exp_total_day = Decimal('0')
                 expense_entries = []

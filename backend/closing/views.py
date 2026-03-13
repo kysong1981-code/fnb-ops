@@ -223,6 +223,17 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
         closing.approved_at = timezone.now()
         closing.save()
 
+        # Auto-create HR Cash entry if none exists and there's unaccounted cash
+        if not closing.hr_cash_entries.exists():
+            remaining = closing.actual_cash - closing.bank_deposit
+            if remaining > 0:
+                ClosingHRCash.objects.create(
+                    daily_closing=closing,
+                    amount=remaining,
+                    recipient_name='Auto',
+                    created_by=request.user.profile,
+                )
+
         serializer = self.get_serializer(closing)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -366,13 +377,32 @@ class ClosingHRCashViewSet(mixins.CreateModelMixin,
 
     @action(detail=False, methods=['get'])
     def balance(self, request):
-        """전체 HR Cash 누적 합계 반환"""
+        """전체 HR Cash 누적 합계 반환 (explicit entries + implicit from closings without entries)"""
         from users.filters import get_target_org
         from decimal import Decimal
         org = get_target_org(request)
-        total = ClosingHRCash.objects.filter(
+
+        # 1. Explicit HR Cash entries
+        explicit_total = ClosingHRCash.objects.filter(
             daily_closing__organization=org
         ).aggregate(total=Coalesce(Sum('amount'), Decimal('0')))['total']
+
+        # 2. Implicit: closings without HR Cash entries where actual_cash > bank_deposit
+        closings_with_hr = ClosingHRCash.objects.filter(
+            daily_closing__organization=org
+        ).values_list('daily_closing_id', flat=True)
+
+        implicit_total = DailyClosing.objects.filter(
+            organization=org,
+        ).exclude(
+            id__in=closings_with_hr
+        ).annotate(
+            remaining=F('actual_cash') - F('bank_deposit')
+        ).filter(
+            remaining__gt=0
+        ).aggregate(total=Coalesce(Sum('remaining'), Decimal('0')))['total']
+
+        total = explicit_total + implicit_total
         return Response({'balance': str(total)})
 
 
