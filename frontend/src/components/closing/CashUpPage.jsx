@@ -130,7 +130,7 @@ export default function CashUpPage() {
       }
     }
     loadClosing()
-  }, [selectedDate])
+  }, [selectedDate, activeTab])
 
   const loadHrCash = async (closingId) => {
     try {
@@ -286,6 +286,7 @@ export default function CashUpPage() {
     try {
       await closingAPI.patch(closing.id, { bank_deposit: parseFloat(bankDeposit) || 0 })
       await syncHrCash(closing.id)
+      await loadHrCash(closing.id)
       showMsg('Cash up saved')
     } catch (err) {
       setError(getErrorMsg(err))
@@ -302,6 +303,7 @@ export default function CashUpPage() {
     try {
       await closingAPI.patch(closing.id, { bank_deposit: parseFloat(bankDeposit) || 0 })
       await syncHrCash(closing.id)
+      await loadHrCash(closing.id)
       const res = await closingAPI.approve(closing.id)
       setClosing(res.data)
       showMsg('Saved & Approved')
@@ -315,7 +317,8 @@ export default function CashUpPage() {
   // Calculations
   const deposit = parseFloat(bankDeposit) || 0
   const expenseTotal = expenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
-  const hrCashTotal = hrCashEntries.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
+  const hrCashFromEntries = hrCashEntries.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
+  const hrCashTotal = hrCashFromEntries || parseFloat(hrCashAmount) || 0
   const totalCash = deposit + expenseTotal + hrCashTotal
   const actualCash = parseFloat(closing?.actual_cash || 0)
   const cashVariance = actualCash - totalCash
