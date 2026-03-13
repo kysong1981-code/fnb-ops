@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { hrAPI, storeAPI } from '../../services/api'
+import { useStore } from '../../context/StoreContext'
 import Card from '../ui/Card'
 import SectionLabel from '../ui/SectionLabel'
 import { TrashIcon, ClipboardIcon } from '../icons'
@@ -15,6 +16,8 @@ const WORK_TYPES = [
 const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 
 export default function InviteTab() {
+  const { selectedStore } = useStore()
+  const storeParams = selectedStore && selectedStore.id !== 'all' ? { store_id: selectedStore.id } : {}
   const [invites, setInvites] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -44,7 +47,7 @@ export default function InviteTab() {
   const loadInvites = async () => {
     setLoading(true)
     try {
-      const res = await hrAPI.getInvites()
+      const res = await hrAPI.getInvites(storeParams)
       setInvites(Array.isArray(res.data) ? res.data : res.data.results || [])
     } catch { setInvites([]) }
     finally { setLoading(false) }
@@ -52,7 +55,7 @@ export default function InviteTab() {
 
   const loadJobTitles = async () => {
     try {
-      const res = await storeAPI.getJobTitles()
+      const res = await storeAPI.getJobTitles(storeParams)
       const titles = (Array.isArray(res.data) ? res.data : res.data.results || []).filter(j => j.is_active)
       setJobTitles(titles)
     } catch (e) { console.error('Failed to load job titles', e) }
@@ -74,7 +77,7 @@ export default function InviteTab() {
     setSaving(true)
     setError('')
     try {
-      const res = await hrAPI.createInvite(form)
+      const res = await hrAPI.createInvite(form, storeParams)
       const data = res.data
       // Show generated credentials
       if (data.generated_credentials) {

@@ -233,8 +233,8 @@ export const hrAPI = {
     }),
 
   // Invites
-  getInvites: () => api.get('/hr/invites/'),
-  createInvite: (data) => api.post('/hr/invites/', data),
+  getInvites: (params) => api.get('/hr/invites/', { params }),
+  createInvite: (data, params) => api.post('/hr/invites/', data, { params }),
   deleteInvite: (id) => api.delete(`/hr/invites/${id}/`),
   resendInvite: (id) => api.post(`/hr/invites/${id}/resend/`),
   verifyInvite: (code) => api.get('/hr/accept-invite/', { params: { code } }),

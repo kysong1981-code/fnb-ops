@@ -1209,7 +1209,7 @@ class EmployeeInviteViewSet(viewsets.ModelViewSet):
     pagination_class = None
 
     def get_queryset(self):
-        org = self.request.user.profile.organization
+        org = get_target_org(self.request)
         return EmployeeInvite.objects.filter(organization=org).select_related(
             'invited_by__user', 'accepted_by__user'
         )
@@ -1222,7 +1222,7 @@ class EmployeeInviteViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         profile = request.user.profile
-        org = profile.organization
+        org = get_target_org(request)
         invite_data = serializer.validated_data
 
         email = invite_data['email']
