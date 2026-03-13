@@ -529,16 +529,11 @@ export default function CashUpPage() {
       ) : (
         /* ============ HR CASH TAB ============ */
         <>
-          {/* Date & Balance */}
+          {/* Balance */}
           <Card className="p-5 space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-500">Date</span>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="text-sm font-semibold text-gray-900 bg-transparent border-none p-0 text-right cursor-pointer"
-              />
+              <span className="text-sm font-medium text-gray-500">Today</span>
+              <span className="text-sm font-semibold text-gray-900">{selectedDate}</span>
             </div>
             <div className="border-t border-gray-100" />
             <div className="flex justify-between items-center">

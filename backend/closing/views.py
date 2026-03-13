@@ -368,10 +368,11 @@ class ClosingHRCashViewSet(mixins.CreateModelMixin,
     def balance(self, request):
         """전체 HR Cash 누적 합계 반환"""
         from users.filters import get_target_org
+        from decimal import Decimal
         org = get_target_org(request)
         total = ClosingHRCash.objects.filter(
             daily_closing__organization=org
-        ).aggregate(total=Coalesce(Sum('amount'), 0))['total']
+        ).aggregate(total=Coalesce(Sum('amount'), Decimal('0')))['total']
         return Response({'balance': str(total)})
 
 
