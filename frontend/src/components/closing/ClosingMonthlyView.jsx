@@ -38,10 +38,12 @@ export default function ClosingMonthlyView() {
       })
       const items = res.data?.results || res.data || []
 
-      // Map by date
+      // Map by date (only SUBMITTED/APPROVED)
       const map = {}
       items.forEach(c => {
-        map[c.closing_date] = c
+        if (['SUBMITTED', 'APPROVED'].includes(c.status)) {
+          map[c.closing_date] = c
+        }
       })
       setClosings(map)
     } catch (err) {

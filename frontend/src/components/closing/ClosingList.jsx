@@ -69,9 +69,13 @@ export default function ClosingList() {
   const today = new Date()
   const todayStr = getTodayNZ()
 
-  // Map closings by date
+  // Map closings by date (only SUBMITTED/APPROVED shown on calendar)
   const closingMap = {}
-  closings.forEach(c => { closingMap[c.closing_date] = c })
+  closings.forEach(c => {
+    if (['SUBMITTED', 'APPROVED'].includes(c.status)) {
+      closingMap[c.closing_date] = c
+    }
+  })
 
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
   const monthName = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' })
