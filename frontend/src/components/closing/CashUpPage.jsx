@@ -366,12 +366,12 @@ export default function CashUpPage() {
         <div className="flex justify-center py-12">
           <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : !closing ? (
+      ) : activeTab === 'cashup' && !closing ? (
         <Card className="p-8 text-center">
           <p className="text-gray-400 text-sm">No closing found for this date</p>
           <p className="text-gray-300 text-xs mt-1">Staff must create a closing first</p>
         </Card>
-      ) : activeTab === 'cashup' ? (
+      ) : activeTab === 'cashup' && closing ? (
         /* ============ CASH UP TAB ============ */
         <>
           <Card className="p-5 space-y-4">
