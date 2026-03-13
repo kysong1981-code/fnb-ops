@@ -4,14 +4,23 @@ import { useAuth } from '../../context/AuthContext'
 import { useStore } from '../../context/StoreContext'
 import { BellIcon, SunIcon, UserIcon, LogoutIcon, HomeIcon } from '../icons'
 
+const ROLE_OPTIONS = [
+  { value: 'CEO', label: 'CEO', icon: '👑' },
+  { value: 'REGIONAL_MANAGER', label: 'Regional', icon: '🌏' },
+  { value: 'MANAGER', label: 'Manager', icon: '🏪' },
+  { value: 'EMPLOYEE', label: 'Employee', icon: '👤' },
+]
+
 export default function ManagerHeader() {
-  const { user, logout } = useAuth()
+  const { user, logout, setRoleOverride, roleOverride, isTestOrg, realUser } = useAuth()
   const { stores, selectedStore, selectStore } = useStore()
   const navigate = useNavigate()
   const [avatarOpen, setAvatarOpen] = useState(false)
   const [storeOpen, setStoreOpen] = useState(false)
+  const [roleOpen, setRoleOpen] = useState(false)
   const avatarRef = useRef(null)
   const storeRef = useRef(null)
+  const roleRef = useRef(null)
 
   const getGreeting = () => {
     const h = new Date().getHours()
@@ -29,6 +38,7 @@ export default function ManagerHeader() {
     const handleClickOutside = (e) => {
       if (avatarRef.current && !avatarRef.current.contains(e.target)) setAvatarOpen(false)
       if (storeRef.current && !storeRef.current.contains(e.target)) setStoreOpen(false)
+      if (roleRef.current && !roleRef.current.contains(e.target)) setRoleOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -43,6 +53,15 @@ export default function ManagerHeader() {
     selectStore(store)
     setStoreOpen(false)
   }
+
+  const handleRoleSelect = (role) => {
+    setRoleOverride(role)
+    setRoleOpen(false)
+    navigate('/dashboard')
+  }
+
+  const currentRole = user?.role || ''
+  const currentRoleOption = ROLE_OPTIONS.find(r => r.value === currentRole)
 
   return (
     <header className="bg-white border-b border-gray-100 px-6 py-4 shrink-0">
@@ -95,6 +114,46 @@ export default function ManagerHeader() {
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50">
               <HomeIcon size={14} className="text-blue-500" />
               <span className="text-sm font-medium text-blue-700">{selectedStore.name}</span>
+            </div>
+          )}
+
+          {/* Role Switcher (OneOps test org only) */}
+          {isTestOrg && realUser?.role === 'CEO' && (
+            <div className="relative hidden sm:block" ref={roleRef}>
+              <button
+                onClick={() => setRoleOpen(!roleOpen)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                  roleOverride ? 'bg-amber-50 hover:bg-amber-100' : 'bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                <span className="text-sm">{currentRoleOption?.icon || '👤'}</span>
+                <span className={`text-xs font-medium ${roleOverride ? 'text-amber-700' : 'text-gray-600'}`}>
+                  {currentRoleOption?.label || currentRole}
+                </span>
+                {roleOverride && <span className="text-[10px] text-amber-500">(Test)</span>}
+                <svg className={`w-3 h-3 transition-transform ${roleOpen ? 'rotate-180' : ''} text-gray-400`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {roleOpen && (
+                <div className="absolute left-0 mt-1 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
+                  {ROLE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => handleRoleSelect(opt.value === realUser.role ? null : opt.value)}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition ${
+                        currentRole === opt.value ? 'bg-amber-50 text-amber-700 font-medium' : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span>{opt.icon}</span>
+                      <span>{opt.label}</span>
+                      {currentRole === opt.value && <span className="ml-auto text-amber-500 text-xs">✓</span>}
+                      {opt.value === realUser.role && <span className="ml-auto text-gray-400 text-[10px]">original</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

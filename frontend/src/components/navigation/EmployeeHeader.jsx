@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { BellIcon, LogoutIcon } from '../icons'
 
 export default function EmployeeHeader() {
-  const { user, logout } = useAuth()
+  const { user, logout, roleOverride, setRoleOverride, isTestOrg } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
 
@@ -27,6 +27,18 @@ export default function EmployeeHeader() {
   }, [menuOpen])
 
   return (
+    <>
+    {isTestOrg && roleOverride && (
+      <div className="bg-amber-400 px-4 py-2 flex items-center justify-between">
+        <span className="text-xs font-semibold text-amber-900">Test Mode: {roleOverride}</span>
+        <button
+          onClick={() => setRoleOverride(null)}
+          className="text-xs font-bold text-amber-900 bg-amber-300 px-2 py-0.5 rounded hover:bg-amber-200 transition"
+        >
+          Back to CEO
+        </button>
+      </div>
+    )}
     <header className="bg-white px-5 pt-4 pb-3 shrink-0">
       <div className="flex items-center justify-between">
         <div>
@@ -64,5 +76,6 @@ export default function EmployeeHeader() {
         </div>
       </div>
     </header>
+    </>
   )
 }

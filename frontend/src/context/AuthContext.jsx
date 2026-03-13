@@ -7,6 +7,7 @@ const AuthContext = createContext()
 // AuthProvider component
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
+  const [realUser, setRealUser] = useState(null) // original user before role override
   const [token, setToken] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -31,7 +32,9 @@ export function AuthProvider({ children }) {
           Authorization: `Bearer ${accessToken}`,
         },
       })
-      setUser(response.data.profile)
+      const profile = response.data.profile
+      setUser(profile)
+      setRealUser(profile)
       setError(null)
     } catch (err) {
       console.error('Failed to fetch profile:', err)
@@ -117,6 +120,19 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Role override (OneOps test mode only, org_id=3)
+  const setRoleOverride = (role) => {
+    if (!realUser) return
+    if (role && role !== realUser.role) {
+      setUser({ ...realUser, role })
+    } else {
+      setUser(realUser)
+    }
+  }
+
+  const isTestOrg = realUser?.organization === 3 || realUser?.organization_detail?.id === 3
+  const roleOverride = realUser && user && user.role !== realUser.role ? user.role : null
+
   // Check if a feature module is enabled for this organization
   const isModuleEnabled = (moduleKey) => {
     const modules = user?.organization_detail?.enabled_modules
@@ -147,6 +163,7 @@ export function AuthProvider({ children }) {
 
   const value = {
     user,
+    realUser,
     token,
     loading,
     error,
@@ -157,6 +174,9 @@ export function AuthProvider({ children }) {
     isModuleEnabled,
     refreshProfile,
     isAuthenticated: !!token && !!user,
+    setRoleOverride,
+    roleOverride,
+    isTestOrg,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
