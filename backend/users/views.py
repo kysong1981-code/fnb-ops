@@ -113,13 +113,13 @@ class AssignStoresView(APIView):
 
 
 class OrganizationSettingsView(generics.RetrieveUpdateAPIView):
-    """매장 설정 조회/수정 (자기 조직만)"""
+    """매장 설정 조회/수정 (CEO/HQ는 store_id로 매장 전환 가능)"""
     serializer_class = OrganizationSerializer
     permission_classes = [IsAuthenticated, IsManager]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_object(self):
-        return self.request.user.profile.organization
+        return get_target_org(self.request)
 
 
 class IntegrationListView(generics.ListAPIView):

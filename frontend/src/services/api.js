@@ -329,28 +329,29 @@ export const hrAPI = {
 // Store Settings API
 export const storeAPI = {
   // Organization 설정
-  getSettings: () => api.get('/users/organization/settings/'),
-  updateSettings: (data) => api.patch('/users/organization/settings/', data),
-  updateSettingsWithFile: (formData) =>
+  getSettings: (params) => api.get('/users/organization/settings/', { params }),
+  updateSettings: (data, params) => api.patch('/users/organization/settings/', data, { params }),
+  updateSettingsWithFile: (formData, params) =>
     api.patch('/users/organization/settings/', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      params,
     }),
 
   // Suppliers
-  getSuppliers: () => api.get('/closing/suppliers/'),
-  createSupplier: (data) => api.post('/closing/suppliers/', data),
+  getSuppliers: (params) => api.get('/closing/suppliers/', { params }),
+  createSupplier: (data, params) => api.post('/closing/suppliers/', data, { params }),
   updateSupplier: (id, data) => api.patch(`/closing/suppliers/${id}/`, data),
   deleteSupplier: (id) => api.delete(`/closing/suppliers/${id}/`),
 
   // Sales Categories
-  getSalesCategories: () => api.get('/closing/sales-categories/'),
-  createSalesCategory: (data) => api.post('/closing/sales-categories/', data),
+  getSalesCategories: (params) => api.get('/closing/sales-categories/', { params }),
+  createSalesCategory: (data, params) => api.post('/closing/sales-categories/', data, { params }),
   updateSalesCategory: (id, data) => api.patch(`/closing/sales-categories/${id}/`, data),
   deleteSalesCategory: (id) => api.delete(`/closing/sales-categories/${id}/`),
 
   // Job Titles
   getJobTitles: (params) => api.get('/users/job-titles/', { params }),
-  createJobTitle: (data) => api.post('/users/job-titles/', data),
+  createJobTitle: (data, params) => api.post('/users/job-titles/', data, { params }),
   updateJobTitle: (id, data) => api.patch(`/users/job-titles/${id}/`, data),
   deleteJobTitle: (id) => api.delete(`/users/job-titles/${id}/`),
 
@@ -373,13 +374,13 @@ export const safetyAPI = {
 
   // Temperature Locations
   getTemperatureLocations: (params) => api.get('/safety/temperature-locations/', { params }),
-  createTemperatureLocation: (data) => api.post('/safety/temperature-locations/', data),
+  createTemperatureLocation: (data, params) => api.post('/safety/temperature-locations/', data, { params }),
   updateTemperatureLocation: (id, data) => api.patch(`/safety/temperature-locations/${id}/`, data),
   deleteTemperatureLocation: (id) => api.delete(`/safety/temperature-locations/${id}/`),
 
   // Cleaning Areas
   getCleaningAreas: (params) => api.get('/safety/cleaning-areas/', { params }),
-  createCleaningArea: (data) => api.post('/safety/cleaning-areas/', data),
+  createCleaningArea: (data, params) => api.post('/safety/cleaning-areas/', data, { params }),
   updateCleaningArea: (id, data) => api.patch(`/safety/cleaning-areas/${id}/`, data),
   deleteCleaningArea: (id) => api.delete(`/safety/cleaning-areas/${id}/`),
 

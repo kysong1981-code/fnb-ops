@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { useStore } from '../../context/StoreContext'
 import { storeAPI, safetyAPI, hrAPI } from '../../services/api'
 import ALL_MODULES from '../../constants/modules'
 import PageHeader from '../ui/PageHeader'
@@ -80,6 +81,8 @@ const TRAINING_MODULE_TYPES = [
 
 export default function StoreSettings() {
   const { refreshProfile } = useAuth()
+  const { selectedStore } = useStore()
+  const storeParams = selectedStore && selectedStore.id !== 'all' ? { store_id: selectedStore.id } : {}
   const [tab, setTab] = useState('modules')
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -159,7 +162,7 @@ export default function StoreSettings() {
   // Load settings
   const fetchSettings = useCallback(async () => {
     try {
-      const res = await storeAPI.getSettings()
+      const res = await storeAPI.getSettings(storeParams)
       const d = res.data
       setSettings(d)
       setForm({
@@ -184,77 +187,77 @@ export default function StoreSettings() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedStore])
 
   const fetchSuppliers = useCallback(async () => {
     try {
-      const res = await storeAPI.getSuppliers()
+      const res = await storeAPI.getSuppliers(storeParams)
       setSuppliers(res.data)
     } catch (e) { console.error(e) }
-  }, [])
+  }, [selectedStore])
 
   const fetchCategories = useCallback(async () => {
     try {
-      const res = await storeAPI.getSalesCategories()
+      const res = await storeAPI.getSalesCategories(storeParams)
       setCategories(res.data)
     } catch (e) { console.error(e) }
-  }, [])
+  }, [selectedStore])
 
   const fetchTempLocations = useCallback(async () => {
     try {
-      const res = await safetyAPI.getTemperatureLocations()
+      const res = await safetyAPI.getTemperatureLocations(storeParams)
       setTempLocations(res.data)
     } catch (e) { console.error(e) }
-  }, [])
+  }, [selectedStore])
 
   const fetchCleaningAreas = useCallback(async () => {
     try {
-      const res = await safetyAPI.getCleaningAreas()
+      const res = await safetyAPI.getCleaningAreas(storeParams)
       setCleaningAreas(Array.isArray(res.data) ? res.data : res.data.results || [])
     } catch (e) { console.error(e) }
-  }, [])
+  }, [selectedStore])
 
   const fetchTemplates = useCallback(async () => {
     try {
-      const res = await safetyAPI.getTemplates()
+      const res = await safetyAPI.getTemplates(storeParams)
       setTemplates(Array.isArray(res.data) ? res.data : res.data.results || [])
     } catch (e) { console.error(e) }
-  }, [])
+  }, [selectedStore])
 
   const fetchRecordConfigs = useCallback(async () => {
     try {
-      const res = await safetyAPI.getRecordConfigs()
+      const res = await safetyAPI.getRecordConfigs(storeParams)
       setRecordConfigs(Array.isArray(res.data) ? res.data : res.data.results || [])
     } catch (e) { console.error(e) }
-  }, [])
+  }, [selectedStore])
 
   const fetchJobTitles = useCallback(async () => {
     try {
-      const res = await storeAPI.getJobTitles()
+      const res = await storeAPI.getJobTitles(storeParams)
       setJobTitles(Array.isArray(res.data) ? res.data : res.data.results || [])
     } catch (e) { console.error(e) }
-  }, [])
+  }, [selectedStore])
 
   const fetchDocTemplates = useCallback(async () => {
     try {
-      const res = await hrAPI.getDocumentTemplates()
+      const res = await hrAPI.getDocumentTemplates(storeParams)
       setDocTemplates(Array.isArray(res.data) ? res.data : res.data.results || [])
     } catch (e) { console.error(e) }
-  }, [])
+  }, [selectedStore])
 
   const fetchTrainingModules = useCallback(async () => {
     try {
-      const res = await hrAPI.getTrainingModules()
+      const res = await hrAPI.getTrainingModules(storeParams)
       setTrainingModules(Array.isArray(res.data) ? res.data : res.data.results || [])
     } catch (e) { console.error(e) }
-  }, [])
+  }, [selectedStore])
 
   const fetchIntegrations = useCallback(async () => {
     try {
-      const res = await storeAPI.getIntegrations()
+      const res = await storeAPI.getIntegrations(storeParams)
       setIntegrations(Array.isArray(res.data) ? res.data : res.data.results || [])
     } catch (e) { console.error(e) }
-  }, [])
+  }, [selectedStore])
 
   useEffect(() => {
     fetchSettings()
@@ -278,11 +281,11 @@ export default function StoreSettings() {
         const fd = new FormData()
         Object.entries(form).forEach(([k, v]) => { if (v !== '') fd.append(k, v) })
         fd.append('logo', logoFile)
-        await storeAPI.updateSettingsWithFile(fd)
+        await storeAPI.updateSettingsWithFile(fd, storeParams)
       } else {
         const data = {}
         Object.entries(form).forEach(([k, v]) => { data[k] = v || null })
-        await storeAPI.updateSettings(data)
+        await storeAPI.updateSettings(data, storeParams)
       }
       showToast('Settings saved')
       fetchSettings()
@@ -314,7 +317,7 @@ export default function StoreSettings() {
   const handleSaveModules = async () => {
     setSaving(true)
     try {
-      await storeAPI.updateSettings({ enabled_modules: enabledModules })
+      await storeAPI.updateSettings({ enabled_modules: enabledModules }, storeParams)
       await refreshProfile()
       showToast('Modules updated')
     } catch (e) {
@@ -332,7 +335,7 @@ export default function StoreSettings() {
         hr_cash_enabled: hrCashEnabled,
         otherwise_working_weeks: owWeeks,
         otherwise_working_threshold: owThreshold,
-      })
+      }, storeParams)
       showToast('Settings saved')
     } catch (e) {
       showToast('Error saving settings')
@@ -348,7 +351,7 @@ export default function StoreSettings() {
       if (data.id) {
         await storeAPI.updateSupplier(data.id, data)
       } else {
-        await storeAPI.createSupplier(data)
+        await storeAPI.createSupplier(data, storeParams)
       }
       setSupplierForm(null)
       fetchSuppliers()
@@ -374,7 +377,7 @@ export default function StoreSettings() {
       if (categoryForm.id) {
         await storeAPI.updateSalesCategory(categoryForm.id, categoryForm)
       } else {
-        await storeAPI.createSalesCategory(categoryForm)
+        await storeAPI.createSalesCategory(categoryForm, storeParams)
       }
       setCategoryForm(null)
       fetchCategories()
@@ -405,7 +408,7 @@ export default function StoreSettings() {
       if (tempForm.id) {
         await safetyAPI.updateTemperatureLocation(tempForm.id, data)
       } else {
-        await safetyAPI.createTemperatureLocation(data)
+        await safetyAPI.createTemperatureLocation(data, storeParams)
       }
       setTempForm(null)
       fetchTempLocations()
@@ -432,7 +435,7 @@ export default function StoreSettings() {
       if (cleaningAreaForm.id) {
         await safetyAPI.updateCleaningArea(cleaningAreaForm.id, data)
       } else {
-        await safetyAPI.createCleaningArea(data)
+        await safetyAPI.createCleaningArea(data, storeParams)
       }
       setCleaningAreaForm(null)
       fetchCleaningAreas()
@@ -460,7 +463,7 @@ export default function StoreSettings() {
       if (jobTitleForm.id) {
         await storeAPI.updateJobTitle(jobTitleForm.id, data)
       } else {
-        await storeAPI.createJobTitle(data)
+        await storeAPI.createJobTitle(data, storeParams)
       }
       setJobTitleForm(null)
       fetchJobTitles()
