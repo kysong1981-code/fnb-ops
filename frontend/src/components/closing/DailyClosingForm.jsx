@@ -232,7 +232,7 @@ export default function DailyClosingForm() {
       }
 
       setEditMode(false)
-      showMsg('Saved & Submitted successfully')
+      navigate('/closing')
     } catch (err) {
       setError(err.response?.data?.detail || err.response?.data?.closing_date?.[0] || 'Failed to save')
     } finally {
@@ -275,11 +275,8 @@ export default function DailyClosingForm() {
 
       // Submit then approve
       try { await closingAPI.submit(cId) } catch { /* may already be submitted */ }
-      const res = await closingAPI.approve(cId)
-      setClosingStatus(res.data.status)
-
-      setEditMode(false)
-      showMsg('Submitted & Approved!')
+      await closingAPI.approve(cId)
+      navigate('/closing')
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to submit & approve')
     } finally {
@@ -315,9 +312,8 @@ export default function DailyClosingForm() {
     setSaving(true)
     setError('')
     try {
-      const res = await closingAPI.approve(closingId)
-      setClosingStatus(res.data.status)
-      showMsg('Approved!')
+      await closingAPI.approve(closingId)
+      navigate('/closing')
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to approve')
     } finally {

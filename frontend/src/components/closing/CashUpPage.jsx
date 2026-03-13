@@ -157,15 +157,34 @@ export default function CashUpPage() {
     }
   }
 
+  // Auto-create closing if needed (for HR Cash tab)
+  const ensureClosing = async () => {
+    if (closing) return closing
+    try {
+      const res = await closingAPI.create({
+        organization: user?.organization,
+        closing_date: selectedDate,
+        pos_card: 0, pos_cash: 0, actual_card: 0, actual_cash: 0, tab_count: 0,
+      })
+      setClosing(res.data)
+      return res.data
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to create closing')
+      return null
+    }
+  }
+
   // Add HR Cash
   const handleAddHrCash = async (e) => {
     e.preventDefault()
-    if (!closing || !hrForm.amount) return
+    if (!hrForm.amount) return
+    const c = await ensureClosing()
+    if (!c) return
     setSaving(true)
     setError('')
     try {
       const fd = new FormData()
-      fd.append('daily_closing', closing.id)
+      fd.append('daily_closing', c.id)
       fd.append('amount', hrForm.amount)
       if (hrForm.recipient_name) fd.append('recipient_name', hrForm.recipient_name)
       if (hrForm.notes) fd.append('notes', hrForm.notes)
@@ -174,7 +193,7 @@ export default function CashUpPage() {
       await hrCashAPI.create(fd)
       setHrForm({ recipient_name: '', amount: '', notes: '', photo: null })
       setShowHrForm(false)
-      loadHrCash(closing.id)
+      loadHrCash(c.id)
       showMsg('HR cash added')
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to add HR cash')
@@ -193,12 +212,14 @@ export default function CashUpPage() {
   // Add Expense
   const handleAddExpense = async (e) => {
     e.preventDefault()
-    if (!closing || !expForm.amount || !expForm.reason) return
+    if (!expForm.amount || !expForm.reason) return
+    const c = await ensureClosing()
+    if (!c) return
     setSaving(true)
     setError('')
     try {
       const fd = new FormData()
-      fd.append('daily_closing', closing.id)
+      fd.append('daily_closing', c.id)
       fd.append('category', expForm.category)
       fd.append('reason', expForm.reason)
       fd.append('amount', expForm.amount)
@@ -208,7 +229,7 @@ export default function CashUpPage() {
       await cashExpenseAPI.create(fd)
       setExpForm({ category: 'SUPPLIES', reason: '', amount: '', notes: '', attachment: null })
       setShowExpForm(false)
-      loadExpenses(closing.id)
+      loadExpenses(c.id)
       showMsg('Expense added')
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to add expense')
@@ -401,7 +422,14 @@ export default function CashUpPage() {
                 type="number"
                 step="0.01"
                 value={bankDeposit}
-                onChange={(e) => setBankDeposit(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setBankDeposit(val)
+                  // Auto-calc HR cash: actual_cash - bank_deposit
+                  const remaining = actualCash - (parseFloat(val) || 0)
+                  setHrCashAmount(remaining > 0 ? String(remaining.toFixed(2)) : '0')
+                }}
+                disabled={closing.status === 'APPROVED'}
                 placeholder="0.00"
                 className={inputCls}
               />
@@ -415,6 +443,7 @@ export default function CashUpPage() {
                 step="0.01"
                 value={hrCashAmount}
                 onChange={(e) => setHrCashAmount(e.target.value)}
+                disabled={closing.status === 'APPROVED'}
                 placeholder="0.00"
                 className={inputCls}
               />
@@ -442,28 +471,10 @@ export default function CashUpPage() {
                 {saving ? 'Saving...' : 'Save & Approve'}
               </button>
             ) : (
-              <>
-                <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-center">
-                  <p className="text-sm text-green-700 font-medium">✓ Approved</p>
-                </div>
-                <button
-                  onClick={handleSaveCashUp}
-                  disabled={saving}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
-                >
-                  <CheckCircleIcon size={18} />
-                  {saving ? 'Saving...' : 'Save'}
-                </button>
-              </>
+              <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-center">
+                <p className="text-sm text-green-700 font-medium">✓ Approved</p>
+              </div>
             )}
-
-            <button
-              onClick={() => navigate(`/closing/form?date=${selectedDate}`)}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
-            >
-              View Daily Closing
-              <ArrowRightIcon size={14} />
-            </button>
           </div>
         </>
       ) : (

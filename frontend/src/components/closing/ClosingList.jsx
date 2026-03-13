@@ -58,10 +58,11 @@ export default function ClosingList() {
 
   const fmt = (v) => `$${parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 
-  // Monthly totals
-  const totalPOS = closings.reduce((s, c) => s + parseFloat(c.pos_total || 0), 0)
-  const totalActual = closings.reduce((s, c) => s + parseFloat(c.actual_total || 0), 0)
-  const totalVariance = closings.reduce((s, c) => s + parseFloat(c.total_variance || 0), 0)
+  // Monthly totals (only Submitted/Approved)
+  const validClosings = closings.filter(c => ['SUBMITTED', 'APPROVED'].includes(c.status))
+  const totalPOS = validClosings.reduce((s, c) => s + parseFloat(c.pos_total || 0), 0)
+  const totalActual = validClosings.reduce((s, c) => s + parseFloat(c.actual_total || 0), 0)
+  const totalVariance = validClosings.reduce((s, c) => s + parseFloat(c.total_variance || 0), 0)
   const approvedCount = closings.filter(c => c.status === 'APPROVED').length
   const submittedCount = closings.filter(c => c.status === 'SUBMITTED').length
 
@@ -83,6 +84,33 @@ export default function ClosingList() {
           Today
         </button>
       </div>
+
+      {/* Incomplete dates for current month */}
+      {(() => {
+        const incompleteDates = []
+        for (let d = 1; d <= Math.min(daysInMonth, todayStr >= `${year}-${String(month+1).padStart(2,'0')}-${String(daysInMonth).padStart(2,'0')}` ? daysInMonth : parseInt(todayStr.split('-')[2]) || 0); d++) {
+          const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+          if (dateStr >= todayStr) continue
+          const c = closingMap[dateStr]
+          if (!c || !['SUBMITTED','APPROVED'].includes(c.status)) incompleteDates.push(dateStr)
+        }
+        if (incompleteDates.length === 0) return null
+        return (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+            <p className="text-sm font-semibold text-red-700 mb-2">
+              {incompleteDates.length} day{incompleteDates.length > 1 ? 's' : ''} incomplete
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {incompleteDates.slice(0, 10).map(d => (
+                <button key={d} onClick={() => navigate(`/closing/form?date=${d}`)}
+                  className="text-xs bg-red-100 text-red-700 px-2.5 py-1 rounded-lg hover:bg-red-200 transition font-medium">
+                  {new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',weekday:'short'})}
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Month Summary */}
       {closings.length > 0 && (
@@ -169,17 +197,15 @@ export default function ClosingList() {
                     }`}>
                       {day}
                     </span>
-                    {closing && (
+                    {closing && ['SUBMITTED', 'APPROVED'].includes(closing.status) && (
                       <span className={`w-2 h-2 rounded-full ${
-                        closing.status === 'APPROVED' ? 'bg-green-500' :
-                        closing.status === 'SUBMITTED' ? 'bg-blue-500' :
-                        'bg-amber-400'
+                        closing.status === 'APPROVED' ? 'bg-green-500' : 'bg-blue-500'
                       }`} />
                     )}
                   </div>
 
-                  {/* Closing data */}
-                  {closing && (
+                  {/* Closing data - only Submitted/Approved */}
+                  {closing && ['SUBMITTED', 'APPROVED'].includes(closing.status) && (
                     <div className="space-y-0.5">
                       <p className="text-[10px] font-semibold text-gray-700 truncate">
                         {fmt(parseFloat(closing.pos_total || 0))}

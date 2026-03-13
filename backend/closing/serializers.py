@@ -79,13 +79,6 @@ class ClosingHRCashSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(f"허용된 파일 형식: {', '.join(allowed_extensions)}")
         return value
 
-    def create(self, validated_data):
-        # Auto-set created_by to current user
-        request = self.context.get('request')
-        if request and request.user:
-            validated_data['created_by'] = request.user
-        return super().create(validated_data)
-
 
 class ClosingCashExpenseSerializer(serializers.ModelSerializer):
     """현금 지출 시리얼라이저 (파일 업로드 포함)"""
@@ -99,9 +92,8 @@ class ClosingCashExpenseSerializer(serializers.ModelSerializer):
             'amount', 'notes', 'attachment', 'created_by', 'created_by_name',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by_name', 'category_display']
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'created_by_name', 'category_display']
         extra_kwargs = {
-            'created_by': {'write_only': True},
             'attachment': {'required': False, 'allow_null': True}
         }
 

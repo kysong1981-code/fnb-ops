@@ -77,7 +77,12 @@ export default function InviteTab() {
     setSaving(true)
     setError('')
     try {
-      const res = await hrAPI.createInvite(form, storeParams)
+      // Clean empty fields before sending
+      const cleanData = { ...form }
+      if (!cleanData.commencement_date) delete cleanData.commencement_date
+      if (!cleanData.min_hours) delete cleanData.min_hours
+      if (!cleanData.max_hours) delete cleanData.max_hours
+      const res = await hrAPI.createInvite(cleanData, storeParams)
       const data = res.data
       // Show generated credentials
       if (data.generated_credentials) {
@@ -91,7 +96,9 @@ export default function InviteTab() {
       loadInvites()
       showMsg('Invite sent — account created')
     } catch (err) {
-      setError(err.response?.data?.error || err.response?.data?.detail || err.response?.data?.email?.[0] || 'Failed to create invite')
+      const d = err.response?.data
+      const msg = d?.error || d?.detail || d?.email?.[0] || d?.commencement_date?.[0] || d?.non_field_errors?.[0] || (typeof d === 'object' ? JSON.stringify(d) : '') || 'Failed to create invite'
+      setError(msg)
     } finally {
       setSaving(false)
     }
