@@ -1138,8 +1138,8 @@ export default function StoreSettings() {
           {/* Add/Edit Form */}
           {supplierForm && (
             <div className="px-5 py-4 bg-blue-50 border-b border-blue-100">
-              <div className="flex items-center gap-3 mb-3">
-                <input className={`${inputCls} flex-1`} placeholder="Supplier name" value={supplierForm.name} onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })} autoFocus />
+              <div className="space-y-3 mb-3">
+                <input className={inputCls} placeholder="Supplier name" value={supplierForm.name} onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })} autoFocus />
                 <select className={inputCls} value={supplierForm.category || 'COGS'} onChange={(e) => setSupplierForm({ ...supplierForm, category: e.target.value })}>
                   <option value="COGS">COGS</option>
                   <option value="MAINTENANCE">Maintenance</option>
