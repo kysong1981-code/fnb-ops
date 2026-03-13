@@ -119,11 +119,7 @@ export default function CashUpPage() {
             setHrCashAmount(hrEntries[0].amount || '')
             setHrCashEntryId(hrEntries[0].id)
           } else {
-            // Auto-calc: HR cash = actual_cash - bank_deposit
-            const ac = parseFloat(c.actual_cash || 0)
-            const bd = parseFloat(c.bank_deposit || 0)
-            const remaining = ac - bd
-            setHrCashAmount(remaining > 0 ? String(remaining.toFixed(2)) : '')
+            setHrCashAmount('')
             setHrCashEntryId(null)
           }
           loadHrCash(c.id)
@@ -477,13 +473,7 @@ export default function CashUpPage() {
                     type="number"
                     step="0.01"
                     value={bankDeposit}
-                    onChange={(e) => {
-                      const val = e.target.value
-                      setBankDeposit(val)
-                      // Auto-calc HR cash: actual_cash - bank_deposit
-                      const remaining = actualCash - (parseFloat(val) || 0)
-                      setHrCashAmount(remaining > 0 ? String(remaining.toFixed(2)) : '0')
-                    }}
+                    onChange={(e) => setBankDeposit(e.target.value)}
                     placeholder="0.00"
                     className={inputCls}
                   />

@@ -61,9 +61,8 @@ export default function ManagerDashboard() {
         ])
         const allItems = allRes.data?.results || allRes.data || []
         const submittedItems = submittedRes.data?.results || submittedRes.data || []
-        // Only show SUBMITTED (not yet approved) in recent list
-        const filtered = allItems.filter(c => c.status === 'SUBMITTED')
-        setRecentClosings(filtered.sort((a, b) => b.closing_date.localeCompare(a.closing_date)).slice(0, 10))
+        // Show all recent closings (most recent first)
+        setRecentClosings(allItems.sort((a, b) => b.closing_date.localeCompare(a.closing_date)).slice(0, 10))
         setPendingClosings(submittedItems.sort((a, b) => b.closing_date.localeCompare(a.closing_date)))
       } catch {}
 
@@ -136,6 +135,7 @@ export default function ManagerDashboard() {
     try {
       await closingAPI.approve(id)
       setPendingClosings(prev => prev.filter(c => c.id !== id))
+      setRecentClosings(prev => prev.map(c => c.id === id ? { ...c, status: 'APPROVED' } : c))
     } catch (err) {
       console.error('Approve failed:', err)
     } finally {

@@ -227,8 +227,8 @@ export default function CashReport() {
             <KpiCard label="Expenses" value={fmt(data.totals.cash_expenses_total)} />
             <KpiCard
               label="HR Balance"
-              value={fmt(data.totals.balance - data.totals.cash_expenses_total)}
-              alert={(data.totals.balance - data.totals.cash_expenses_total) < 0 ? 'Negative' : undefined}
+              value={fmt(data.totals.hr_cash_total - data.totals.cash_expenses_total)}
+              alert={(data.totals.hr_cash_total - data.totals.cash_expenses_total) < 0 ? 'Negative' : undefined}
             />
           </div>
 
@@ -349,7 +349,7 @@ function MonthlyTable({ reports, fmt }) {
     }),
     { cash_sales: 0, bank_deposit: 0, hr_cash: 0, expenses: 0, balance: 0 }
   )
-  const hrBalanceTotal = totals.balance - totals.expenses
+  const hrBalanceTotal = totals.hr_cash - totals.expenses
 
   const fmtShortDate = (dateStr) => {
     const d = new Date(dateStr + 'T00:00:00')
@@ -375,7 +375,8 @@ function MonthlyTable({ reports, fmt }) {
             {reports.map((day) => {
               const bal = parseFloat(day.balance || 0)
               const expTotal = parseFloat(day.cash_expenses_total || 0)
-              const hrBalance = bal - expTotal
+              const hrCash = parseFloat(day.hr_cash_total || 0)
+              const hrBalance = hrCash - expTotal
               const hasExpenses = day.cash_expenses && day.cash_expenses.length > 0
               const isExpanded = expandedDate === day.date
               // Brief summary of expense reasons
