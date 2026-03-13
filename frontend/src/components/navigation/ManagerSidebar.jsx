@@ -33,7 +33,7 @@ const menuSections = [
     roles: MANAGER_ROLES,
     items: [
       { label: 'Daily Closing', path: '/closing', icon: ClipboardIcon, module: 'CLOSING' },
-      { label: 'Cash Up', path: '/cashup', icon: MoneyIcon, module: 'CASHUP' },
+      { label: 'Cash Management', path: '/cashup', icon: MoneyIcon, module: 'CASHUP' },
       { label: 'Reports', path: '/reports', icon: ChartIcon, module: 'REPORTS' },
       { label: 'Sales Analysis', path: '/sales', icon: ChartIcon, module: 'SALES' },
       { label: 'HR Management', path: '/hr', icon: TeamIcon, module: 'HR' },

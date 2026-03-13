@@ -379,7 +379,7 @@ export default function ManagerDashboard() {
       <Card className="p-4 space-y-1">
         {[
           { label: 'Daily Closing', path: '/closing', icon: ClipboardIcon },
-          { label: 'Cash Up', path: '/cashup', icon: MoneyIcon },
+          { label: 'Cash Management', path: '/cashup', icon: MoneyIcon },
           { label: 'Reports', path: '/reports', icon: ChartIcon },
           { label: 'Sales Analysis', path: '/sales', icon: ChartIcon },
           { label: 'Roster Management', path: '/manager/roster', icon: CalendarIcon },

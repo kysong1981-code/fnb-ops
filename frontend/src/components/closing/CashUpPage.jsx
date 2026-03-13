@@ -12,7 +12,7 @@ import {
 
 const TABS = [
   { key: 'cashup', label: 'Cash Up' },
-  { key: 'hrcash', label: 'HR Cash' },
+  { key: 'hrcash', label: 'HR Cash Management' },
 ]
 
 export default function CashUpPage() {
@@ -329,7 +329,7 @@ export default function CashUpPage() {
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Cash Up</h1>
+        <h1 className="text-xl font-bold text-gray-900">Cash Management</h1>
         <p className="text-sm text-gray-400 mt-0.5">Reconcile cash & HR cash for the day</p>
       </div>
 

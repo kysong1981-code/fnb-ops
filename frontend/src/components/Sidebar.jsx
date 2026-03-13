@@ -31,7 +31,7 @@ export default function Sidebar() {
       roles: managerRoles,
       items: [
         { label: 'Daily Closing', path: '/closing', roles: managerRoles },
-        { label: 'Cash Up', path: '/cashup', roles: managerRoles },
+        { label: 'Cash Management', path: '/cashup', roles: managerRoles },
         { label: 'Reports', path: '/reports', roles: managerRoles },
         { label: 'Sales Analysis', path: '/sales', roles: managerRoles },
         { label: 'Roster Management', path: '/manager/roster', roles: managerRoles },
