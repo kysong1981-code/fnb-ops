@@ -325,8 +325,8 @@ export default function CashUpPage() {
         ))}
       </div>
 
-      {/* Missing days alert */}
-      {missingDays.length > 0 && (
+      {/* Missing days alert (Cash Up tab only) */}
+      {activeTab === 'cashup' && missingDays.length > 0 && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
           <p className="text-sm font-semibold text-red-700 mb-2">
             {missingDays.length} day{missingDays.length > 1 ? 's' : ''} not completed
@@ -349,16 +349,18 @@ export default function CashUpPage() {
       {error && <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>}
       {success && <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">{success}</div>}
 
-      {/* Date Picker */}
-      <Card className="p-5">
-        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Date</label>
-        <input
-          type="date"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          className={`${inputCls} mt-2`}
-        />
-      </Card>
+      {/* Date Picker (Cash Up tab only) */}
+      {activeTab === 'cashup' && (
+        <Card className="p-5">
+          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Date</label>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className={`${inputCls} mt-2`}
+          />
+        </Card>
+      )}
 
       {loadingClosing ? (
         <div className="flex justify-center py-12">
@@ -467,8 +469,18 @@ export default function CashUpPage() {
       ) : (
         /* ============ HR CASH TAB ============ */
         <>
-          {/* Balance */}
-          <Card className="p-5">
+          {/* Date & Balance */}
+          <Card className="p-5 space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-500">Date</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="text-sm font-semibold text-gray-900 bg-transparent border-none p-0 text-right cursor-pointer"
+              />
+            </div>
+            <div className="border-t border-gray-100" />
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-500">HR Cash Balance</span>
               <span className="text-xl font-bold text-gray-900">{fmt(hrCashTotal)}</span>
