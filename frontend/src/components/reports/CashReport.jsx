@@ -372,11 +372,16 @@ function MonthlyTable({ reports, fmt }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {reports.map((day) => {
+            {(() => {
+              let cumulativeHrBalance = 0
+              return reports.map((day) => {
               const bal = parseFloat(day.balance || 0)
               const expTotal = parseFloat(day.cash_expenses_total || 0)
               const hrCash = parseFloat(day.hr_cash_total || 0)
-              const hrBalance = hrCash - expTotal
+              if (day.has_data !== false) {
+                cumulativeHrBalance += hrCash - expTotal
+              }
+              const hrBalance = cumulativeHrBalance
               const hasExpenses = day.cash_expenses && day.cash_expenses.length > 0
               const isExpanded = expandedDate === day.date
               // Brief summary of expense reasons
@@ -520,7 +525,8 @@ function MonthlyTable({ reports, fmt }) {
                   )}
                 </Fragment>
               )
-            })}
+            })
+            })()}
           </tbody>
           <tfoot>
             <tr className="bg-gray-900 text-white font-semibold">
