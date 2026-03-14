@@ -108,6 +108,11 @@ class Organization(models.Model):
     # Feature module toggles
     enabled_modules = models.JSONField(default=get_default_modules, help_text="활성화된 모듈 목록")
 
+    # KPI Targets
+    monthly_revenue_target = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="월 매출 목표")
+    labour_cost_target = models.DecimalField(max_digits=5, decimal_places=2, default=30.00, help_text="인건비율 목표 %")
+    food_cost_target = models.DecimalField(max_digits=5, decimal_places=2, default=32.00, help_text="식재료비 목표 %")
+
     # Otherwise Working 룰 (NZ 공휴일 적용 기준)
     otherwise_working_weeks = models.PositiveIntegerField(default=8, help_text="몇 주 기간 확인")
     otherwise_working_threshold = models.PositiveIntegerField(default=7, help_text="그 중 몇 번 근무해야 적용")

@@ -80,35 +80,58 @@ export default function StoreAnalysis({ startDate, endDate, organizationId }) {
 
       {/* KPI Cards — Row 1: Sales */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Total Sales" value={fmt(kpis.total_sales)} />
-        <KpiCard label="Avg Daily" value={fmt(kpis.avg_daily)} sub={`${kpis.days_with_data} days`} />
+        <KpiCardWithComparison
+          label="Total Sales"
+          value={fmt(kpis.total_sales)}
+          prevMonth={kpis.prev_month_pct}
+          prevMonthLabel={kpis.prev_month_total ? fmt(kpis.prev_month_total) : null}
+          lastYear={kpis.last_year_pct}
+          lastYearLabel={kpis.last_year_total ? fmt(kpis.last_year_total) : null}
+          targetPct={kpis.target_pct}
+          targetLabel={kpis.monthly_target ? fmt(kpis.monthly_target) : null}
+        />
+        <KpiCardWithComparison
+          label="Avg Daily"
+          value={fmt(kpis.avg_daily)}
+          sub={`${kpis.days_with_data} days`}
+          prevMonth={kpis.prev_month_avg_daily ? calcPct(kpis.avg_daily, kpis.prev_month_avg_daily) : null}
+          prevMonthLabel={kpis.prev_month_avg_daily ? fmt(kpis.prev_month_avg_daily) : null}
+          lastYear={kpis.last_year_avg_daily ? calcPct(kpis.avg_daily, kpis.last_year_avg_daily) : null}
+          lastYearLabel={kpis.last_year_avg_daily ? fmt(kpis.last_year_avg_daily) : null}
+        />
         <KpiCard label="Transactions" value={(kpis.total_transactions || 0).toLocaleString()} sub={kpis.avg_ticket ? `Avg ${fmt(kpis.avg_ticket)}` : undefined} />
         <KpiCard
-          label="vs Prev Period"
-          value={`${kpis.change_pct > 0 ? '↑' : kpis.change_pct < 0 ? '↓' : '—'} ${Math.abs(kpis.change_pct || 0).toFixed(1)}%`}
-          sub={kpis.prev_period_total ? `Prev: ${fmt(kpis.prev_period_total)}` : undefined}
-          alert={kpis.change_pct < -5 ? 'Declining' : undefined}
+          label="SPLH"
+          value={fmt(kpis.splh)}
+          sub="Sales per Labor Hour"
         />
       </div>
 
       {/* KPI Cards — Row 2: Labor & Efficiency */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="SPLH" value={fmt(kpis.splh)} sub="Sales per Labor Hour" />
         <KpiCard
           label="Labor Hours"
           value={fmtNum(kpis.total_labor_hours)}
           sub={`${kpis.headcount || 0} staff`}
         />
-        <KpiCard
+        <KpiCardWithComparison
           label="Labor Cost"
           value={fmt(kpis.total_labor_cost)}
           sub={kpis.labor_pct ? `${kpis.labor_pct}% of sales` : undefined}
+          targetPct={kpis.labour_target ? (kpis.labor_pct <= kpis.labour_target ? 100 : Math.round((kpis.labour_target / kpis.labor_pct) * 100)) : null}
+          targetLabel={kpis.labour_target ? `Target: ${kpis.labour_target}%` : null}
           alert={kpis.labor_pct > 35 ? 'High' : undefined}
         />
         <KpiCard
           label="Sales / Op Hour"
           value={fmt(kpis.sales_per_op_hour)}
           sub={kpis.daily_op_hours ? `${kpis.daily_op_hours}h/day open` : undefined}
+        />
+        <KpiCard
+          label="Target Progress"
+          value={kpis.target_pct ? `${kpis.target_pct}%` : 'Not Set'}
+          sub={kpis.monthly_target ? `Goal: ${fmt(kpis.monthly_target)}` : 'Set monthly target in settings'}
+          alert={kpis.target_pct && kpis.target_pct < 50 ? 'Behind' : undefined}
         />
       </div>
 
@@ -255,6 +278,59 @@ export default function StoreAnalysis({ startDate, endDate, organizationId }) {
         </div>
       </Card>
     </div>
+  )
+}
+
+function calcPct(current, prev) {
+  if (!prev || prev === 0) return null
+  return Math.round(((current - prev) / prev) * 100 * 10) / 10
+}
+
+function MiniCompare({ label, pct, detail }) {
+  if (pct === null || pct === undefined) return null
+  const isUp = pct >= 0
+  const color = isUp ? 'text-emerald-600' : 'text-red-500'
+  return (
+    <div className="flex items-center justify-between" title={detail || ''}>
+      <span className="text-[10px] text-gray-400">{label}</span>
+      <span className={`text-[10px] font-bold ${color}`}>
+        {isUp ? '↑' : '↓'}{Math.abs(pct).toFixed(1)}%
+      </span>
+    </div>
+  )
+}
+
+function TargetCompare({ pct, detail }) {
+  if (pct === null || pct === undefined) return null
+  const color = pct >= 100 ? 'text-emerald-600' : pct >= 70 ? 'text-amber-500' : 'text-red-500'
+  return (
+    <div className="flex items-center justify-between" title={detail || ''}>
+      <span className="text-[10px] text-gray-400">Target</span>
+      <span className={`text-[10px] font-bold ${color}`}>
+        {pct >= 100 ? '✓' : ''} {pct.toFixed(0)}%
+      </span>
+    </div>
+  )
+}
+
+function KpiCardWithComparison({ label, value, sub, prevMonth, prevMonthLabel, lastYear, lastYearLabel, targetPct, targetLabel, alert }) {
+  return (
+    <Card className="p-4">
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{label}</p>
+      <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+      {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
+      {alert && (
+        <span className="inline-block mt-1 px-2 py-0.5 bg-amber-50 text-amber-600 text-[10px] font-semibold rounded-full border border-amber-200">
+          {alert}
+        </span>
+      )}
+      {/* Mini comparisons */}
+      <div className="mt-2 pt-2 border-t border-gray-100 space-y-0.5">
+        <MiniCompare label="vs Last Month" pct={prevMonth} detail={prevMonthLabel} />
+        <MiniCompare label="vs Last Year" pct={lastYear} detail={lastYearLabel} />
+        <TargetCompare pct={targetPct} detail={targetLabel} />
+      </div>
+    </Card>
   )
 }
 

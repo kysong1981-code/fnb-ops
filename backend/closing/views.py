@@ -1521,6 +1521,36 @@ class SalesAnalysisViewSet(viewsets.GenericViewSet):
             row['splh'] = round(row['total'] / lh, 2) if lh else 0
             row['sales_per_op_hour'] = round(row['total'] / daily_op_hours, 2) if daily_op_hours else 0
 
+        # Last year same period comparison
+        from dateutil.relativedelta import relativedelta
+        ly_start = start - relativedelta(years=1)
+        ly_end = end - relativedelta(years=1)
+        ly_total = self._period_total(org_ids, ly_start, ly_end)
+        ly_change_pct = 0
+        if ly_total:
+            ly_change_pct = round(((totals['total_sales'] - ly_total) / ly_total) * 100, 1)
+
+        # Previous month comparison
+        pm_start = start - relativedelta(months=1)
+        pm_end = end - relativedelta(months=1)
+        pm_total = self._period_total(org_ids, pm_start, pm_end)
+        pm_change_pct = 0
+        if pm_total:
+            pm_change_pct = round(((totals['total_sales'] - pm_total) / pm_total) * 100, 1)
+
+        # Target data
+        from users.models import Organization
+        org = Organization.objects.filter(id=org_ids[0]).first()
+        monthly_target = float(org.monthly_revenue_target) if org and org.monthly_revenue_target else None
+        labour_target = float(org.labour_cost_target) if org else 30.0
+        target_pct = None
+        if monthly_target and monthly_target > 0:
+            target_pct = round((totals['total_sales'] / monthly_target) * 100, 1)
+
+        # Per-KPI comparisons
+        prev_avg_daily = (pm_total / max((pm_end - pm_start).days + 1, 1)) if pm_total else None
+        ly_avg_daily = (ly_total / max((ly_end - ly_start).days + 1, 1)) if ly_total else None
+
         return Response({
             'organization': {'id': org_ids[0], 'name': org_name},
             'start_date': str(start),
@@ -1529,6 +1559,18 @@ class SalesAnalysisViewSet(viewsets.GenericViewSet):
                 **totals,
                 'prev_period_total': prev_total,
                 'change_pct': change_pct,
+                # Previous month
+                'prev_month_total': pm_total,
+                'prev_month_pct': pm_change_pct,
+                'prev_month_avg_daily': prev_avg_daily,
+                # Last year
+                'last_year_total': ly_total,
+                'last_year_pct': ly_change_pct,
+                'last_year_avg_daily': ly_avg_daily,
+                # Targets
+                'monthly_target': monthly_target,
+                'target_pct': target_pct,
+                'labour_target': labour_target,
                 # Labor KPIs
                 'total_labor_hours': labor['total_labor_hours'],
                 'total_labor_cost': labor['total_labor_cost'],
