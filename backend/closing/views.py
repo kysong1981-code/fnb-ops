@@ -1547,9 +1547,21 @@ class SalesAnalysisViewSet(viewsets.GenericViewSet):
         if monthly_target and monthly_target > 0:
             target_pct = round((totals['total_sales'] / monthly_target) * 100, 1)
 
-        # Per-KPI comparisons
+        # Per-KPI comparisons — full aggregation for prev month + last year
         prev_avg_daily = (pm_total / max((pm_end - pm_start).days + 1, 1)) if pm_total else None
         ly_avg_daily = (ly_total / max((ly_end - ly_start).days + 1, 1)) if ly_total else None
+
+        # Full prev month aggregation
+        _, pm_totals, _ = self._aggregate_for_orgs(org_ids, pm_start, pm_end)
+        pm_labor = self._labor_metrics(org_ids, pm_start, pm_end)
+        pm_splh = round(pm_totals['total_sales'] / pm_labor['total_labor_hours'], 2) if pm_labor['total_labor_hours'] else 0
+        pm_labor_pct = round((pm_labor['total_labor_cost'] / pm_totals['total_sales']) * 100, 1) if pm_totals['total_sales'] else 0
+
+        # Full last year aggregation
+        _, ly_totals, _ = self._aggregate_for_orgs(org_ids, ly_start, ly_end)
+        ly_labor = self._labor_metrics(org_ids, ly_start, ly_end)
+        ly_splh = round(ly_totals['total_sales'] / ly_labor['total_labor_hours'], 2) if ly_labor['total_labor_hours'] else 0
+        ly_labor_pct = round((ly_labor['total_labor_cost'] / ly_totals['total_sales']) * 100, 1) if ly_totals['total_sales'] else 0
 
         return Response({
             'organization': {'id': org_ids[0], 'name': org_name},
@@ -1563,10 +1575,21 @@ class SalesAnalysisViewSet(viewsets.GenericViewSet):
                 'prev_month_total': pm_total,
                 'prev_month_pct': pm_change_pct,
                 'prev_month_avg_daily': prev_avg_daily,
+                'prev_month_transactions': pm_totals['total_transactions'],
+                'prev_month_splh': pm_splh,
+                'prev_month_labor_hours': pm_labor['total_labor_hours'],
+                'prev_month_labor_cost': pm_labor['total_labor_cost'],
+                'prev_month_labor_pct': pm_labor_pct,
+                'prev_month_sales_per_op_hour': round(pm_totals['total_sales'] / total_op_hours, 2) if total_op_hours else 0,
                 # Last year
                 'last_year_total': ly_total,
                 'last_year_pct': ly_change_pct,
                 'last_year_avg_daily': ly_avg_daily,
+                'last_year_transactions': ly_totals['total_transactions'],
+                'last_year_splh': ly_splh,
+                'last_year_labor_hours': ly_labor['total_labor_hours'],
+                'last_year_labor_cost': ly_labor['total_labor_cost'],
+                'last_year_labor_pct': ly_labor_pct,
                 # Targets
                 'monthly_target': monthly_target,
                 'target_pct': target_pct,

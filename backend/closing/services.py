@@ -92,7 +92,7 @@ def parse_statement(file_path, file_type):
         content = images + [{'type': 'text', 'text': VISION_PROMPT}]
 
         response = client.messages.create(
-            model='claude-sonnet-4-20250514',
+            model='claude-sonnet-4-6',
             max_tokens=4096,
             messages=[{'role': 'user', 'content': content}],
         )

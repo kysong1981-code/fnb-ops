@@ -108,7 +108,7 @@ def generate_sales_insights(sales_data, store_name, start_date, end_date):
         )
 
         response = client.messages.create(
-            model='claude-sonnet-4-20250514',
+            model='claude-sonnet-4-6',
             max_tokens=2048,
             messages=[{'role': 'user', 'content': prompt}],
         )
