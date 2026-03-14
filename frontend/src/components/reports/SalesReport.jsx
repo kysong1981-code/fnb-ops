@@ -1,11 +1,17 @@
 import { useState, useEffect } from 'react'
 import { reportsAPI, monthlyCloseAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
+import { useStore } from '../../context/StoreContext'
 import { getTodayNZ } from '../../utils/date'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+} from 'recharts'
 import Card from '../ui/Card'
 import KpiCard from '../ui/KpiCard'
 import SectionLabel from '../ui/SectionLabel'
 import Badge from '../ui/Badge'
+import SalesCharts from './SalesCharts'
+import AIInsightsCard from './AIInsightsCard'
 
 const DATE_MODES = [
   { key: 'month', label: 'Month' },
@@ -19,16 +25,6 @@ function localDateStr(d) {
   return `${y}-${m}-${day}`
 }
 
-function getWeekRange(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00')
-  const day = d.getDay()
-  const mon = new Date(d)
-  mon.setDate(d.getDate() - ((day + 6) % 7))
-  const sun = new Date(mon)
-  sun.setDate(mon.getDate() + 6)
-  return { start: localDateStr(mon), end: localDateStr(sun) }
-}
-
 function getMonthRange(dateStr) {
   const d = new Date(dateStr + 'T00:00:00')
   const start = new Date(d.getFullYear(), d.getMonth(), 1)
@@ -40,29 +36,44 @@ const SENIOR_ROLES = ['SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO', 'ADMIN'
 
 export default function SalesReport() {
   const { user } = useAuth()
+  const { stores } = useStore()
   const [dateMode, setDateMode] = useState('month')
   const [date, setDate] = useState(getTodayNZ())
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [data, setData] = useState(null)
 
-  // Monthly close state
+  // Store selector
+  const [viewMode, setViewMode] = useState('single') // 'single' | 'all'
+  const [selectedStoreId, setSelectedStoreId] = useState(null)
+
+  // Data
+  const [singleData, setSingleData] = useState(null)
+  const [multiData, setMultiData] = useState(null)
+  const [chartData, setChartData] = useState([])
+
+  // Monthly close
   const [monthClosed, setMonthClosed] = useState(false)
   const [closingAction, setClosingAction] = useState(false)
 
   const isSenior = user && SENIOR_ROLES.includes(user.role)
 
-  useEffect(() => {
-    if (dateMode === 'custom') {
-      if (startDate && endDate) fetchSalesReport()
-    } else {
-      fetchSalesReport()
-    }
-  }, [date, startDate, endDate, dateMode])
+  // Get current date range
+  const getRange = () => {
+    if (dateMode === 'month') return getMonthRange(date)
+    if (dateMode === 'custom' && startDate && endDate) return { start: startDate, end: endDate }
+    return null
+  }
 
-  // Check monthly close status when in month mode
+  // Fetch data when dates or store changes
+  useEffect(() => {
+    const range = getRange()
+    if (!range) return
+    fetchData(range)
+  }, [date, startDate, endDate, dateMode, viewMode, selectedStoreId])
+
+  // Monthly close check
   useEffect(() => {
     if (dateMode === 'month') {
       const d = new Date(date + 'T00:00:00')
@@ -72,13 +83,37 @@ export default function SalesReport() {
     }
   }, [date, dateMode])
 
+  const fetchData = async (range) => {
+    setLoading(true)
+    setError('')
+    try {
+      if (viewMode === 'all' && isSenior) {
+        // Multi-store
+        const res = await reportsAPI.getMultiStoreSales(range.start, range.end)
+        setMultiData(res.data)
+        setSingleData(null)
+      } else {
+        // Single store
+        const [salesRes, chartRes] = await Promise.all([
+          reportsAPI.getSalesReportRange(range.start, range.end),
+          reportsAPI.getChartData(range.start, range.end),
+        ])
+        setSingleData(salesRes.data)
+        setChartData(chartRes.data.days || [])
+        setMultiData(null)
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to load sales report.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const checkMonthClose = async (year, month) => {
     try {
       const res = await monthlyCloseAPI.summary(year, month)
       setMonthClosed(res.data.monthly_close?.status === 'CLOSED')
-    } catch {
-      setMonthClosed(false)
-    }
+    } catch { setMonthClosed(false) }
   }
 
   const handleCloseMonth = async () => {
@@ -88,10 +123,8 @@ export default function SalesReport() {
       await monthlyCloseAPI.closeMonth({ year: d.getFullYear(), month: d.getMonth() + 1 })
       setMonthClosed(true)
     } catch (err) {
-      setError(err.response?.data?.error || err.response?.data?.detail || 'Failed to close month.')
-    } finally {
-      setClosingAction(false)
-    }
+      setError(err.response?.data?.error || 'Failed to close month.')
+    } finally { setClosingAction(false) }
   }
 
   const handleReopenMonth = async () => {
@@ -101,28 +134,18 @@ export default function SalesReport() {
       await monthlyCloseAPI.reopen({ year: d.getFullYear(), month: d.getMonth() + 1 })
       setMonthClosed(false)
     } catch (err) {
-      setError(err.response?.data?.error || err.response?.data?.detail || 'Failed to reopen month.')
-    } finally {
-      setClosingAction(false)
-    }
+      setError(err.response?.data?.error || 'Failed to reopen month.')
+    } finally { setClosingAction(false) }
   }
 
-  const fetchSalesReport = async () => {
-    setLoading(true)
-    setError('')
-    try {
-      let response
-      if (dateMode === 'month') {
-        const { start, end } = getMonthRange(date)
-        response = await reportsAPI.getSalesReportRange(start, end)
-      } else {
-        response = await reportsAPI.getSalesReportRange(startDate, endDate)
-      }
-      setData(response.data)
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load sales report.')
-    } finally {
-      setLoading(false)
+  const handleStoreChange = (e) => {
+    const val = e.target.value
+    if (val === 'all') {
+      setViewMode('all')
+      setSelectedStoreId(null)
+    } else {
+      setViewMode('single')
+      setSelectedStoreId(val || null)
     }
   }
 
@@ -132,20 +155,12 @@ export default function SalesReport() {
   const fmtDate = (d) => {
     try {
       return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    } catch {
-      return d
-    }
+    } catch { return d }
   }
 
   const inputCls = 'px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white'
 
   const getRangeLabel = () => {
-    if (dateMode === 'week') {
-      const { start, end } = getWeekRange(date)
-      const s = new Date(start + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      const e = new Date(end + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      return `${s} — ${e}`
-    }
     if (dateMode === 'month') {
       const d = new Date(date + 'T00:00:00')
       return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
@@ -153,11 +168,23 @@ export default function SalesReport() {
     return null
   }
 
+  const range = getRange()
+
+  // Compute display data for single store
+  const stats = singleData?.statistics
+  const dayOfWeekData = singleData?.data ? computeDayOfWeek(singleData.data) : []
+  const salesSummary = singleData ? {
+    total_sales: stats?.total_sales || 0,
+    card_total: singleData.data?.reduce((s, d) => s + parseFloat(d.card_sales || 0), 0) || 0,
+    cash_total: singleData.data?.reduce((s, d) => s + parseFloat(d.cash_sales || 0), 0) || 0,
+  } : null
+
   return (
     <div className="space-y-6">
       {/* Controls */}
       <Card className="p-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          {/* Date Mode */}
           <div className="bg-gray-100 rounded-xl p-1 flex gap-1">
             {DATE_MODES.map((dm) => (
               <button
@@ -171,9 +198,26 @@ export default function SalesReport() {
               </button>
             ))}
           </div>
+
+          {/* Store Selector (Senior only) */}
+          {isSenior && stores.length > 1 && (
+            <select
+              value={viewMode === 'all' ? 'all' : (selectedStoreId || '')}
+              onChange={handleStoreChange}
+              className={`${inputCls} min-w-[160px]`}
+            >
+              <option value="">My Store</option>
+              <option value="all">All Stores</option>
+              {stores.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Month lock badge */}
           {dateMode === 'month' && monthClosed && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-xs font-semibold">
-              <span>🔒</span> Month Locked
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-xs font-semibold ml-auto">
+              🔒 Month Locked
             </span>
           )}
         </div>
@@ -187,20 +231,16 @@ export default function SalesReport() {
         ) : (
           <div className="flex items-center gap-3">
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
-            {dateMode !== 'day' && (
-              <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
-                {getRangeLabel()}
-              </span>
-            )}
+            <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
+              {getRangeLabel()}
+            </span>
           </div>
         )}
       </Card>
 
       {/* Error */}
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
-          {error}
-        </div>
+        <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">{error}</div>
       )}
 
       {/* Loading */}
@@ -210,30 +250,44 @@ export default function SalesReport() {
         </div>
       )}
 
-      {/* Data */}
-      {!loading && data && (
+      {/* === SINGLE STORE VIEW === */}
+      {!loading && singleData && viewMode === 'single' && (
         <>
           {/* KPI Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard label="Total Sales" value={fmt(data.statistics.total_sales)} />
-            <KpiCard label="Daily Average" value={fmt(data.statistics.average_daily)} />
+            <KpiCard label="Total Sales" value={fmt(stats.total_sales)} />
+            <KpiCard label="Daily Average" value={fmt(stats.average_daily)} />
             <KpiCard
               label="Highest"
-              value={fmt(data.statistics.highest?.amount)}
-              sub={data.statistics.highest?.date ? fmtDate(data.statistics.highest.date) : undefined}
+              value={fmt(stats.highest?.amount)}
+              sub={stats.highest?.date ? fmtDate(stats.highest.date) : undefined}
             />
             <KpiCard
               label="Trend"
               value={
-                data.statistics.trend === 'up'
-                  ? `↑ ${data.statistics.trend_percentage?.toFixed(1) || 0}%`
-                  : data.statistics.trend === 'down'
-                  ? `↓ ${data.statistics.trend_percentage?.toFixed(1) || 0}%`
-                  : '— Flat'
+                stats.trend === 'up' ? `↑ ${stats.trend_percentage?.toFixed(1) || 0}%`
+                : stats.trend === 'down' ? `↓ ${stats.trend_percentage?.toFixed(1) || 0}%`
+                : '— Flat'
               }
-              alert={data.statistics.trend === 'down' ? 'Declining' : undefined}
+              alert={stats.trend === 'down' ? 'Declining' : undefined}
             />
           </div>
+
+          {/* Charts */}
+          <SalesCharts
+            chartData={chartData}
+            salesData={salesSummary}
+            dayOfWeekData={dayOfWeekData}
+          />
+
+          {/* AI Insights */}
+          {range && (
+            <AIInsightsCard
+              startDate={range.start}
+              endDate={range.end}
+              storeId={selectedStoreId}
+            />
+          )}
 
           {/* Detail Table */}
           <SectionLabel>Detail</SectionLabel>
@@ -251,7 +305,7 @@ export default function SalesReport() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {data.data.map((item, idx) => {
+                  {singleData.data.map((item, idx) => {
                     const variance = parseFloat(item.variance || 0)
                     return (
                       <tr key={idx} className="hover:bg-gray-50/50 transition">
@@ -290,25 +344,17 @@ export default function SalesReport() {
                     {monthClosed ? '🔒 Month Closed' : 'Close Month'}
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {monthClosed
-                      ? 'Sales data for this month is locked.'
-                      : 'Lock sales data after reconciliation is complete.'}
+                    {monthClosed ? 'Sales data for this month is locked.' : 'Lock sales data after reconciliation is complete.'}
                   </p>
                 </div>
                 {monthClosed ? (
-                  <button
-                    onClick={handleReopenMonth}
-                    disabled={closingAction}
-                    className="px-4 py-2 bg-amber-500 text-white rounded-xl text-sm font-semibold hover:bg-amber-600 disabled:bg-gray-300 transition"
-                  >
+                  <button onClick={handleReopenMonth} disabled={closingAction}
+                    className="px-4 py-2 bg-amber-500 text-white rounded-xl text-sm font-semibold hover:bg-amber-600 disabled:bg-gray-300 transition">
                     {closingAction ? 'Reopening...' : 'Reopen'}
                   </button>
                 ) : (
-                  <button
-                    onClick={handleCloseMonth}
-                    disabled={closingAction}
-                    className="px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:bg-gray-300 transition"
-                  >
+                  <button onClick={handleCloseMonth} disabled={closingAction}
+                    className="px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:bg-gray-300 transition">
                     {closingAction ? 'Closing...' : 'Close & Lock'}
                   </button>
                 )}
@@ -317,6 +363,151 @@ export default function SalesReport() {
           )}
         </>
       )}
+
+      {/* === ALL STORES VIEW === */}
+      {!loading && multiData && viewMode === 'all' && (
+        <>
+          {/* Combined KPIs */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard label="Total Sales (All)" value={fmt(multiData.combined?.total_sales)} />
+            <KpiCard label="Stores" value={multiData.stores?.length || 0} />
+            <KpiCard label="Card Total" value={fmt(multiData.combined?.card_total)} />
+            <KpiCard label="Cash Total" value={fmt(multiData.combined?.cash_total)} />
+          </div>
+
+          {/* Store Ranking Chart */}
+          <SectionLabel>Store Comparison</SectionLabel>
+          <Card className="p-4">
+            <StoreRankingChart stores={multiData.stores || []} />
+          </Card>
+
+          {/* Store Detail Table */}
+          <SectionLabel>Store Details</SectionLabel>
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left px-4 py-3 font-semibold text-gray-600">Store</th>
+                    <th className="text-right px-4 py-3 font-semibold text-gray-600">Total Sales</th>
+                    <th className="text-right px-4 py-3 font-semibold text-gray-600">Daily Avg</th>
+                    <th className="text-right px-4 py-3 font-semibold text-gray-600">Card</th>
+                    <th className="text-right px-4 py-3 font-semibold text-gray-600">Cash</th>
+                    <th className="text-center px-4 py-3 font-semibold text-gray-600">Trend</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {[...(multiData.stores || [])].sort((a, b) => b.total_sales - a.total_sales).map((store, idx) => (
+                    <tr key={store.store_id} className="hover:bg-gray-50/50 transition">
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
+                            idx === 0 ? 'bg-amber-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-amber-700' : 'bg-gray-300'
+                          }`}>{idx + 1}</span>
+                          <span className="font-medium text-gray-900">{store.store_name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{fmt(store.total_sales)}</td>
+                      <td className="px-4 py-2.5 text-right text-gray-700">{fmt(store.average_daily)}</td>
+                      <td className="px-4 py-2.5 text-right text-gray-700">{fmt(store.card_total)}</td>
+                      <td className="px-4 py-2.5 text-right text-gray-700">{fmt(store.cash_total)}</td>
+                      <td className="px-4 py-2.5 text-center">
+                        <span className={`text-sm font-semibold ${
+                          store.trend === 'up' ? 'text-emerald-600' : store.trend === 'down' ? 'text-red-600' : 'text-gray-500'
+                        }`}>
+                          {store.trend === 'up' ? `↑${store.trend_percentage}%` : store.trend === 'down' ? `↓${Math.abs(store.trend_percentage)}%` : '—'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          {/* Day of Week for All Stores */}
+          {multiData.combined?.day_of_week_avg && (
+            <SalesCharts
+              chartData={null}
+              salesData={multiData.combined}
+              dayOfWeekData={multiData.combined.day_of_week_avg}
+            />
+          )}
+
+          {/* AI Insights for All Stores */}
+          {range && (
+            <AIInsightsCard startDate={range.start} endDate={range.end} storeId={null} />
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// Helper: compute day-of-week averages from daily data
+function computeDayOfWeek(data) {
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  const map = {}
+  dayOrder.forEach(d => { map[d] = [] })
+
+  for (const item of data) {
+    if (!item.date) continue
+    const dt = new Date(item.date + 'T00:00:00')
+    const dayName = dayNames[dt.getDay()]
+    map[dayName]?.push(parseFloat(item.actual_total || 0))
+  }
+
+  return dayOrder.map(day => ({
+    day,
+    avg_sales: map[day].length > 0
+      ? Math.round(map[day].reduce((a, b) => a + b, 0) / map[day].length)
+      : 0,
+  }))
+}
+
+// Sub-component: horizontal bar chart ranking stores by sales
+function StoreRankingChart({ stores }) {
+  if (!stores || stores.length === 0) return null
+
+  const sorted = [...stores].sort((a, b) => b.total_sales - a.total_sales)
+  const maxSales = sorted[0]?.total_sales || 1
+
+  const fmt = (v) =>
+    `$${parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+
+  return (
+    <div className="space-y-2">
+      {sorted.map((store, idx) => {
+        const pct = (store.total_sales / maxSales) * 100
+        return (
+          <div key={store.store_id} className="flex items-center gap-3">
+            <div className="w-28 text-xs font-medium text-gray-600 text-right truncate shrink-0">
+              {store.store_name}
+            </div>
+            <div className="flex-1">
+              <div className="bg-gray-100 rounded-full h-8 overflow-hidden">
+                <div
+                  className="h-full rounded-full flex items-center justify-end pr-3 transition-all"
+                  style={{
+                    width: `${Math.max(pct, 5)}%`,
+                    backgroundColor: idx === 0 ? '#3b82f6' : idx === 1 ? '#60a5fa' : '#93c5fd',
+                  }}
+                >
+                  {pct > 20 && (
+                    <span className="text-[11px] font-semibold text-white">{fmt(store.total_sales)}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            {pct <= 20 && (
+              <div className="w-20 text-right shrink-0">
+                <span className="text-xs font-semibold text-gray-900">{fmt(store.total_sales)}</span>
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

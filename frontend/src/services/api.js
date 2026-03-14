@@ -521,6 +521,19 @@ export const reportsAPI = {
     api.get('/reports/chart_data/', {
       params: { start_date: startDate, end_date: endDate },
     }),
+
+  // Multi-store sales comparison
+  getMultiStoreSales: (startDate, endDate, storeIds) =>
+    api.get('/reports/multi_store_sales/', {
+      params: { start_date: startDate, end_date: endDate, store_ids: storeIds?.join(',') },
+    }),
+
+  // AI Insights
+  getAIInsights: (startDate, endDate, storeId) =>
+    api.get('/reports/ai_insights/', {
+      params: { start_date: startDate, end_date: endDate, store_id: storeId },
+      timeout: 60000,
+    }),
 }
 
 // Other Sales API (기타 매출)

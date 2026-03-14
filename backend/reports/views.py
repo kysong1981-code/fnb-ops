@@ -16,6 +16,7 @@ from .serializers import ReportSerializer, GeneratedReportSerializer, SkyReportS
 from closing.models import DailyClosing, ClosingHRCash, ClosingCashExpense, ClosingSupplierCost, SupplierMonthlyStatement
 from sales.models import Sales
 from hr.models import Timesheet
+from users.models import Organization
 from users.permissions import IsManager, IsRegionalManager
 from users.filters import OrganizationFilterBackend
 
@@ -994,6 +995,221 @@ class ReportViewSet(viewsets.ModelViewSet):
                     'trend_percentage': trend_pct,
                 },
                 'data': result_data,
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def _get_accessible_stores(self, request):
+        """Return stores the user can access based on role."""
+        profile = request.user.profile
+        if profile.role in ['CEO', 'HQ', 'ADMIN']:
+            return Organization.objects.filter(level='STORE').order_by('name')
+        elif profile.role in ['REGIONAL_MANAGER', 'SENIOR_MANAGER']:
+            return Organization.objects.filter(
+                level='STORE', parent=profile.organization
+            ).order_by('name') | Organization.objects.filter(
+                id=profile.organization_id, level='STORE'
+            ).order_by('name')
+        else:
+            return Organization.objects.filter(id=profile.organization_id)
+
+    def _compute_store_sales(self, org, start_date, end_date):
+        """Compute sales data for a single store. Reused by sales_report and multi_store_sales."""
+        from closing.models import ClosingOtherSale
+
+        closings = DailyClosing.objects.filter(
+            organization=org,
+            closing_date__range=[start_date, end_date]
+        ).order_by('closing_date')
+
+        daily_data = []
+        for c in closings:
+            other_sales = ClosingOtherSale.objects.filter(closing=c).aggregate(
+                total=Sum('amount'))['total'] or 0
+            total = float(c.pos_card + c.pos_cash) + float(other_sales)
+            daily_data.append({
+                'date': str(c.closing_date),
+                'actual_total': total,
+                'card_sales': float(c.actual_card),
+                'cash_sales': float(c.actual_cash),
+                'variance': float(c.total_variance),
+                'status': c.status,
+            })
+
+        totals = [d['actual_total'] for d in daily_data]
+        total_sales = sum(totals)
+        num_days = max(len(daily_data), 1)
+        avg_daily = total_sales / num_days
+
+        card_total = sum(d['card_sales'] for d in daily_data)
+        cash_total = sum(d['cash_sales'] for d in daily_data)
+
+        best = max(daily_data, key=lambda d: d['actual_total'], default=None)
+        worst = min(daily_data, key=lambda d: d['actual_total'], default=None)
+
+        # Trend
+        if len(daily_data) >= 2:
+            mid = len(daily_data) // 2
+            first_half = sum(d['actual_total'] for d in daily_data[:mid])
+            second_half = sum(d['actual_total'] for d in daily_data[mid:])
+            trend_pct = round(((second_half - first_half) / max(first_half, 1)) * 100, 1)
+            trend = 'up' if trend_pct > 0 else 'down' if trend_pct < 0 else 'stable'
+        else:
+            trend, trend_pct = 'stable', 0
+
+        # Day-of-week averages
+        dow_map = defaultdict(list)
+        for d in daily_data:
+            dt = datetime.strptime(d['date'], '%Y-%m-%d').date()
+            dow_map[dt.strftime('%a')].append(d['actual_total'])
+
+        day_order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        day_of_week_avg = []
+        for day in day_order:
+            vals = dow_map.get(day, [])
+            day_of_week_avg.append({
+                'day': day,
+                'avg_sales': round(sum(vals) / max(len(vals), 1), 2) if vals else 0,
+                'count': len(vals),
+            })
+
+        return {
+            'total_sales': round(total_sales, 2),
+            'average_daily': round(avg_daily, 2),
+            'card_total': round(card_total, 2),
+            'cash_total': round(cash_total, 2),
+            'highest': {'date': best['date'] if best else None, 'amount': best['actual_total'] if best else 0},
+            'lowest': {'date': worst['date'] if worst else None, 'amount': worst['actual_total'] if worst else 0},
+            'trend': trend,
+            'trend_percentage': trend_pct,
+            'data': daily_data,
+            'day_of_week_avg': day_of_week_avg,
+        }
+
+    @action(detail=False, methods=['get'])
+    def multi_store_sales(self, request):
+        """
+        Multi-store sales comparison.
+        Query params:
+        - start_date, end_date: YYYY-MM-DD (required)
+        - store_ids: comma-separated store IDs (optional, all if omitted)
+        """
+        try:
+            start_str = request.query_params.get('start_date')
+            end_str = request.query_params.get('end_date')
+            if not start_str or not end_str:
+                return Response({'error': 'start_date and end_date required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_str, '%Y-%m-%d').date()
+
+            stores = self._get_accessible_stores(request)
+            store_ids_param = request.query_params.get('store_ids')
+            if store_ids_param:
+                ids = [int(x) for x in store_ids_param.split(',') if x.strip()]
+                stores = stores.filter(id__in=ids)
+
+            store_results = []
+            for store in stores:
+                result = self._compute_store_sales(store, start_date, end_date)
+                store_results.append({
+                    'store_id': store.id,
+                    'store_name': store.name,
+                    **result,
+                })
+
+            # Combined totals
+            combined = self._compute_store_sales_combined(store_results)
+
+            return Response({
+                'start_date': str(start_date),
+                'end_date': str(end_date),
+                'stores': store_results,
+                'combined': combined,
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def _compute_store_sales_combined(self, store_results):
+        """Aggregate multiple store results into combined totals."""
+        if not store_results:
+            return {'total_sales': 0, 'average_daily': 0, 'card_total': 0, 'cash_total': 0}
+
+        total = sum(s['total_sales'] for s in store_results)
+        card = sum(s['card_total'] for s in store_results)
+        cash = sum(s['cash_total'] for s in store_results)
+
+        # Combine day-of-week averages
+        dow_combined = defaultdict(list)
+        for s in store_results:
+            for d in s.get('day_of_week_avg', []):
+                if d['avg_sales'] > 0:
+                    dow_combined[d['day']].append(d['avg_sales'])
+
+        day_order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        day_of_week_avg = []
+        for day in day_order:
+            vals = dow_combined.get(day, [])
+            day_of_week_avg.append({
+                'day': day,
+                'avg_sales': round(sum(vals), 2) if vals else 0,
+            })
+
+        return {
+            'total_sales': round(total, 2),
+            'average_daily': round(total / max(len(store_results), 1), 2),
+            'card_total': round(card, 2),
+            'cash_total': round(cash, 2),
+            'day_of_week_avg': day_of_week_avg,
+        }
+
+    @action(detail=False, methods=['get'])
+    def ai_insights(self, request):
+        """
+        AI-powered sales analysis using Claude API.
+        Query params:
+        - start_date, end_date: YYYY-MM-DD (required)
+        - store_id: specific store (optional)
+        """
+        try:
+            start_str = request.query_params.get('start_date')
+            end_str = request.query_params.get('end_date')
+            if not start_str or not end_str:
+                return Response({'error': 'start_date and end_date required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_str, '%Y-%m-%d').date()
+
+            store_id = request.query_params.get('store_id')
+            if store_id:
+                try:
+                    org = Organization.objects.get(id=store_id)
+                except Organization.DoesNotExist:
+                    return Response({'error': 'Store not found.'}, status=status.HTTP_404_NOT_FOUND)
+                store_name = org.name
+            else:
+                org = self._get_organization(request)
+                store_name = org.name if org else 'Unknown'
+
+            if not org:
+                return Response({'error': 'Organization not found.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            result = self._compute_store_sales(org, start_date, end_date)
+
+            from .services import generate_sales_insights
+            insights = generate_sales_insights(result, store_name, str(start_date), str(end_date))
+
+            if insights is None:
+                return Response({
+                    'insights': None,
+                    'error': 'AI analysis unavailable. ANTHROPIC_API_KEY not configured.',
+                }, status=status.HTTP_200_OK)
+
+            return Response({
+                'insights': insights,
+                'generated_at': timezone.now().isoformat(),
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
