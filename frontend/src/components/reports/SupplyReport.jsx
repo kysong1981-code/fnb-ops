@@ -210,21 +210,9 @@ export default function SupplyReport() {
       const response = await reportsAPI.getSupplyReport(view, params)
       const d = response.data
 
-      // If no real data, use placeholder
-      const hasData = view === 'monthly'
-        ? (d.suppliers && d.suppliers.length > 0)
-        : (d.daily_reports && d.daily_reports.length > 0)
-
-      if (!hasData) {
-        setData(view === 'monthly' ? PLACEHOLDER_MONTHLY : PLACEHOLDER_DAILY)
-        setIsPlaceholder(true)
-      } else {
-        setData(d)
-      }
+      setData(d)
     } catch (err) {
-      // On error, show placeholder
-      setData(view === 'monthly' ? PLACEHOLDER_MONTHLY : PLACEHOLDER_DAILY)
-      setIsPlaceholder(true)
+      setError(err.response?.data?.error || 'Failed to load expense report.')
     } finally {
       setLoading(false)
     }

@@ -131,7 +131,13 @@ export default function DailyCharts({ startDate, endDate }) {
     )
   }
 
-  if (data.length === 0) return null
+  if (data.length === 0) {
+    return (
+      <Card className="p-5 text-center text-gray-400 text-sm">
+        No chart data available for this period
+      </Card>
+    )
+  }
 
   const fmtNum = (v) => parseFloat(v || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })
   const fmtHours = (v) => `${parseFloat(v || 0).toFixed(1)}h`
