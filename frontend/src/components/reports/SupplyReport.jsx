@@ -149,6 +149,11 @@ export default function SupplyReport() {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
 
+  // Comparison state
+  const [comparisonData, setComparisonData] = useState(null)
+  const [comparisonLoading, setComparisonLoading] = useState(false)
+  const [showComparison, setShowComparison] = useState(null) // statement id
+
   useEffect(() => {
     fetchReport()
     setExpandedSupplier(null)
@@ -274,10 +279,10 @@ export default function SupplyReport() {
     }
   }
 
-  // Handle statement upload
+  // Handle statement upload (Vision API auto-parses)
   const handleUploadStatement = async (e) => {
     e.preventDefault()
-    if (!showUpload || !uploadFile || !uploadTotal) return
+    if (!showUpload || !uploadFile) return
 
     setUploading(true)
     setUploadError('')
@@ -285,7 +290,9 @@ export default function SupplyReport() {
       const formData = new FormData()
       formData.append('supplier', showUpload.supplier_id)
       formData.append('statement_file', uploadFile)
-      formData.append('statement_total', uploadTotal)
+      // statement_total is optional now — Vision API auto-extracts
+      if (uploadTotal) formData.append('statement_total', uploadTotal)
+      else formData.append('statement_total', '0')  // will be auto-filled by Vision
       if (uploadNotes) formData.append('notes', uploadNotes)
 
       const [y, mo] = month.split('-').map(Number)
@@ -301,7 +308,7 @@ export default function SupplyReport() {
       setUploadNotes('')
       fetchReport()
     } catch (err) {
-      setUploadError(err.response?.data?.detail || err.response?.data?.statement_file?.[0] || 'Upload failed.')
+      setUploadError(err.response?.data?.detail || err.response?.data?.statement_file?.[0] || err.response?.data?.statement_total?.[0] || 'Upload failed.')
     } finally {
       setUploading(false)
     }
@@ -314,6 +321,25 @@ export default function SupplyReport() {
       fetchReport()
     } catch (err) {
       setError('Reconcile failed.')
+    }
+  }
+
+  // View comparison (line-by-line)
+  const handleViewComparison = async (statementId) => {
+    if (showComparison === statementId) {
+      setShowComparison(null)
+      setComparisonData(null)
+      return
+    }
+    setShowComparison(statementId)
+    setComparisonLoading(true)
+    try {
+      const res = await supplierStatementAPI.comparison(statementId)
+      setComparisonData(res.data)
+    } catch {
+      setComparisonData(null)
+    } finally {
+      setComparisonLoading(false)
     }
   }
 
@@ -444,12 +470,22 @@ export default function SupplyReport() {
                           </td>
                           <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                             {hasStatement ? (
-                              <button
-                                onClick={() => handleReconcile(s.statement.id)}
-                                className="text-xs text-blue-600 hover:underline font-medium"
-                              >
-                                Re-check
-                              </button>
+                              <div className="flex items-center gap-2 justify-center">
+                                {s.statement.status === 'MISMATCHED' && (
+                                  <button
+                                    onClick={() => handleViewComparison(s.statement.id)}
+                                    className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded-lg hover:bg-red-100 transition font-medium"
+                                  >
+                                    Compare
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleReconcile(s.statement.id)}
+                                  className="text-xs text-blue-600 hover:underline font-medium"
+                                >
+                                  Re-check
+                                </button>
+                              </div>
                             ) : (
                               <button
                                 onClick={() => setShowUpload(s)}
@@ -477,15 +513,12 @@ export default function SupplyReport() {
                                     {/* Mismatch callout */}
                                     {hasStatement && s.statement.status === 'MISMATCHED' && (
                                       <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm">
-                                        <p className="font-semibold text-red-700 mb-1">Mismatch Investigation</p>
+                                        <p className="font-semibold text-red-700 mb-1">Mismatch Found</p>
                                         <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-red-600">
                                           <span>Our total: <b>{fmt(s.total)}</b></span>
                                           <span>Statement: <b>{fmt(s.statement.statement_total)}</b></span>
                                           <span>Variance: <b>{fmt(s.statement.variance)}</b></span>
                                         </div>
-                                        <p className="text-xs text-red-500 mt-2">
-                                          Compare each entry below with the supplier statement to find the discrepancy.
-                                        </p>
                                       </div>
                                     )}
 
@@ -520,6 +553,96 @@ export default function SupplyReport() {
                                         {detailData.entry_count || 0} entries total
                                       </span>
                                       <span className="text-sm font-bold text-gray-900">{fmt(detailData.total)}</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+
+                        {/* Comparison results (when Compare button clicked) */}
+                        {showComparison === s.statement?.id && (
+                          <tr key={`comparison-${s.supplier_id}`}>
+                            <td colSpan={7} className="p-0">
+                              <div className="bg-blue-50/50 border-t border-b border-blue-200 px-4 py-3">
+                                {comparisonLoading ? (
+                                  <div className="flex items-center justify-center gap-2 py-6">
+                                    <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                                    <span className="text-sm text-blue-600">Comparing entries...</span>
+                                  </div>
+                                ) : !comparisonData ? (
+                                  <p className="text-sm text-gray-400 text-center py-4">No comparison data. Upload a statement first.</p>
+                                ) : (
+                                  <div className="space-y-3">
+                                    <p className="text-sm font-bold text-gray-900">Line-by-Line Comparison</p>
+
+                                    {/* Matched items */}
+                                    {(comparisonData.matched || []).length > 0 && (
+                                      <div>
+                                        <p className="text-xs font-semibold text-green-700 mb-1">Matched ({comparisonData.matched.length})</p>
+                                        <div className="space-y-1">
+                                          {comparisonData.matched.map((m, i) => (
+                                            <div key={i} className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-green-600 text-sm">✓</span>
+                                                <span className="text-xs text-gray-700">{fmtDateShort(m.statement.date)}</span>
+                                                <span className="text-xs text-gray-500 truncate max-w-[150px]">{m.statement.description}</span>
+                                              </div>
+                                              <span className="text-xs font-semibold text-gray-900">{fmt(m.statement.amount)}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Unmatched from statement */}
+                                    {(comparisonData.unmatched_statement || []).length > 0 && (
+                                      <div>
+                                        <p className="text-xs font-semibold text-amber-700 mb-1">In Statement Only ({comparisonData.unmatched_statement.length})</p>
+                                        <div className="space-y-1">
+                                          {comparisonData.unmatched_statement.map((item, i) => (
+                                            <div key={i} className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-amber-600 text-sm">⚠</span>
+                                                <span className="text-xs text-gray-700">{fmtDateShort(item.date)}</span>
+                                                <span className="text-xs text-gray-500 truncate max-w-[150px]">{item.description}</span>
+                                              </div>
+                                              <span className="text-xs font-semibold text-amber-700">{fmt(item.amount)}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Unmatched from our records */}
+                                    {(comparisonData.unmatched_ours || []).length > 0 && (
+                                      <div>
+                                        <p className="text-xs font-semibold text-blue-700 mb-1">In Our Records Only ({comparisonData.unmatched_ours.length})</p>
+                                        <div className="space-y-1">
+                                          {comparisonData.unmatched_ours.map((item, i) => (
+                                            <div key={i} className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-blue-600 text-sm">ℹ</span>
+                                                <span className="text-xs text-gray-700">{fmtDateShort(item.date)}</span>
+                                                <span className="text-xs text-gray-500 truncate max-w-[150px]">{item.description || item.invoice_number || '—'}</span>
+                                              </div>
+                                              <span className="text-xs font-semibold text-blue-700">{fmt(item.amount)}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Summary */}
+                                    <div className="flex justify-between items-center pt-2 border-t border-blue-200">
+                                      <div className="flex gap-4 text-xs">
+                                        <span className="text-gray-600">Statement: <b>{fmt(comparisonData.statement_total)}</b></span>
+                                        <span className="text-gray-600">Ours: <b>{fmt(comparisonData.our_total)}</b></span>
+                                      </div>
+                                      <span className={`text-sm font-bold ${comparisonData.total_variance === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        Variance: {fmt(comparisonData.total_variance)}
+                                      </span>
                                     </div>
                                   </div>
                                 )}
@@ -641,19 +764,19 @@ export default function SupplyReport() {
                   accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls"
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 />
-                <p className="text-xs text-gray-400 mt-1">Max 10MB (PDF, JPG, PNG, XLSX)</p>
+                <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG (max 10MB) — AI auto-reads amounts</p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Statement Total ($)
+                  Statement Total ($) <span className="text-gray-400 font-normal">— optional, auto-detected</span>
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   value={uploadTotal}
                   onChange={(e) => setUploadTotal(e.target.value)}
-                  placeholder="0.00"
+                  placeholder="Leave blank for auto-detection"
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 />
               </div>
@@ -675,16 +798,22 @@ export default function SupplyReport() {
                 <button
                   type="button"
                   onClick={() => { setShowUpload(null); setUploadError(''); }}
-                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+                  disabled={uploading}
+                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={uploading || !uploadFile || !uploadTotal}
+                  disabled={uploading || !uploadFile}
                   className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:bg-gray-300 transition"
                 >
-                  {uploading ? 'Uploading...' : 'Upload & Reconcile'}
+                  {uploading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Analyzing...
+                    </span>
+                  ) : 'Upload & Reconcile'}
                 </button>
               </div>
             </form>

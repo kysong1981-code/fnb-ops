@@ -599,6 +599,27 @@ class SupplierMonthlyStatementViewSet(mixins.CreateModelMixin,
             organization=org,
             uploaded_by=self.request.user.profile
         )
+
+        # Parse statement with Claude Vision API
+        try:
+            from closing.services import parse_statement
+            file_path = instance.statement_file.path
+            file_ext = file_path.rsplit('.', 1)[-1].lower()
+            parsed = parse_statement(file_path, file_ext)
+
+            if parsed:
+                instance.parsed_data = {
+                    'total': float(parsed['total']),
+                    'line_items': parsed.get('line_items', []),
+                }
+                # Auto-fill statement_total from Vision if not manually provided
+                if parsed['total'] > 0 and (not instance.statement_total or instance.statement_total == 0):
+                    instance.statement_total = parsed['total']
+                instance.save()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Vision parsing failed: {e}")
+
         instance.reconcile()
 
     @action(detail=True, methods=['post'])
@@ -608,6 +629,43 @@ class SupplierMonthlyStatementViewSet(mixins.CreateModelMixin,
         statement.reconcile()
         serializer = self.get_serializer(statement)
         return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def comparison(self, request, pk=None):
+        """항목별 대조 결과 반환"""
+        from closing.services import compare_entries
+        from datetime import date as date_cls
+
+        statement = self.get_object()
+
+        # Get our entries for this supplier/month
+        start_date = date_cls(statement.year, statement.month, 1)
+        if statement.month == 12:
+            end_date = date_cls(statement.year + 1, 1, 1)
+        else:
+            end_date = date_cls(statement.year, statement.month + 1, 1)
+
+        our_costs = ClosingSupplierCost.objects.filter(
+            closing__organization=statement.organization,
+            supplier=statement.supplier,
+            closing__closing_date__gte=start_date,
+            closing__closing_date__lt=end_date,
+        ).select_related('closing')
+
+        our_entries = [{
+            'id': c.id,
+            'date': str(c.closing.closing_date),
+            'amount': float(c.amount),
+            'invoice_number': c.invoice_number or '',
+            'description': c.description or '',
+        } for c in our_costs]
+
+        result = compare_entries(statement.parsed_data, our_entries)
+        result['statement_id'] = statement.id
+        result['supplier_name'] = statement.supplier.name
+        result['status'] = statement.status
+
+        return Response(result)
 
 
 class MonthlyCloseViewSet(mixins.ListModelMixin,

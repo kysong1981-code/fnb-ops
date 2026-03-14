@@ -548,9 +548,12 @@ export const supplierStatementAPI = {
   upload: (formData) =>
     api.post('/closing/supplier-statements/', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000, // Vision API parsing may take time
     }),
   reconcile: (id) =>
     api.post(`/closing/supplier-statements/${id}/reconcile/`),
+  comparison: (id) =>
+    api.get(`/closing/supplier-statements/${id}/comparison/`),
 }
 
 // CQ Report API

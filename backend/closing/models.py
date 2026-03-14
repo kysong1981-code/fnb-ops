@@ -285,6 +285,12 @@ class SupplierMonthlyStatement(models.Model):
         max_length=20, choices=STATEMENT_STATUS_CHOICES, default='PENDING'
     )
 
+    # Vision API parsed data
+    parsed_data = models.JSONField(
+        null=True, blank=True,
+        help_text="Parsed line items from Vision API: {total, line_items: [{date, description, amount}]}"
+    )
+
     # Metadata
     uploaded_by = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True)
     notes = models.TextField(null=True, blank=True)

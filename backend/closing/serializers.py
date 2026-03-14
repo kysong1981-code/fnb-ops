@@ -253,17 +253,20 @@ class SupplierMonthlyStatementSerializer(serializers.ModelSerializer):
             'year', 'month',
             'statement_file', 'statement_total',
             'our_total', 'variance', 'status', 'status_display',
+            'parsed_data',
             'uploaded_by', 'uploaded_by_name', 'notes',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'our_total', 'variance', 'status',
+            'parsed_data',
             'created_at', 'updated_at',
             'supplier_name', 'uploaded_by_name', 'status_display'
         ]
         extra_kwargs = {
             'uploaded_by': {'write_only': True, 'required': False},
             'organization': {'required': False},
+            'statement_total': {'required': False},  # Vision API can auto-fill
         }
 
     def get_uploaded_by_name(self, obj):

@@ -30,5 +30,8 @@ gunicorn==23.0.0
 # Logging (production)
 python-json-logger==3.3.0
 
+# AI / Vision
+anthropic==0.52.0
+
 # Error Tracking (optional)
 sentry-sdk==2.22.0
