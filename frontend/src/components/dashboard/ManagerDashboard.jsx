@@ -53,15 +53,15 @@ export default function ManagerDashboard() {
         setStaff(employees.slice(0, 5)) // Show top 5
       } catch {}
 
-      // Load closings that need approval (not APPROVED)
+      // Load closings that need approval (SUBMITTED only)
       try {
         const res = await closingAPI.list({})
         const allItems = res.data?.results || res.data || []
         const needApproval = allItems
-          .filter(c => c.status !== 'APPROVED')
+          .filter(c => c.status === 'SUBMITTED')
           .sort((a, b) => b.closing_date.localeCompare(a.closing_date))
         setRecentClosings(needApproval)
-        setPendingClosings(needApproval.filter(c => c.status === 'SUBMITTED'))
+        setPendingClosings(needApproval)
       } catch {}
 
       // Load this week's closing data for chart

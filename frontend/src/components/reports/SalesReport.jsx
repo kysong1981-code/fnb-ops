@@ -9,7 +9,6 @@ import Badge from '../ui/Badge'
 
 const DATE_MODES = [
   { key: 'month', label: 'Month' },
-  { key: 'week', label: 'Week' },
   { key: 'custom', label: 'Custom' },
 ]
 
@@ -113,12 +112,7 @@ export default function SalesReport() {
     setError('')
     try {
       let response
-      if (dateMode === 'day') {
-        response = await reportsAPI.getSalesReportByDate(date)
-      } else if (dateMode === 'week') {
-        const { start, end } = getWeekRange(date)
-        response = await reportsAPI.getSalesReportRange(start, end)
-      } else if (dateMode === 'month') {
+      if (dateMode === 'month') {
         const { start, end } = getMonthRange(date)
         response = await reportsAPI.getSalesReportRange(start, end)
       } else {
@@ -242,7 +236,7 @@ export default function SalesReport() {
           </div>
 
           {/* Bar Chart */}
-          <SectionLabel>Sales by {dateMode === 'day' ? 'Day' : dateMode === 'week' ? 'Week' : dateMode === 'month' ? 'Month' : 'Period'}</SectionLabel>
+          <SectionLabel>Sales by {dateMode === 'month' ? 'Month' : 'Period'}</SectionLabel>
           <Card className="p-5">
             {data.data.length === 0 ? (
               <p className="text-center text-gray-400 py-8 text-sm">No data available.</p>

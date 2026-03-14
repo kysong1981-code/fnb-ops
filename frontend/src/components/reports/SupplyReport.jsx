@@ -10,7 +10,6 @@ const SENIOR_ROLES = ['SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO', 'ADMIN'
 
 const VIEW_OPTIONS = [
   { key: 'monthly', label: 'Monthly' },
-  { key: 'daily', label: 'Daily' },
 ]
 
 // Placeholder data for preview when API has no data
@@ -326,36 +325,20 @@ export default function SupplyReport() {
     <div className="space-y-6">
       {/* Controls */}
       <Card className="p-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* View toggle */}
-          <div className="bg-gray-100 rounded-xl p-1 flex gap-1">
-            {VIEW_OPTIONS.map((opt) => (
-              <button
-                key={opt.key}
-                onClick={() => setView(opt.key)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
-                  view === opt.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {monthClosed && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-xs font-semibold">
                 <span>🔒</span> Month Locked
               </span>
             )}
-            {/* Month picker */}
-            <input
-              type="month"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-            />
           </div>
+          <input
+            type="month"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+          />
         </div>
       </Card>
 
