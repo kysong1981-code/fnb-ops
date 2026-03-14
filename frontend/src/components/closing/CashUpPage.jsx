@@ -569,7 +569,7 @@ export default function CashUpPage() {
           <Card className="p-5">
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-500">Current Balance</span>
-              <span className="text-xl font-bold text-gray-900">{fmt(hrCashBalance)}</span>
+              <span className={`text-xl font-bold ${hrNetBalance >= 0 ? 'text-gray-900' : 'text-red-600'}`}>{fmt(hrNetBalance)}</span>
             </div>
           </Card>
 
