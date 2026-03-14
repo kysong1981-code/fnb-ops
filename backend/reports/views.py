@@ -1026,7 +1026,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             ly_start = start_date - timedelta(days=364)
             ly_end = end_date - timedelta(days=364)
 
-            # Sales aggregation by date
+            # Sales aggregation by date (try Sales model first, fallback to DailyClosing POS data)
             sales_agg = {
                 row['date']: {'total': float(row['total'] or 0), 'qty': row['qty']}
                 for row in Sales.objects.filter(
@@ -1034,12 +1034,30 @@ class ReportViewSet(viewsets.ModelViewSet):
                 ).values('date').annotate(total=Sum('amount'), qty=Count('id'))
             }
 
+            # Fallback: if no Sales data, use DailyClosing POS totals
+            if not sales_agg:
+                for dc in DailyClosing.objects.filter(
+                    organization=org, closing_date__range=[start_date, end_date]
+                ):
+                    total = float(dc.pos_card or 0) + float(dc.pos_cash or 0)
+                    if total > 0:
+                        sales_agg[dc.closing_date] = {'total': total, 'qty': 0}
+
             ly_sales_agg = {
                 row['date']: {'total': float(row['total'] or 0), 'qty': row['qty']}
                 for row in Sales.objects.filter(
                     organization=org, date__range=[ly_start, ly_end]
                 ).values('date').annotate(total=Sum('amount'), qty=Count('id'))
             }
+
+            # Fallback for last year too
+            if not ly_sales_agg:
+                for dc in DailyClosing.objects.filter(
+                    organization=org, closing_date__range=[ly_start, ly_end]
+                ):
+                    total = float(dc.pos_card or 0) + float(dc.pos_cash or 0)
+                    if total > 0:
+                        ly_sales_agg[dc.closing_date] = {'total': total, 'qty': 0}
 
             # COGS aggregation by date
             cogs_agg = {
