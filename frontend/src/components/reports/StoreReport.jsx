@@ -226,7 +226,7 @@ export default function StoreReport() {
         </div>
       ) : reportData ? (
         <>
-          {reportType === 'daily' && <DailyStoreReport data={reportData} />}
+          {reportType === 'daily' && dateMode === 'day' && <DailyStoreReport data={reportData} />}
           {reportType === 'comparison' && <StoreComparison data={reportData} />}
         </>
       ) : null}
