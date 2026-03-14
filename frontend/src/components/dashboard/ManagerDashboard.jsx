@@ -53,17 +53,15 @@ export default function ManagerDashboard() {
         setStaff(employees.slice(0, 5)) // Show top 5
       } catch {}
 
-      // Load all recent closings (always visible) + pending submitted
+      // Load closings that need approval (not APPROVED)
       try {
-        const [allRes, submittedRes] = await Promise.all([
-          closingAPI.list({}),
-          closingAPI.list({ status: 'SUBMITTED' }),
-        ])
-        const allItems = allRes.data?.results || allRes.data || []
-        const submittedItems = submittedRes.data?.results || submittedRes.data || []
-        // Show all recent closings (most recent first)
-        setRecentClosings(allItems.sort((a, b) => b.closing_date.localeCompare(a.closing_date)).slice(0, 10))
-        setPendingClosings(submittedItems.sort((a, b) => b.closing_date.localeCompare(a.closing_date)))
+        const res = await closingAPI.list({})
+        const allItems = res.data?.results || res.data || []
+        const needApproval = allItems
+          .filter(c => c.status !== 'APPROVED')
+          .sort((a, b) => b.closing_date.localeCompare(a.closing_date))
+        setRecentClosings(needApproval)
+        setPendingClosings(needApproval.filter(c => c.status === 'SUBMITTED'))
       } catch {}
 
       // Load this week's closing data for chart
@@ -135,7 +133,7 @@ export default function ManagerDashboard() {
     try {
       await closingAPI.approve(id)
       setPendingClosings(prev => prev.filter(c => c.id !== id))
-      setRecentClosings(prev => prev.map(c => c.id === id ? { ...c, status: 'APPROVED' } : c))
+      setRecentClosings(prev => prev.filter(c => c.id !== id))
     } catch (err) {
       console.error('Approve failed:', err)
     } finally {
@@ -214,9 +212,9 @@ export default function ManagerDashboard() {
         ))}
       </div>
 
-      {/* Recent Closings (always visible) */}
+      {/* Closings Needing Approval */}
       <div className="flex items-center justify-between">
-        <SectionLabel>Recent Closings</SectionLabel>
+        <SectionLabel>Needs Approval</SectionLabel>
         <button
           onClick={() => navigate('/closing/monthly')}
           className="text-xs font-medium text-blue-600 flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition"
@@ -285,7 +283,10 @@ export default function ManagerDashboard() {
           </div>
         </Card>
       ) : (
-        <Card className="p-5 text-center text-gray-400 text-sm">No closings yet</Card>
+        <Card className="p-5 text-center">
+          <CheckCircleIcon size={24} className="text-green-500 mx-auto mb-1" />
+          <p className="text-sm text-gray-400">All closings approved</p>
+        </Card>
       )}
 
       {/* Safety Tasks Widget */}
