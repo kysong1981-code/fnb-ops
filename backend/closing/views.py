@@ -218,13 +218,12 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Balance must be 0 to approve
+        # Balance must be 0 to approve (deposit + HR cash must cover actual cash)
         hr_total = sum(e.amount for e in closing.hr_cash_entries.all())
-        exp_total = sum(e.amount for e in closing.cash_expenses.all())
-        balance = closing.actual_cash - closing.bank_deposit - hr_total - exp_total
+        balance = closing.actual_cash - closing.bank_deposit - hr_total
         if balance != 0:
             return Response(
-                {'detail': f'Balance must be $0.00 to approve. Current balance: ${balance:.2f}. Allocate via Bank Deposit, HR Cash, or Expenses.'},
+                {'detail': f'Balance must be $0.00 to approve. Current: ${balance:.2f}. Use Bank Deposit + HR Cash to cover actual cash.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 

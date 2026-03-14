@@ -376,7 +376,7 @@ export default function CashUpPage() {
   const expenseTotal = expenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
   const hrCashFromEntries = hrCashEntries.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
   const hrCashTotal = hrCashFromEntries || parseFloat(hrCashAmount) || 0
-  const totalCash = deposit + expenseTotal + hrCashTotal
+  const totalCash = deposit + hrCashTotal
   const actualCash = parseFloat(closing?.actual_cash || 0)
   const cashVariance = actualCash - totalCash
 
@@ -550,9 +550,14 @@ export default function CashUpPage() {
 
               {/* Save & Approve */}
               <div className="space-y-3 pb-6">
+                {cashVariance !== 0 && actualCash > 0 && (
+                  <p className="text-xs text-center text-amber-600">
+                    Balance is {fmt(cashVariance)} — must be $0.00 to approve
+                  </p>
+                )}
                 <button
                   onClick={handleSaveAndSubmit}
-                  disabled={saving}
+                  disabled={saving || cashVariance !== 0 || actualCash === 0}
                   className="w-full flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition"
                 >
                   <CheckCircleIcon size={18} />
