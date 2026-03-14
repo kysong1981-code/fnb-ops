@@ -1747,6 +1747,74 @@ class SalesAnalysisViewSet(viewsets.GenericViewSet):
 
         return Response(list(orgs))
 
+    @action(detail=False, methods=['get'], url_path='compare',
+            permission_classes=[IsAuthenticated, IsManager])
+    def compare(self, request):
+        """Multi-store comparison — daily breakdown per store."""
+        from users.models import Organization
+        from users.filters import filter_queryset_by_role
+        profile = request.user.profile
+        start, end = self._parse_dates(request)
+
+        store_ids_param = request.query_params.get('store_ids', '')
+        if store_ids_param:
+            store_ids = [int(x) for x in store_ids_param.split(',') if x.strip()]
+        else:
+            accessible = filter_queryset_by_role(profile, Organization.objects.all())
+            store_ids = list(accessible.values_list('id', flat=True))
+
+        # Validate access
+        accessible = filter_queryset_by_role(profile, Organization.objects.all())
+        store_ids = [sid for sid in store_ids if accessible.filter(id=sid).exists()]
+
+        if not store_ids:
+            return Response({'stores': [], 'daily_comparison': []})
+
+        labor = self._labor_metrics(store_ids, start, end)
+        _, op_hours = self._operating_hours(store_ids, (end - start).days + 1)
+        per_store = self._per_org_totals(store_ids, start, end, labor_data=labor, op_hours_data=op_hours)
+
+        # Daily data per store for chart overlay
+        daily_by_store = {}
+        for sid in store_ids:
+            rows, _, _ = self._aggregate_for_orgs([sid], start, end)
+            store_name = Organization.objects.filter(id=sid).values_list('name', flat=True).first() or str(sid)
+            daily_by_store[sid] = {
+                'store_id': sid,
+                'store_name': store_name,
+                'daily': rows,
+            }
+
+        # Build comparison: each date has all stores' totals
+        all_dates = sorted(set(
+            r['date'] for store_data in daily_by_store.values() for r in store_data['daily']
+        ))
+        daily_comparison = []
+        for d in all_dates:
+            entry = {'date': d}
+            for sid, store_data in daily_by_store.items():
+                day_row = next((r for r in store_data['daily'] if r['date'] == d), None)
+                key = f"store_{sid}"
+                entry[key] = day_row['total'] if day_row else 0
+                entry[f"{key}_name"] = store_data['store_name']
+            daily_comparison.append(entry)
+
+        # Previous period for each store
+        prev_start, prev_end = self._prev_period(start, end)
+        for store in per_store:
+            sid = store['organization']['id']
+            prev_total = self._period_total([sid], prev_start, prev_end)
+            store['prev_total'] = prev_total
+            store['change_pct'] = round(((store['total_sales'] - prev_total) / prev_total) * 100, 1) if prev_total else 0
+
+        return Response({
+            'stores': per_store,
+            'daily_comparison': daily_comparison,
+            'store_ids': store_ids,
+            'start_date': str(start),
+            'end_date': str(end),
+        })
+
     @action(detail=False, methods=['get'], url_path='ai-insights',
             permission_classes=[IsAuthenticated, IsManager])
     def ai_insights(self, request):
