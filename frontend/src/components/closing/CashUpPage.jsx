@@ -268,6 +268,40 @@ export default function CashUpPage() {
     } catch { setError('Failed to delete') }
   }
 
+  // HR Cash tab: Save expense + approve + return to HR Cash Management
+  const handleHrSaveApprove = async () => {
+    const c = await ensureClosing()
+    if (!c) return
+    setSaving(true)
+    setError('')
+    try {
+      // Save expense if form has data
+      if (expForm.amount && expForm.reason) {
+        const fd = new FormData()
+        fd.append('daily_closing', c.id)
+        fd.append('category', expForm.category)
+        fd.append('reason', expForm.reason)
+        fd.append('amount', expForm.amount)
+        if (expForm.notes) fd.append('notes', expForm.notes)
+        if (expForm.attachment) fd.append('attachment', expForm.attachment)
+        await cashExpenseAPI.create(fd)
+      }
+      // Approve
+      const res = await closingAPI.approve(c.id)
+      setClosing(res.data)
+      setExpForm({ category: 'SUPPLIES', reason: '', amount: '', notes: '', attachment: null })
+      loadHrCashBalance()
+      loadExpenses(c.id)
+      showMsg('Saved & Approved')
+      // Switch back to show updated state
+      setActiveTab('hr')
+    } catch (err) {
+      setError(err.response?.data?.detail || err.response?.data?.error || 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // Sync HR Cash (single entry)
   const syncHrCash = async (closingId) => {
     const val = parseFloat(hrCashAmount)
@@ -531,142 +565,89 @@ export default function CashUpPage() {
       ) : (
         /* ============ HR CASH TAB ============ */
         <>
-          {/* Net Balance - Hero */}
-          <Card className={`p-5 ${hrNetBalance >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-            <p className="text-xs font-medium text-gray-500 mb-1">Net Balance</p>
-            <p className={`text-2xl font-bold ${hrNetBalance >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-              {fmt(hrNetBalance)}
-            </p>
-            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-              <span>HR Cash {fmt(hrCashBalance)}</span>
-              <span>−</span>
-              <span>Expenses {fmt(hrTotalExpenses)}</span>
+          {/* Current Balance */}
+          <Card className="p-5">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-500">Current Balance</span>
+              <span className="text-xl font-bold text-gray-900">{fmt(hrCashBalance)}</span>
             </div>
           </Card>
 
-          {/* Expense Form - only if not locked */}
-          {!isLocked ? (
-            <Card className="p-5">
-              <SectionLabel>Add Expense</SectionLabel>
-              <form onSubmit={handleAddExpense} className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Account</label>
-                    <select
-                      value={expForm.reason}
-                      onChange={(e) => setExpForm(p => ({ ...p, reason: e.target.value }))}
-                      className={inputCls}
-                    >
-                      <option value="">Select</option>
-                      <option value="ChCh">ChCh</option>
-                      <option value="QT">QT</option>
-                      <option value="Manager">Manager</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Amount</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={expForm.amount}
-                      onChange={(e) => setExpForm(p => ({ ...p, amount: e.target.value }))}
-                      placeholder="0.00"
-                      className={inputCls}
-                    />
-                  </div>
+          {/* Expense */}
+          <Card className="p-5">
+            <SectionLabel>Expense</SectionLabel>
+            <form onSubmit={handleAddExpense} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Account</label>
+                  <select
+                    value={expForm.reason}
+                    onChange={(e) => setExpForm(p => ({ ...p, reason: e.target.value }))}
+                    className={inputCls}
+                  >
+                    <option value="">Select</option>
+                    <option value="ChCh">ChCh</option>
+                    <option value="QT">QT</option>
+                    <option value="Manager">Manager</option>
+                  </select>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Notes</label>
+                  <label className="text-xs text-gray-500 mb-1 block">Amount</label>
                   <input
-                    value={expForm.notes}
-                    onChange={(e) => setExpForm(p => ({ ...p, notes: e.target.value }))}
-                    placeholder="Optional notes"
+                    type="number"
+                    step="0.01"
+                    value={expForm.amount}
+                    onChange={(e) => setExpForm(p => ({ ...p, amount: e.target.value }))}
+                    placeholder="0.00"
                     className={inputCls}
                   />
                 </div>
-                <div>
-                  <label className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition">
-                    <CameraIcon size={18} className="text-gray-400" />
-                    <span className="text-sm text-gray-500">
-                      {expForm.attachment ? expForm.attachment.name : 'Tap to attach photo'}
-                    </span>
-                    <input
-                      type="file"
-                      accept=".jpg,.jpeg,.png,.pdf"
-                      onChange={(e) => setExpForm(p => ({ ...p, attachment: e.target.files[0] }))}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-                <button
-                  type="submit"
-                  disabled={saving || !expForm.amount || !expForm.reason}
-                  className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-40 transition"
-                >
-                  {saving ? 'Saving...' : 'Save'}
-                </button>
-              </form>
-            </Card>
-          ) : (
-            <div className="flex items-center gap-2 px-4 py-3 bg-gray-100 rounded-xl">
-              <span className="text-sm">🔒</span>
-              <span className="text-sm text-gray-500">This day is approved. Expenses cannot be added or removed.</span>
-            </div>
-          )}
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Notes</label>
+                <input
+                  value={expForm.notes}
+                  onChange={(e) => setExpForm(p => ({ ...p, notes: e.target.value }))}
+                  placeholder="Optional notes"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition">
+                  <CameraIcon size={18} className="text-gray-400" />
+                  <span className="text-sm text-gray-500">
+                    {expForm.attachment ? expForm.attachment.name : 'Tap to attach photo'}
+                  </span>
+                  <input
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    onChange={(e) => setExpForm(p => ({ ...p, attachment: e.target.files[0] }))}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </form>
+          </Card>
 
-          {/* Today's Expense List */}
-          {expenses.length > 0 && (
-            <Card className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <SectionLabel>Today's Expenses</SectionLabel>
-                <span className="text-sm font-semibold text-red-600">
-                  -{fmt(expenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0))}
-                </span>
-              </div>
-              <div className="space-y-2">
-                {expenses.map((exp) => (
-                  <div key={exp.id}>
-                    <div className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
-                      <div>
-                        <span className="text-sm font-medium text-gray-700">{exp.reason}</span>
-                        <span className="text-xs text-gray-400 ml-2">{exp.category}</span>
-                        {exp.notes && <p className="text-xs text-gray-400 mt-0.5">{exp.notes}</p>}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-red-600">-{fmt(exp.amount)}</span>
-                        {!isLocked && (
-                          <button
-                            onClick={() => setDeleteConfirmId(deleteConfirmId === exp.id ? null : exp.id)}
-                            className="text-gray-300 hover:text-red-500 transition"
-                          >
-                            <TrashIcon size={14} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    {/* Delete confirmation */}
-                    {deleteConfirmId === exp.id && (
-                      <div className="flex items-center justify-end gap-2 mt-1.5 px-2">
-                        <span className="text-xs text-gray-500">Delete this expense?</span>
-                        <button
-                          onClick={() => handleDeleteExpense(exp.id)}
-                          className="px-3 py-1 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition"
-                        >
-                          Delete
-                        </button>
-                        <button
-                          onClick={() => setDeleteConfirmId(null)}
-                          className="px-3 py-1 bg-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-300 transition"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+          {/* Net Balance */}
+          <Card className="p-5">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-semibold text-gray-700">Net Balance</span>
+              <span className={`text-xl font-bold ${hrNetBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {fmt(hrNetBalance)}
+              </span>
+            </div>
+          </Card>
+
+          {/* Save & Approve */}
+          <button
+            onClick={handleHrSaveApprove}
+            disabled={saving}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition"
+          >
+            <CheckCircleIcon size={18} />
+            {saving ? 'Saving...' : 'Save & Approve'}
+          </button>
         </>
       )}
     </div>
