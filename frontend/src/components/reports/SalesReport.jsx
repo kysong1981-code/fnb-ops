@@ -235,45 +235,6 @@ export default function SalesReport() {
             />
           </div>
 
-          {/* Bar Chart */}
-          <SectionLabel>Sales by {dateMode === 'month' ? 'Month' : 'Period'}</SectionLabel>
-          <Card className="p-5">
-            {data.data.length === 0 ? (
-              <p className="text-center text-gray-400 py-8 text-sm">No data available.</p>
-            ) : (
-              <div className="space-y-2.5">
-                {data.data.map((item, idx) => {
-                  const total = parseFloat(item.actual_total || 0)
-                  const maxSales = Math.max(...data.data.map((d) => parseFloat(d.actual_total || 0)), 1)
-                  const pct = (total / maxSales) * 100
-                  const label = item.date ? fmtDate(item.date) : item.period || ''
-                  return (
-                    <div key={idx} className="flex items-center gap-3">
-                      <div className="w-16 text-xs font-medium text-gray-400 text-right shrink-0">
-                        {label}
-                      </div>
-                      <div className="flex-1">
-                        <div className="bg-gray-100 rounded-full h-7 overflow-hidden">
-                          <div
-                            className="bg-gray-900 h-full rounded-full flex items-center justify-end pr-2.5 transition-all"
-                            style={{ width: `${Math.max(pct, 3)}%` }}
-                          >
-                            {pct > 25 && (
-                              <span className="text-[10px] font-semibold text-white">{fmt(total)}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="w-20 text-right shrink-0">
-                        <p className="text-xs font-semibold text-gray-900">{fmt(total)}</p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </Card>
-
           {/* Detail Table */}
           <SectionLabel>Detail</SectionLabel>
           <Card className="overflow-hidden">
