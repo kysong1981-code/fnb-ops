@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import { salesAnalysisAPI } from '../../services/api'
+import { salesAnalysisAPI, reportsAPI } from '../../services/api'
 import Card from '../ui/Card'
 import KpiCard from '../ui/KpiCard'
 import SectionLabel from '../ui/SectionLabel'
+import SalesCharts from '../reports/SalesCharts'
+import AIInsightsCard from '../reports/AIInsightsCard'
 
 const fmt = (v) =>
   `$${parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -22,6 +24,7 @@ export default function StoreAnalysis({ startDate, endDate, organizationId }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [data, setData] = useState(null)
+  const [chartData, setChartData] = useState([])
 
   useEffect(() => {
     fetchData()
@@ -33,8 +36,12 @@ export default function StoreAnalysis({ startDate, endDate, organizationId }) {
     try {
       const params = { start_date: startDate, end_date: endDate }
       if (organizationId) params.organization_id = organizationId
-      const res = await salesAnalysisAPI.getStoreAnalysis(params)
-      setData(res.data)
+      const [salesRes, chartRes] = await Promise.all([
+        salesAnalysisAPI.getStoreAnalysis(params),
+        reportsAPI.getChartData(startDate, endDate).catch(() => ({ data: { days: [] } })),
+      ])
+      setData(salesRes.data)
+      setChartData(chartRes.data.days || [])
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load store analysis.')
     } finally {
@@ -181,6 +188,25 @@ export default function StoreAnalysis({ startDate, endDate, organizationId }) {
         )}
       </Card>
 
+      {/* Charts */}
+      <SalesCharts
+        chartData={chartData}
+        salesData={{
+          total_sales: kpis.total_sales || 0,
+          card_total: kpis.total_card || 0,
+          cash_total: kpis.total_cash || 0,
+        }}
+        dayOfWeekData={computeDayOfWeek(daily)}
+      />
+
+      {/* AI Insights */}
+      <AIInsightsCard
+        startDate={startDate}
+        endDate={endDate}
+        storeId={organizationId}
+        useSalesAnalysisAPI
+      />
+
       {/* Daily Detail Table */}
       <SectionLabel>Daily Detail</SectionLabel>
       <Card className="overflow-hidden">
@@ -230,4 +256,23 @@ export default function StoreAnalysis({ startDate, endDate, organizationId }) {
       </Card>
     </div>
   )
+}
+
+function computeDayOfWeek(data) {
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  const map = {}
+  dayOrder.forEach(d => { map[d] = [] })
+  for (const item of (data || [])) {
+    if (!item.date) continue
+    const dt = new Date(item.date + 'T00:00:00')
+    const dayName = dayNames[dt.getDay()]
+    map[dayName]?.push(parseFloat(item.total || 0))
+  }
+  return dayOrder.map(day => ({
+    day,
+    avg_sales: map[day].length > 0
+      ? Math.round(map[day].reduce((a, b) => a + b, 0) / map[day].length)
+      : 0,
+  }))
 }

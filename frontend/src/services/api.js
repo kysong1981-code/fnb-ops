@@ -589,6 +589,7 @@ export const salesAnalysisAPI = {
   getRegionalAnalysis: (params) => api.get('/closing/sales-analysis/regional/', { params }),
   getEnterpriseAnalysis: (params) => api.get('/closing/sales-analysis/enterprise/', { params }),
   getAccessibleStores: () => api.get('/closing/sales-analysis/stores/'),
+  getAIInsights: (params) => api.get('/closing/sales-analysis/ai-insights/', { params, timeout: 60000 }),
 }
 
 // Monthly Close API

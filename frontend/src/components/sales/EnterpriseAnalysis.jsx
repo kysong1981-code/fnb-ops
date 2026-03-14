@@ -3,6 +3,7 @@ import { salesAnalysisAPI } from '../../services/api'
 import Card from '../ui/Card'
 import KpiCard from '../ui/KpiCard'
 import SectionLabel from '../ui/SectionLabel'
+import AIInsightsCard from '../reports/AIInsightsCard'
 
 const fmt = (v) =>
   `$${parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -313,6 +314,14 @@ export default function EnterpriseAnalysis({ startDate, endDate, onDrillDown }) 
           </Card>
         </>
       )}
+
+      {/* AI Insights */}
+      <AIInsightsCard
+        startDate={data?.start_date || ''}
+        endDate={data?.end_date || ''}
+        storeId={null}
+        useSalesAnalysisAPI
+      />
 
       {/* Daily Trend */}
       <SectionLabel>Daily Trend</SectionLabel>

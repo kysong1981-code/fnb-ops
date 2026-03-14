@@ -1746,3 +1746,87 @@ class SalesAnalysisViewSet(viewsets.GenericViewSet):
         ).values('id', 'name').order_by('name')
 
         return Response(list(orgs))
+
+    @action(detail=False, methods=['get'], url_path='ai-insights',
+            permission_classes=[IsAuthenticated, IsManager])
+    def ai_insights(self, request):
+        """AI-powered sales analysis using Claude API."""
+        profile = request.user.profile
+        start, end = self._parse_dates(request)
+
+        org_id = request.query_params.get('organization_id')
+        if org_id:
+            from users.models import Organization
+            from users.filters import filter_queryset_by_role
+            accessible = filter_queryset_by_role(profile, Organization.objects.all())
+            if not accessible.filter(id=org_id).exists():
+                return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
+            org_ids = [int(org_id)]
+            org_name = accessible.get(id=org_id).name
+        else:
+            org_ids = [profile.organization_id]
+            org_name = profile.organization.name if profile.organization else 'Unknown'
+
+        daily_rows, totals, _ = self._aggregate_for_orgs(org_ids, start, end)
+        labor = self._labor_metrics(org_ids, start, end)
+
+        # Build data for AI
+        sales_data = {
+            'total_sales': totals['total_sales'],
+            'average_daily': totals['avg_daily'],
+            'card_total': totals['total_card'],
+            'cash_total': totals['total_cash'],
+            'highest': max(daily_rows, key=lambda d: d['total'], default={'date': None, 'total': 0}),
+            'lowest': min(daily_rows, key=lambda d: d['total'], default={'date': None, 'total': 0}),
+            'trend': 'stable',
+            'trend_percentage': 0,
+            'data': [{'date': d['date'], 'actual_total': d['total'], 'card_sales': d['card'], 'cash_sales': d['cash']} for d in daily_rows],
+            'day_of_week_avg': self._compute_dow_avg(daily_rows),
+            'labor_hours': labor['total_labor_hours'],
+            'labor_cost': labor['total_labor_cost'],
+            'labor_pct': round((labor['total_labor_cost'] / totals['total_sales']) * 100, 1) if totals['total_sales'] else 0,
+            'splh': round(totals['total_sales'] / labor['total_labor_hours'], 2) if labor['total_labor_hours'] else 0,
+        }
+
+        # Trend calculation
+        if len(daily_rows) >= 2:
+            mid = len(daily_rows) // 2
+            first = sum(d['total'] for d in daily_rows[:mid])
+            second = sum(d['total'] for d in daily_rows[mid:])
+            if first > 0:
+                pct = round(((second - first) / first) * 100, 1)
+                sales_data['trend'] = 'up' if pct > 0 else 'down' if pct < 0 else 'stable'
+                sales_data['trend_percentage'] = pct
+
+        # Remap highest/lowest to match expected format
+        h = sales_data['highest']
+        l = sales_data['lowest']
+        sales_data['highest'] = {'date': h.get('date'), 'amount': h.get('total', 0)}
+        sales_data['lowest'] = {'date': l.get('date'), 'amount': l.get('total', 0)}
+
+        from reports.services import generate_sales_insights
+        insights = generate_sales_insights(sales_data, org_name, str(start), str(end))
+
+        if insights is None:
+            return Response({
+                'insights': None,
+                'error': 'AI analysis unavailable. ANTHROPIC_API_KEY not configured.',
+            })
+
+        return Response({
+            'insights': insights,
+            'generated_at': timezone.now().isoformat(),
+        })
+
+    def _compute_dow_avg(self, daily_rows):
+        """Compute day-of-week averages from daily data."""
+        from collections import defaultdict
+        dow_map = defaultdict(list)
+        for d in daily_rows:
+            dt = date_type.fromisoformat(d['date'])
+            dow_map[dt.strftime('%a')].append(d['total'])
+        day_order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        return [
+            {'day': day, 'avg_sales': round(sum(dow_map.get(day, [])) / max(len(dow_map.get(day, [])), 1), 2)}
+            for day in day_order
+        ]

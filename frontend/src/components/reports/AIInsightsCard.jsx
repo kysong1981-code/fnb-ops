@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { reportsAPI } from '../../services/api'
+import { reportsAPI, salesAnalysisAPI } from '../../services/api'
 import Card from '../ui/Card'
 import SectionLabel from '../ui/SectionLabel'
 
@@ -9,7 +9,7 @@ const TYPE_STYLES = {
   neutral: { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700', icon: 'ℹ️' },
 }
 
-export default function AIInsightsCard({ startDate, endDate, storeId }) {
+export default function AIInsightsCard({ startDate, endDate, storeId, useSalesAnalysisAPI }) {
   const [insights, setInsights] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -19,7 +19,14 @@ export default function AIInsightsCard({ startDate, endDate, storeId }) {
     setError('')
     setInsights(null)
     try {
-      const res = await reportsAPI.getAIInsights(startDate, endDate, storeId)
+      let res
+      if (useSalesAnalysisAPI) {
+        const params = { start_date: startDate, end_date: endDate }
+        if (storeId) params.organization_id = storeId
+        res = await salesAnalysisAPI.getAIInsights(params)
+      } else {
+        res = await reportsAPI.getAIInsights(startDate, endDate, storeId)
+      }
       if (res.data.insights) {
         setInsights(res.data.insights)
       } else {
