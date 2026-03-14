@@ -361,7 +361,16 @@ export default function CashUpPage() {
       loadHrCashBalance()
       const res = await closingAPI.approve(closing.id)
       setClosing(res.data)
-      showMsg('Saved & Approved')
+      // Remove this date from missing days
+      const updatedMissing = missingDays.filter(d => d !== selectedDate)
+      setMissingDays(updatedMissing)
+      // Navigate to next missing day, or show all-done
+      if (updatedMissing.length > 0) {
+        showMsg('Approved! Moving to next day...')
+        setTimeout(() => setSelectedDate(updatedMissing[0]), 500)
+      } else {
+        showMsg('All days approved!')
+      }
     } catch (err) {
       setError(getErrorMsg(err))
     } finally {
