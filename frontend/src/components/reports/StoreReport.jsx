@@ -211,11 +211,6 @@ export default function StoreReport() {
         </div>
       )}
 
-      {/* Charts (always shown for daily tab) */}
-      {reportType === 'daily' && !isSelfContained && (
-        <DailyCharts startDate={chartRange.start} endDate={chartRange.end} />
-      )}
-
       {/* Report content */}
       {isSelfContained ? (
         <>
@@ -235,6 +230,11 @@ export default function StoreReport() {
           {reportType === 'comparison' && <StoreComparison data={reportData} />}
         </>
       ) : null}
+
+      {/* Charts (below report data for daily tab) */}
+      {reportType === 'daily' && !isSelfContained && (
+        <DailyCharts startDate={chartRange.start} endDate={chartRange.end} />
+      )}
     </div>
   )
 }

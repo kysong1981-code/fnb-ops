@@ -8,9 +8,8 @@ import SectionLabel from '../ui/SectionLabel'
 import Badge from '../ui/Badge'
 
 const DATE_MODES = [
-  { key: 'day', label: 'Day' },
-  { key: 'week', label: 'Week' },
   { key: 'month', label: 'Month' },
+  { key: 'week', label: 'Week' },
   { key: 'custom', label: 'Custom' },
 ]
 
@@ -42,7 +41,7 @@ const SENIOR_ROLES = ['SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO', 'ADMIN'
 
 export default function SalesReport() {
   const { user } = useAuth()
-  const [dateMode, setDateMode] = useState('day')
+  const [dateMode, setDateMode] = useState('month')
   const [date, setDate] = useState(getTodayNZ())
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
