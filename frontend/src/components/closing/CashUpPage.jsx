@@ -465,6 +465,15 @@ export default function CashUpPage() {
           <p className="text-gray-400 text-sm">No closing found for this date</p>
           <p className="text-gray-300 text-xs mt-1">Staff must create a closing first</p>
         </Card>
+      ) : activeTab === 'cashup' && closing && closing.status === 'APPROVED' && missingDays.length === 0 ? (
+        /* ============ ALL DONE STATE ============ */
+        <Card className="p-8 text-center space-y-3">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+            <CheckCircleIcon size={32} className="text-green-600" />
+          </div>
+          <p className="text-lg font-bold text-gray-900">All Done!</p>
+          <p className="text-sm text-gray-500">All daily closings are approved.</p>
+        </Card>
       ) : activeTab === 'cashup' && closing ? (
         /* ============ CASH UP TAB ============ */
         <>
