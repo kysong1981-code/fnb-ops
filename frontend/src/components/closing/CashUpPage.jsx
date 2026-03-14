@@ -459,113 +459,78 @@ export default function CashUpPage() {
       ) : activeTab === 'cashup' && closing ? (
         /* ============ CASH UP TAB ============ */
         <>
-          {closing.status === 'APPROVED' ? (
-            /* ---- Approved: Read-only summary ---- */
-            <>
-              <Card className="p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-700">Cash Up Summary</span>
-                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-700">✓ Approved</span>
-                </div>
-                <div className="border-t border-gray-100" />
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">Actual Cash</span>
-                  <span className="text-sm font-bold text-gray-900">{fmt(closing.actual_cash)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">Bank Deposit</span>
-                  <span className="text-sm font-bold text-gray-900">{fmt(bankDeposit)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">HR Cash</span>
-                  <span className="text-sm font-bold text-gray-900">{fmt(hrCashAmount)}</span>
-                </div>
-                <div className="border-t border-gray-200 pt-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-semibold text-gray-700">Remaining</span>
-                    <span className={`text-lg font-bold ${(actualCash - deposit - (parseFloat(hrCashAmount) || 0)) === 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {fmt(actualCash - deposit - (parseFloat(hrCashAmount) || 0))}
-                    </span>
-                  </div>
-                </div>
-              </Card>
-            </>
-          ) : (
-            /* ---- Not approved: Editable form ---- */
-            <>
-              <Card className="p-5 space-y-4">
-                {/* Actual Cash */}
-                <div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-500">Actual Cash</span>
-                    <span className="text-xl font-bold text-gray-900">{fmt(closing.actual_cash)}</span>
-                  </div>
-                  <div className="mt-1">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      closing.status === 'SUBMITTED' ? 'bg-blue-100 text-blue-700' :
-                      'bg-gray-100 text-gray-600'
-                    }`}>
-                      {closing.status}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="border-t border-gray-100" />
-
-                {/* Bank Deposit */}
-                <div>
-                  <label className="text-sm font-medium text-gray-500 block mb-1.5">Bank Deposit</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={bankDeposit}
-                    onChange={(e) => setBankDeposit(e.target.value)}
-                    placeholder="0.00"
-                    className={inputCls}
-                  />
-                </div>
-
-                {/* HR Cash */}
-                <div>
-                  <label className="text-sm font-medium text-gray-500 block mb-1.5">HR Cash</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={hrCashAmount}
-                    onChange={(e) => setHrCashAmount(e.target.value)}
-                    placeholder="0.00"
-                    className={inputCls}
-                  />
-                </div>
-
-                <div className="border-t border-gray-200 pt-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-semibold text-gray-700">Remaining Cash</span>
-                    <span className={`text-xl font-bold ${(actualCash - deposit - (parseFloat(hrCashAmount) || 0)) === 0 ? 'text-green-600' : (actualCash - deposit - (parseFloat(hrCashAmount) || 0)) > 0 ? 'text-amber-600' : 'text-red-600'}`}>
-                      {fmt(actualCash - deposit - (parseFloat(hrCashAmount) || 0))}
-                    </span>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Save & Approve */}
-              <div className="space-y-3 pb-6">
-                {cashVariance !== 0 && actualCash > 0 && (
-                  <p className="text-xs text-center text-amber-600">
-                    Balance is {fmt(cashVariance)} — must be $0.00 to approve
-                  </p>
-                )}
-                <button
-                  onClick={handleSaveAndSubmit}
-                  disabled={saving || cashVariance !== 0 || actualCash === 0}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition"
-                >
-                  <CheckCircleIcon size={18} />
-                  {saving ? 'Saving...' : 'Save & Approve'}
-                </button>
+          <Card className="p-5 space-y-4">
+            {/* Actual Cash */}
+            <div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-500">Actual Cash</span>
+                <span className="text-xl font-bold text-gray-900">{fmt(closing.actual_cash)}</span>
               </div>
-            </>
-          )}
+              <div className="mt-1">
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                  closing.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
+                  closing.status === 'SUBMITTED' ? 'bg-blue-100 text-blue-700' :
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  {closing.status === 'APPROVED' ? '✓ Approved' : closing.status}
+                </span>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-100" />
+
+            {/* Bank Deposit */}
+            <div>
+              <label className="text-sm font-medium text-gray-500 block mb-1.5">Bank Deposit</label>
+              <input
+                type="number"
+                step="0.01"
+                value={bankDeposit}
+                onChange={(e) => setBankDeposit(e.target.value)}
+                placeholder="0.00"
+                className={inputCls}
+              />
+            </div>
+
+            {/* HR Cash */}
+            <div>
+              <label className="text-sm font-medium text-gray-500 block mb-1.5">HR Cash</label>
+              <input
+                type="number"
+                step="0.01"
+                value={hrCashAmount}
+                onChange={(e) => setHrCashAmount(e.target.value)}
+                placeholder="0.00"
+                className={inputCls}
+              />
+            </div>
+
+            <div className="border-t border-gray-200 pt-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-semibold text-gray-700">Remaining Cash</span>
+                <span className={`text-xl font-bold ${cashVariance === 0 ? 'text-green-600' : cashVariance > 0 ? 'text-amber-600' : 'text-red-600'}`}>
+                  {fmt(cashVariance)}
+                </span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Save & Approve */}
+          <div className="space-y-3 pb-6">
+            {cashVariance !== 0 && actualCash > 0 && (
+              <p className="text-xs text-center text-amber-600">
+                Balance is {fmt(cashVariance)} — must be $0.00 to approve
+              </p>
+            )}
+            <button
+              onClick={handleSaveAndSubmit}
+              disabled={saving || cashVariance !== 0 || actualCash === 0}
+              className="w-full flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition"
+            >
+              <CheckCircleIcon size={18} />
+              {saving ? 'Saving...' : 'Save & Approve'}
+            </button>
+          </div>
         </>
       ) : (
         /* ============ HR CASH TAB ============ */

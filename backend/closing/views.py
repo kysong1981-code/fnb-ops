@@ -212,9 +212,9 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if closing.status not in ('DRAFT', 'SUBMITTED'):
+        if closing.status not in ('DRAFT', 'SUBMITTED', 'APPROVED'):
             return Response(
-                {'detail': f'DRAFT 또는 SUBMITTED 상태인 클로징만 승인할 수 있습니다. 현재 상태: {closing.status}'},
+                {'detail': f'Cannot approve. Current status: {closing.status}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
