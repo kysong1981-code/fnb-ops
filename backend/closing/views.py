@@ -218,21 +218,20 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Balance must be 0 to approve
+        hr_total = sum(e.amount for e in closing.hr_cash_entries.all())
+        exp_total = sum(e.amount for e in closing.cash_expenses.all())
+        balance = closing.actual_cash - closing.bank_deposit - hr_total - exp_total
+        if balance != 0:
+            return Response(
+                {'detail': f'Balance must be $0.00 to approve. Current balance: ${balance:.2f}. Allocate via Bank Deposit, HR Cash, or Expenses.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         closing.status = 'APPROVED'
         closing.approved_by = request.user.profile
         closing.approved_at = timezone.now()
         closing.save()
-
-        # Auto-create HR Cash entry if none exists and there's unaccounted cash
-        if not closing.hr_cash_entries.exists():
-            remaining = closing.actual_cash - closing.bank_deposit
-            if remaining > 0:
-                ClosingHRCash.objects.create(
-                    daily_closing=closing,
-                    amount=remaining,
-                    recipient_name='Auto',
-                    created_by=request.user.profile,
-                )
 
         serializer = self.get_serializer(closing)
         return Response(serializer.data, status=status.HTTP_200_OK)
