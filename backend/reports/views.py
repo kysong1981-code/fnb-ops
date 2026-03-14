@@ -1034,12 +1034,22 @@ class ReportViewSet(viewsets.ModelViewSet):
                 ).values('date').annotate(total=Sum('amount'), qty=Count('id'))
             }
 
-            # Fallback: if no Sales data, use DailyClosing POS totals
+            # Fallback: if no Sales data, use DailyClosing POS totals + Other Sales
             if not sales_agg:
+                from closing.models import ClosingOtherSale
+                other_sales_agg = {
+                    row['closing__closing_date']: float(row['total'] or 0)
+                    for row in ClosingOtherSale.objects.filter(
+                        closing__organization=org,
+                        closing__closing_date__range=[start_date, end_date]
+                    ).values('closing__closing_date').annotate(total=Sum('amount'))
+                }
                 for dc in DailyClosing.objects.filter(
                     organization=org, closing_date__range=[start_date, end_date]
                 ):
-                    total = float(dc.pos_card or 0) + float(dc.pos_cash or 0)
+                    pos_total = float(dc.pos_card or 0) + float(dc.pos_cash or 0)
+                    other_total = other_sales_agg.get(dc.closing_date, 0)
+                    total = pos_total + other_total
                     if total > 0:
                         sales_agg[dc.closing_date] = {'total': total, 'qty': 0}
 

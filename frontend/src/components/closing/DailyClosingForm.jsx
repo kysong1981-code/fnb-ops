@@ -46,7 +46,8 @@ export default function DailyClosingForm() {
 
   // Supplier costs (Today's Invoices)
   const [suppliers, setSuppliers] = useState([])
-  const [supplierCosts, setSupplierCosts] = useState([])
+  const [supplierCosts, setSupplierCosts] = useState([])       // saved in DB
+  const [pendingInvoices, setPendingInvoices] = useState([])    // local only, not yet saved
   const [invoiceAmounts, setInvoiceAmounts] = useState({})
 
   const [loading, setLoading] = useState(false)
@@ -220,8 +221,9 @@ export default function DailyClosingForm() {
         setClosingStatus(res.data.status)
       }
 
-      // Sync other sales
+      // Sync other sales + pending invoices
       await syncOtherSales(cId)
+      await syncPendingInvoices(cId)
 
       // Submit if still draft
       if (!closingStatus || closingStatus === 'DRAFT') {
@@ -270,8 +272,9 @@ export default function DailyClosingForm() {
         setClosingId(cId)
       }
 
-      // Sync other sales
+      // Sync other sales + pending invoices
       await syncOtherSales(cId)
+      await syncPendingInvoices(cId)
 
       // Submit then approve
       try { await closingAPI.submit(cId) } catch { /* may already be submitted */ }
@@ -285,27 +288,34 @@ export default function DailyClosingForm() {
     }
   }
 
-  // Add invoice for a supplier
-  const handleAddInvoice = async (supplierId) => {
+  // Add invoice locally (saved on Submit)
+  const handleAddInvoice = (supplierId) => {
     const amount = invoiceAmounts[supplierId]
     if (!amount) return
+    const sup = suppliers.find(s => s.id === supplierId)
+    setPendingInvoices(prev => [...prev, {
+      _localId: Date.now() + Math.random(),
+      supplier: supplierId,
+      supplier_name: sup?.name || '',
+      amount: parseFloat(amount),
+    }])
+    setInvoiceAmounts(prev => ({ ...prev, [supplierId]: '' }))
+  }
 
-    setLoading(true)
-    setError('')
-    try {
-      const cId = await ensureClosing()
-      if (!cId) { setLoading(false); return }
+  // Delete pending (local) invoice
+  const handleDeletePending = (localId) => {
+    setPendingInvoices(prev => prev.filter(p => p._localId !== localId))
+  }
 
-      await supplierCostAPI.create({ closing: cId, supplier: supplierId, amount })
-      setInvoiceAmounts(prev => ({ ...prev, [supplierId]: '' }))
-      const res = await supplierCostAPI.list(cId)
-      setSupplierCosts(res.data.results || res.data || [])
-      showMsg('Invoice added')
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to add invoice')
-    } finally {
-      setLoading(false)
+  // Save all pending invoices to DB
+  const syncPendingInvoices = async (cId) => {
+    for (const inv of pendingInvoices) {
+      await supplierCostAPI.create({ closing: cId, supplier: inv.supplier, amount: inv.amount })
     }
+    setPendingInvoices([])
+    // Reload from DB
+    const res = await supplierCostAPI.list(cId)
+    setSupplierCosts(res.data.results || res.data || [])
   }
 
   // Approve (for manager reviewing employee submissions)
@@ -346,7 +356,7 @@ export default function DailyClosingForm() {
 
   const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400'
 
-  const supplierCostTotal = supplierCosts.reduce((s, c) => s + parseFloat(c.amount || 0), 0)
+  const supplierCostTotal = supplierCosts.reduce((s, c) => s + parseFloat(c.amount || 0), 0) + pendingInvoices.reduce((s, p) => s + (p.amount || 0), 0)
   const otherSaleTotal = Object.values(otherSaleAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0)
 
   // Format date for display
@@ -516,7 +526,9 @@ export default function DailyClosingForm() {
           <SectionLabel>Today's Invoices</SectionLabel>
           <div className="space-y-3">
             {suppliers.map((sup) => {
-              const entries = supplierCosts.filter(sc => sc.supplier === sup.id)
+              const saved = supplierCosts.filter(sc => sc.supplier === sup.id)
+              const pending = pendingInvoices.filter(p => p.supplier === sup.id)
+              const allEntries = [...saved, ...pending]
               return (
                 <div key={sup.id} className="border border-gray-100 rounded-xl overflow-hidden">
                   <div className="flex items-center gap-3 p-3 bg-gray-50">
@@ -532,7 +544,7 @@ export default function DailyClosingForm() {
                         />
                         <button
                           onClick={() => handleAddInvoice(sup.id)}
-                          disabled={loading || !invoiceAmounts[sup.id]}
+                          disabled={!invoiceAmounts[sup.id]}
                           className="shrink-0 flex items-center gap-1 px-3 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 disabled:opacity-40 transition"
                         >
                           <PlusIcon size={14} /> Add
@@ -540,9 +552,9 @@ export default function DailyClosingForm() {
                       </>
                     )}
                   </div>
-                  {entries.length > 0 && (
+                  {allEntries.length > 0 && (
                     <div className="px-3 pb-2">
-                      {entries.map((sc) => (
+                      {saved.map((sc) => (
                         <div key={sc.id} className="flex items-center justify-between py-1.5 pl-3">
                           <span className="text-xs text-gray-500">{fmt(sc.amount)}</span>
                           {!isReadOnly && (
@@ -552,10 +564,18 @@ export default function DailyClosingForm() {
                           )}
                         </div>
                       ))}
-                      {entries.length > 1 && (
+                      {pending.map((p) => (
+                        <div key={p._localId} className="flex items-center justify-between py-1.5 pl-3 bg-blue-50 rounded">
+                          <span className="text-xs text-blue-600 font-medium">{fmt(p.amount)} <span className="text-blue-400">(unsaved)</span></span>
+                          <button onClick={() => handleDeletePending(p._localId)} className="text-gray-300 hover:text-red-500 transition p-1">
+                            <TrashIcon size={14} />
+                          </button>
+                        </div>
+                      ))}
+                      {allEntries.length > 1 && (
                         <div className="flex justify-end pt-1 border-t border-gray-100 mt-1">
                           <span className="text-xs font-semibold text-gray-600">
-                            {fmt(entries.reduce((s, c) => s + parseFloat(c.amount || 0), 0))}
+                            {fmt(allEntries.reduce((s, c) => s + parseFloat(c.amount || 0), 0))}
                           </span>
                         </div>
                       )}
