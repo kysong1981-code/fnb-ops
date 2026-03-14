@@ -592,6 +592,7 @@ export const salesAnalysisAPI = {
   getAIInsights: (params) => api.get('/closing/sales-analysis/ai-insights/', { params, timeout: 60000 }),
   getComparison: (params) => api.get('/closing/sales-analysis/compare/', { params }),
   getHolidays: (params) => api.get('/closing/sales-analysis/holidays/', { params }),
+  getUpcomingHolidays: (limit = 5) => api.get('/closing/sales-analysis/upcoming-holidays/', { params: { limit } }),
 }
 
 // Monthly Close API

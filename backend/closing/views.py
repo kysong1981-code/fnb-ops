@@ -2029,6 +2029,39 @@ class SalesAnalysisViewSet(viewsets.GenericViewSet):
             'period_total': totals['total_sales'],
         })
 
+    @action(detail=False, methods=['get'], url_path='upcoming-holidays',
+            permission_classes=[IsAuthenticated])
+    def upcoming_holidays(self, request):
+        """Get next upcoming holidays from today."""
+        from closing.models import Holiday
+        today = date_type.today()
+        limit = int(request.query_params.get('limit', 5))
+
+        upcoming = Holiday.objects.filter(
+            end_date__gte=today,
+        ).order_by('start_date')[:limit]
+
+        result = []
+        for h in upcoming:
+            days_until = (h.start_date - today).days
+            if days_until < 0:
+                days_until = 0  # Currently ongoing
+
+            result.append({
+                'id': h.id,
+                'name': h.name,
+                'name_ko': h.name_ko,
+                'category': h.category,
+                'start_date': str(h.start_date),
+                'end_date': str(h.end_date),
+                'impact': h.impact,
+                'days_until': days_until,
+                'is_ongoing': h.start_date <= today <= h.end_date,
+                'duration': (h.end_date - h.start_date).days + 1,
+            })
+
+        return Response({'upcoming': result})
+
     def _compute_dow_avg(self, daily_rows):
         """Compute day-of-week averages from daily data."""
         from collections import defaultdict
