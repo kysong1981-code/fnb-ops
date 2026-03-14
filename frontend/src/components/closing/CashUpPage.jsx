@@ -74,7 +74,7 @@ export default function CashUpPage() {
           try {
             const res = await closingAPI.getByDate(dateStr)
             const data = res.data.results || res.data || []
-            if (data.length === 0 || !['SUBMITTED', 'APPROVED'].includes(data[0].status)) {
+            if (data.length === 0 || data[0].status !== 'APPROVED') {
               missing.push(dateStr)
             }
           } catch {
@@ -410,17 +410,17 @@ export default function CashUpPage() {
         ))}
       </div>
 
-      {/* Missing days alert (Cash Up tab only) */}
-      {activeTab === 'cashup' && missingDays.length > 0 && (
+      {/* Missing days alert */}
+      {missingDays.length > 0 && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
           <p className="text-sm font-semibold text-red-700 mb-2">
-            {missingDays.length} day{missingDays.length > 1 ? 's' : ''} not completed
+            {missingDays.length} day{missingDays.length > 1 ? 's' : ''} not approved
           </p>
           <div className="flex flex-wrap gap-2">
             {missingDays.map((d) => (
               <button
                 key={d}
-                onClick={() => setSelectedDate(d)}
+                onClick={() => { setSelectedDate(d); setActiveTab('cashup') }}
                 className="text-xs bg-red-100 text-red-700 px-2.5 py-1 rounded-lg hover:bg-red-200 transition font-medium"
               >
                 {formatDateShort(d)}
