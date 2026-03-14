@@ -486,7 +486,12 @@ export default function CashUpPage() {
                 type="number"
                 step="0.01"
                 value={bankDeposit}
-                onChange={(e) => setBankDeposit(e.target.value)}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value) || 0
+                  setBankDeposit(e.target.value)
+                  const remaining = actualCash - val
+                  setHrCashAmount(remaining > 0 ? String(remaining) : '0')
+                }}
                 placeholder="0.00"
                 className={inputCls}
               />
