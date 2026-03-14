@@ -290,6 +290,13 @@ export default function StoreAnalysis({ startDate, endDate, organizationId }) {
         dayOfWeekData={computeDayOfWeek(daily)}
       />
 
+      {/* Holiday Analysis */}
+      <HolidayAnalysis
+        startDate={startDate}
+        endDate={endDate}
+        organizationId={organizationId}
+      />
+
       {/* AI Insights */}
       <AIInsightsCard
         startDate={startDate}
@@ -414,6 +421,90 @@ function KpiCardWithComparison({ label, value, sub, prevMonth, prevMonthLabel, l
         </div>
       )}
     </Card>
+  )
+}
+
+const CATEGORY_LABELS = {
+  NZ_PUBLIC: { label: 'NZ Public Holiday', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  NZ_SCHOOL: { label: 'School Holiday', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+  CN_MAJOR: { label: 'Chinese Holiday', color: 'bg-red-100 text-red-700 border-red-200' },
+  CN_FESTIVAL: { label: 'Chinese Festival', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  KR_MAJOR: { label: 'Korean Holiday', color: 'bg-green-100 text-green-700 border-green-200' },
+  OTHER: { label: 'Other', color: 'bg-gray-100 text-gray-700 border-gray-200' },
+}
+
+function HolidayAnalysis({ startDate, endDate, organizationId }) {
+  const [holidays, setHolidays] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!startDate || !endDate) return
+    setLoading(true)
+    const params = { start_date: startDate, end_date: endDate }
+    if (organizationId) params.organization_id = organizationId
+    salesAnalysisAPI.getHolidays(params)
+      .then(res => setHolidays(res.data))
+      .catch(() => setHolidays(null))
+      .finally(() => setLoading(false))
+  }, [startDate, endDate, organizationId])
+
+  if (loading) return null
+  if (!holidays || !holidays.holidays || holidays.holidays.length === 0) return null
+
+  const sorted = [...holidays.holidays].sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
+
+  return (
+    <>
+      <SectionLabel>Holiday Impact Analysis</SectionLabel>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {sorted.map(h => {
+          const cat = CATEGORY_LABELS[h.category] || CATEGORY_LABELS.OTHER
+          const isPositive = h.impact_pct >= 0
+          return (
+            <Card key={h.id} className="p-4">
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{h.name}</p>
+                  {h.name_ko && <p className="text-xs text-gray-500">{h.name_ko}</p>}
+                </div>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${cat.color}`}>
+                  {cat.label}
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-400 mb-3">
+                {h.start_date === h.end_date
+                  ? new Date(h.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  : `${new Date(h.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — ${new Date(h.end_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                }
+              </p>
+              {h.days_with_data > 0 ? (
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase">Total</p>
+                    <p className="text-sm font-bold text-gray-900">{fmt(h.total_sales)}</p>
+                    <p className="text-[10px] text-gray-400">{h.days_with_data} days</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase">Avg Daily</p>
+                    <p className="text-sm font-bold text-gray-900">{fmt(h.avg_daily)}</p>
+                    <p className="text-[10px] text-gray-400">vs {fmt(h.non_holiday_avg)} normal</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase">Impact</p>
+                    <p className={`text-sm font-bold ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {isPositive ? '↑' : '↓'} {Math.abs(h.impact_pct).toFixed(1)}%
+                    </p>
+                    <p className="text-[10px] text-gray-400">vs normal days</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400">No sales data for this period</p>
+              )}
+            </Card>
+          )
+        })}
+      </div>
+    </>
   )
 }
 

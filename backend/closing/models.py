@@ -458,3 +458,42 @@ class CQExpense(models.Model):
 
     def __str__(self):
         return f"{self.get_account_display()} - {self.description} ({self.amount})"
+
+
+# Holiday Category Choices
+HOLIDAY_CATEGORY_CHOICES = (
+    ('NZ_PUBLIC', 'NZ Public Holiday'),
+    ('NZ_SCHOOL', 'NZ School Holiday'),
+    ('CN_MAJOR', 'Chinese Major Holiday'),
+    ('CN_FESTIVAL', 'Chinese Festival'),
+    ('KR_MAJOR', 'Korean Major Holiday'),
+    ('OTHER', 'Other'),
+)
+
+
+class Holiday(models.Model):
+    """Holiday calendar for sales analysis — tracks public holidays, school breaks, and tourism seasons."""
+    name = models.CharField(max_length=200)
+    name_ko = models.CharField(max_length=200, blank=True, help_text="Korean name")
+    category = models.CharField(max_length=20, choices=HOLIDAY_CATEGORY_CHOICES)
+    start_date = models.DateField()
+    end_date = models.DateField(help_text="Same as start_date for single-day holidays")
+    year = models.IntegerField()
+    impact = models.CharField(
+        max_length=20, default='HIGH',
+        choices=(('HIGH', 'High'), ('MEDIUM', 'Medium'), ('LOW', 'Low')),
+        help_text="Expected impact on sales"
+    )
+    notes = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['start_date']
+        indexes = [
+            models.Index(fields=['start_date', 'end_date']),
+            models.Index(fields=['category', 'year']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.start_date} ~ {self.end_date})"

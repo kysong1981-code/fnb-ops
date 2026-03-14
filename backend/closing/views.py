@@ -1951,6 +1951,84 @@ class SalesAnalysisViewSet(viewsets.GenericViewSet):
             'generated_at': timezone.now().isoformat(),
         })
 
+    @action(detail=False, methods=['get'], url_path='holidays',
+            permission_classes=[IsAuthenticated])
+    def holidays(self, request):
+        """Get holidays for a date range, with sales data overlay."""
+        from closing.models import Holiday
+        start, end = self._parse_dates(request)
+        profile = request.user.profile
+
+        # Get holidays in range
+        holidays = Holiday.objects.filter(
+            start_date__lte=end,
+            end_date__gte=start,
+        ).values('id', 'name', 'name_ko', 'category', 'start_date', 'end_date', 'year', 'impact')
+
+        # Get org sales data
+        org_id = request.query_params.get('organization_id')
+        if org_id:
+            org_ids = [int(org_id)]
+        else:
+            org_ids = [profile.organization_id]
+
+        # Get daily sales for the period
+        daily_rows, totals, _ = self._aggregate_for_orgs(org_ids, start, end)
+        sales_by_date = {r['date']: r['total'] for r in daily_rows}
+
+        # Compute holiday sales analysis
+        result = []
+        for h in holidays:
+            h_start = max(h['start_date'], start)
+            h_end = min(h['end_date'], end)
+
+            # Sum sales during this holiday
+            holiday_sales = []
+            d = h_start
+            while d <= h_end:
+                s = sales_by_date.get(str(d), 0)
+                if s > 0:
+                    holiday_sales.append(s)
+                d += timedelta(days=1)
+
+            holiday_total = sum(holiday_sales)
+            holiday_days = len(holiday_sales)
+            holiday_avg = round(holiday_total / holiday_days, 2) if holiday_days else 0
+
+            # Compare to non-holiday average
+            non_holiday_sales = []
+            for row in daily_rows:
+                row_date = date_type.fromisoformat(row['date'])
+                is_in_any_holiday = any(
+                    hh['start_date'] <= row_date <= hh['end_date'] for hh in holidays
+                )
+                if not is_in_any_holiday and row['total'] > 0:
+                    non_holiday_sales.append(row['total'])
+
+            non_holiday_avg = round(sum(non_holiday_sales) / len(non_holiday_sales), 2) if non_holiday_sales else 0
+            impact_pct = round(((holiday_avg - non_holiday_avg) / non_holiday_avg) * 100, 1) if non_holiday_avg else 0
+
+            result.append({
+                'id': h['id'],
+                'name': h['name'],
+                'name_ko': h['name_ko'],
+                'category': h['category'],
+                'start_date': str(h['start_date']),
+                'end_date': str(h['end_date']),
+                'impact': h['impact'],
+                'total_sales': holiday_total,
+                'days_with_data': holiday_days,
+                'avg_daily': holiday_avg,
+                'non_holiday_avg': non_holiday_avg,
+                'impact_pct': impact_pct,
+            })
+
+        return Response({
+            'holidays': result,
+            'period_avg': totals['avg_daily'],
+            'period_total': totals['total_sales'],
+        })
+
     def _compute_dow_avg(self, daily_rows):
         """Compute day-of-week averages from daily data."""
         from collections import defaultdict
