@@ -73,7 +73,7 @@ class ReportViewSet(viewsets.ModelViewSet):
         """
         try:
             date_str = request.query_params.get('date')
-            target_date = timezone.now().date() if not date_str else date_str
+            target_date = timezone.localdate() if not date_str else date_str
 
             org = self._get_organization(request)
 
@@ -136,7 +136,7 @@ class ReportViewSet(viewsets.ModelViewSet):
         """
         try:
             date_str = request.query_params.get('date')
-            target_date = timezone.now().date() if not date_str else date_str
+            target_date = timezone.localdate() if not date_str else date_str
 
             # 현재 조직 및 하위 조직 찾기
             current_org = self._get_organization(request)
@@ -224,7 +224,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             period = request.query_params.get('period', 'daily')
             days = int(request.query_params.get('days', 30))
 
-            end_date = timezone.now().date()
+            end_date = timezone.localdate()
             start_date = end_date - timedelta(days=days)
 
             org = self._get_organization(request)
@@ -357,7 +357,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                 start = datetime.strptime(start_date_str, '%Y-%m-%d').date()
                 end = datetime.strptime(end_date_str, '%Y-%m-%d').date()
             else:
-                start = timezone.now().date()
+                start = timezone.localdate()
                 end = start
 
             # 기간 내 클로징 데이터 조회
@@ -379,7 +379,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                 'balance': Decimal('0'),
             }
 
-            today = timezone.now().date()
+            today = timezone.localdate()
             # 미래 날짜는 오늘까지만
             effective_end = min(end, today)
 
@@ -517,7 +517,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                 start = datetime.strptime(start_date_str, '%Y-%m-%d').date()
                 end = datetime.strptime(end_date_str, '%Y-%m-%d').date()
             else:
-                start = timezone.now().date()
+                start = timezone.localdate()
                 end = start
 
             # 클로징 데이터 조회
@@ -665,7 +665,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                     parts = month_str.split('-')
                     year, month = int(parts[0]), int(parts[1])
                 else:
-                    today = timezone.now().date()
+                    today = timezone.localdate()
                     year, month = today.year, today.month
 
                 from datetime import date as dt_date
@@ -729,7 +729,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                     start = datetime.strptime(start_str, '%Y-%m-%d').date()
                     end = datetime.strptime(end_str, '%Y-%m-%d').date()
                 else:
-                    end = timezone.now().date()
+                    end = timezone.localdate()
                     start = end - timedelta(days=30)
 
                 entries = ClosingSupplierCost.objects.filter(
@@ -807,7 +807,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                 parts = month_str.split('-')
                 year, month = int(parts[0]), int(parts[1])
             else:
-                today = timezone.now().date()
+                today = timezone.localdate()
                 year, month = today.year, today.month
 
             from datetime import date as dt_date
@@ -886,7 +886,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             start_param = request.query_params.get('start_date')
             end_param = request.query_params.get('end_date')
 
-            today = timezone.now().date()
+            today = timezone.localdate()
 
             if start_param and end_param:
                 start_date = datetime.strptime(start_param, '%Y-%m-%d').date()

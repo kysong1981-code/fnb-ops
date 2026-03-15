@@ -392,7 +392,7 @@ class StoreApplicationAdminViewSet(viewsets.ReadOnlyModelViewSet):
                 employee_id=employee_id,
                 role='MANAGER',
                 organization=org,
-                date_of_joining=timezone.now().date(),
+                date_of_joining=timezone.localdate(),
                 phone=application.applicant_phone or '',
             )
 

@@ -55,8 +55,8 @@ class SalesViewSet(viewsets.ModelViewSet):
             end_date_str = request.query_params.get('end_date')
             start_date_str = request.query_params.get('start_date')
 
-            end_date = timezone.now().date() if not end_date_str else end_date_str
-            start_date = (timezone.now().date() - timedelta(days=7)) if not start_date_str else start_date_str
+            end_date = timezone.localdate() if not end_date_str else end_date_str
+            start_date = (timezone.localdate() - timedelta(days=7)) if not start_date_str else start_date_str
 
             # 필터링된 데이터 조회
             queryset = self.filter_queryset(self.get_queryset())
@@ -94,7 +94,7 @@ class SalesViewSet(viewsets.ModelViewSet):
         """
         try:
             weeks = int(request.query_params.get('weeks', 4))
-            end_date = timezone.now().date()
+            end_date = timezone.localdate()
             start_date = end_date - timedelta(weeks=weeks)
 
             # 필터링된 데이터 조회
@@ -148,7 +148,7 @@ class SalesViewSet(viewsets.ModelViewSet):
         """
         try:
             months = int(request.query_params.get('months', 12))
-            end_date = timezone.now().date()
+            end_date = timezone.localdate()
             start_date = end_date - timedelta(days=30*months)
 
             # 필터링된 데이터 조회
@@ -202,7 +202,7 @@ class SalesViewSet(viewsets.ModelViewSet):
         - 전체 통계
         """
         try:
-            today = timezone.now().date()
+            today = timezone.localdate()
             yesterday = today - timedelta(days=1)
 
             # 필터링된 데이터 조회

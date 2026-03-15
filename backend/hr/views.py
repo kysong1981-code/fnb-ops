@@ -463,7 +463,7 @@ class RosterViewSet(viewsets.ModelViewSet):
         """Update break_minutes for all unpublished rosters in a week."""
         break_minutes = request.data.get('break_minutes', 30)
         date_str = request.data.get('date')
-        target_date = timezone.now().date() if not date_str else timezone.datetime.strptime(date_str, '%Y-%m-%d').date()
+        target_date = timezone.localdate() if not date_str else timezone.datetime.strptime(date_str, '%Y-%m-%d').date()
         week_start = target_date - timedelta(days=target_date.weekday())
         week_end = week_start + timedelta(days=6)
         org = self._resolve_org()
@@ -481,7 +481,7 @@ class RosterViewSet(viewsets.ModelViewSet):
         """주간 스케줄 조회"""
         try:
             date_str = request.query_params.get('date')
-            target_date = timezone.now().date() if not date_str else timezone.datetime.strptime(date_str, '%Y-%m-%d').date()
+            target_date = timezone.localdate() if not date_str else timezone.datetime.strptime(date_str, '%Y-%m-%d').date()
 
             # 주의 시작일 (월요일)
             week_start = target_date - timedelta(days=target_date.weekday())
@@ -512,7 +512,7 @@ class RosterViewSet(viewsets.ModelViewSet):
             if date_str:
                 target_date = timezone.datetime.strptime(date_str, '%Y-%m-%d').date()
             else:
-                target_date = timezone.now().date()
+                target_date = timezone.localdate()
 
             month_start = target_date.replace(day=1)
             if month_start.month == 12:
@@ -542,7 +542,7 @@ class RosterViewSet(viewsets.ModelViewSet):
     def my_roster(self, request):
         """Employee's own roster: today, tomorrow, and weekly"""
         profile = request.user.profile
-        today = timezone.now().date()
+        today = timezone.localdate()  # NZ date, not UTC
         tomorrow = today + timedelta(days=1)
 
         today_roster = Roster.objects.filter(user=profile, date=today).first()
@@ -716,7 +716,7 @@ class TimesheetViewSet(viewsets.ModelViewSet):
     def weekly(self, request):
         try:
             date_str = request.query_params.get('date')
-            target_date = timezone.now().date() if not date_str else timezone.datetime.strptime(date_str, '%Y-%m-%d').date()
+            target_date = timezone.localdate() if not date_str else timezone.datetime.strptime(date_str, '%Y-%m-%d').date()
             week_start = target_date - timedelta(days=target_date.weekday())
             week_end = week_start + timedelta(days=6)
             timesheets = self.filter_queryset(self.get_queryset()).filter(
@@ -737,7 +737,7 @@ class TimesheetViewSet(viewsets.ModelViewSet):
     def today(self, request):
         """Return current user's today timesheet + status"""
         profile = request.user.profile
-        today = timezone.now().date()
+        today = timezone.localdate()
         try:
             ts = Timesheet.objects.get(user=profile, date=today)
         except Timesheet.DoesNotExist:
@@ -765,7 +765,7 @@ class TimesheetViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='clock_in')
     def clock_in(self, request):
         profile = request.user.profile
-        today = timezone.now().date()
+        today = timezone.localdate()
         if Timesheet.objects.filter(user=profile, date=today).exists():
             return Response({'error': 'Already clocked in today.'}, status=status.HTTP_400_BAD_REQUEST)
         ts = Timesheet.objects.create(
@@ -780,7 +780,7 @@ class TimesheetViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='clock_out')
     def clock_out(self, request):
         profile = request.user.profile
-        today = timezone.now().date()
+        today = timezone.localdate()
         try:
             ts = Timesheet.objects.get(user=profile, date=today)
         except Timesheet.DoesNotExist:
@@ -866,7 +866,7 @@ class TimesheetViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='break_start')
     def start_break(self, request):
         profile = request.user.profile
-        today = timezone.now().date()
+        today = timezone.localdate()
         try:
             ts = Timesheet.objects.get(user=profile, date=today)
         except Timesheet.DoesNotExist:
@@ -885,7 +885,7 @@ class TimesheetViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='break_end')
     def end_break(self, request):
         profile = request.user.profile
-        today = timezone.now().date()
+        today = timezone.localdate()
         try:
             ts = Timesheet.objects.get(user=profile, date=today)
         except Timesheet.DoesNotExist:
@@ -1097,7 +1097,7 @@ class TeamViewSet(viewsets.ViewSet):
             except (ValueError, TypeError):
                 return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
         else:
-            effective_date = timezone.now().date()
+            effective_date = timezone.localdate()
 
         with transaction.atomic():
             # Deactivate current salary (set end date to day before new rate)
@@ -1621,7 +1621,7 @@ class EmployeeInviteViewSet(viewsets.ModelViewSet):
                 organization=org,
                 job_title=invite.job_title,
                 work_type=invite.work_type,
-                date_of_joining=timezone.now().date(),
+                date_of_joining=timezone.localdate(),
                 phone='',
             )
 
@@ -1630,7 +1630,7 @@ class EmployeeInviteViewSet(viewsets.ModelViewSet):
                 organization=org,
                 user=user_profile,
                 hourly_rate=invite.hourly_rate,
-                effective_from=timezone.now().date(),
+                effective_from=timezone.localdate(),
                 is_active=True,
             )
 
