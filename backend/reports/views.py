@@ -1025,14 +1025,15 @@ class ReportViewSet(viewsets.ModelViewSet):
 
         daily_data = []
         for c in closings:
-            other_sales = ClosingOtherSale.objects.filter(closing=c).aggregate(
+            other_sales_total = ClosingOtherSale.objects.filter(closing=c).aggregate(
                 total=Sum('amount'))['total'] or 0
-            total = float(c.pos_card + c.pos_cash) + float(other_sales)
+            total = float(c.pos_card + c.pos_cash) + float(other_sales_total)
             daily_data.append({
                 'date': str(c.closing_date),
                 'actual_total': total,
                 'card_sales': float(c.actual_card),
                 'cash_sales': float(c.actual_cash),
+                'other_sales': float(other_sales_total),
                 'variance': float(c.total_variance),
                 'status': c.status,
             })
@@ -1044,6 +1045,7 @@ class ReportViewSet(viewsets.ModelViewSet):
 
         card_total = sum(d['card_sales'] for d in daily_data)
         cash_total = sum(d['cash_sales'] for d in daily_data)
+        other_total = sum(d['other_sales'] for d in daily_data)
 
         best = max(daily_data, key=lambda d: d['actual_total'], default=None)
         worst = min(daily_data, key=lambda d: d['actual_total'], default=None)
@@ -1079,6 +1081,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             'average_daily': round(avg_daily, 2),
             'card_total': round(card_total, 2),
             'cash_total': round(cash_total, 2),
+            'other_total': round(other_total, 2),
             'highest': {'date': best['date'] if best else None, 'amount': best['actual_total'] if best else 0},
             'lowest': {'date': worst['date'] if worst else None, 'amount': worst['actual_total'] if worst else 0},
             'trend': trend,

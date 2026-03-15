@@ -175,8 +175,9 @@ export default function SalesReport() {
   const dayOfWeekData = singleData?.data ? computeDayOfWeek(singleData.data) : []
   const salesSummary = singleData ? {
     total_sales: stats?.total_sales || 0,
-    card_total: singleData.data?.reduce((s, d) => s + parseFloat(d.card_sales || 0), 0) || 0,
-    cash_total: singleData.data?.reduce((s, d) => s + parseFloat(d.cash_sales || 0), 0) || 0,
+    card_total: stats?.card_total || singleData.data?.reduce((s, d) => s + parseFloat(d.card_sales || 0), 0) || 0,
+    cash_total: stats?.cash_total || singleData.data?.reduce((s, d) => s + parseFloat(d.cash_sales || 0), 0) || 0,
+    other_total: stats?.other_total || singleData.data?.reduce((s, d) => s + parseFloat(d.other_sales || 0), 0) || 0,
   } : null
 
   return (
@@ -255,7 +256,7 @@ export default function SalesReport() {
         <>
           {/* KPI Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard label="Total Sales" value={fmt(stats.total_sales)} />
+            <KpiCard label="Total Revenue" value={fmt(stats.total_sales)} sub={`POS: ${fmt((stats.card_total || 0) + (stats.cash_total || 0))}${stats.other_total > 0 ? ` + Other: ${fmt(stats.other_total)}` : ''}`} />
             <KpiCard label="Daily Average" value={fmt(stats.average_daily)} />
             <KpiCard
               label="Highest"
@@ -272,6 +273,35 @@ export default function SalesReport() {
               alert={stats.trend === 'down' ? 'Declining' : undefined}
             />
           </div>
+
+          {/* Revenue Breakdown */}
+          {salesSummary && salesSummary.other_total > 0 && (
+            <Card className="p-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Revenue Breakdown</p>
+              <div className="h-8 rounded-xl overflow-hidden flex bg-gray-100 mb-3">
+                {salesSummary.card_total > 0 && (
+                  <div className="bg-gray-900 h-full flex items-center justify-center" style={{ width: `${(salesSummary.card_total / salesSummary.total_sales * 100)}%` }}>
+                    {(salesSummary.card_total / salesSummary.total_sales * 100) > 12 && <span className="text-[10px] font-semibold text-white">Card {(salesSummary.card_total / salesSummary.total_sales * 100).toFixed(1)}%</span>}
+                  </div>
+                )}
+                {salesSummary.cash_total > 0 && (
+                  <div className="bg-emerald-500 h-full flex items-center justify-center" style={{ width: `${(salesSummary.cash_total / salesSummary.total_sales * 100)}%` }}>
+                    {(salesSummary.cash_total / salesSummary.total_sales * 100) > 8 && <span className="text-[10px] font-semibold text-white">Cash {(salesSummary.cash_total / salesSummary.total_sales * 100).toFixed(1)}%</span>}
+                  </div>
+                )}
+                {salesSummary.other_total > 0 && (
+                  <div className="bg-blue-400 h-full flex items-center justify-center" style={{ width: `${(salesSummary.other_total / salesSummary.total_sales * 100)}%` }}>
+                    {(salesSummary.other_total / salesSummary.total_sales * 100) > 5 && <span className="text-[10px] font-semibold text-white">Other {(salesSummary.other_total / salesSummary.total_sales * 100).toFixed(1)}%</span>}
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-4 text-xs">
+                <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-900" /><span className="text-gray-600">Card</span><span className="font-semibold">{fmt(salesSummary.card_total)}</span></div>
+                <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-500" /><span className="text-gray-600">Cash</span><span className="font-semibold">{fmt(salesSummary.cash_total)}</span></div>
+                <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-blue-400" /><span className="text-gray-600">Other</span><span className="font-semibold">{fmt(salesSummary.other_total)}</span></div>
+              </div>
+            </Card>
+          )}
 
           {/* Charts */}
           <SalesCharts
@@ -296,29 +326,32 @@ export default function SalesReport() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left px-4 py-3 font-semibold text-gray-600">Date</th>
-                    <th className="text-right px-4 py-3 font-semibold text-gray-600">Card</th>
-                    <th className="text-right px-4 py-3 font-semibold text-gray-600">Cash</th>
-                    <th className="text-right px-4 py-3 font-semibold text-gray-600">Total</th>
-                    <th className="text-right px-4 py-3 font-semibold text-gray-600">Variance</th>
-                    <th className="text-center px-4 py-3 font-semibold text-gray-600">Status</th>
+                    <th className="text-left px-3 py-3 font-semibold text-gray-600">Date</th>
+                    <th className="text-right px-3 py-3 font-semibold text-gray-900 bg-gray-100">Total</th>
+                    <th className="text-right px-3 py-3 font-semibold text-gray-600">Card</th>
+                    <th className="text-right px-3 py-3 font-semibold text-gray-600">Cash</th>
+                    <th className="text-right px-3 py-3 font-semibold text-blue-600">Other</th>
+                    <th className="text-right px-3 py-3 font-semibold text-gray-600">Variance</th>
+                    <th className="text-center px-3 py-3 font-semibold text-gray-600">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {singleData.data.map((item, idx) => {
                     const variance = parseFloat(item.variance || 0)
+                    const otherSales = parseFloat(item.other_sales || 0)
                     return (
                       <tr key={idx} className="hover:bg-gray-50/50 transition">
-                        <td className="px-4 py-2.5 font-medium text-gray-900">
+                        <td className="px-3 py-2.5 font-medium text-gray-900">
                           {item.date ? fmtDate(item.date) : item.period}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-gray-700">{fmt(item.card_sales)}</td>
-                        <td className="px-4 py-2.5 text-right text-gray-700">{fmt(item.cash_sales)}</td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{fmt(item.actual_total)}</td>
-                        <td className={`px-4 py-2.5 text-right font-medium ${variance < 0 ? 'text-red-600' : variance > 0 ? 'text-emerald-600' : 'text-gray-500'}`}>
+                        <td className="px-3 py-2.5 text-right font-bold text-gray-900 bg-gray-50">{fmt(item.actual_total)}</td>
+                        <td className="px-3 py-2.5 text-right text-gray-700">{fmt(item.card_sales)}</td>
+                        <td className="px-3 py-2.5 text-right text-gray-700">{fmt(item.cash_sales)}</td>
+                        <td className="px-3 py-2.5 text-right text-blue-600">{otherSales > 0 ? fmt(otherSales) : '-'}</td>
+                        <td className={`px-3 py-2.5 text-right font-medium ${variance < 0 ? 'text-red-600' : variance > 0 ? 'text-emerald-600' : 'text-gray-500'}`}>
                           {variance > 0 ? '+' : ''}{fmt(variance)}
                         </td>
-                        <td className="px-4 py-2.5 text-center">
+                        <td className="px-3 py-2.5 text-center">
                           {item.status === 'APPROVED' ? (
                             <Badge variant="success">Approved</Badge>
                           ) : item.status === 'SUBMITTED' ? (
@@ -330,6 +363,16 @@ export default function SalesReport() {
                       </tr>
                     )
                   })}
+                  {/* Totals row */}
+                  <tr className="bg-gray-100 font-semibold border-t-2 border-gray-300">
+                    <td className="px-3 py-2.5 text-gray-900">Total</td>
+                    <td className="px-3 py-2.5 text-right text-gray-900 bg-gray-200">{fmt(stats.total_sales)}</td>
+                    <td className="px-3 py-2.5 text-right text-gray-900">{fmt(stats.card_total)}</td>
+                    <td className="px-3 py-2.5 text-right text-gray-900">{fmt(stats.cash_total)}</td>
+                    <td className="px-3 py-2.5 text-right text-blue-700">{fmt(stats.other_total)}</td>
+                    <td className="px-3 py-2.5" />
+                    <td className="px-3 py-2.5" />
+                  </tr>
                 </tbody>
               </table>
             </div>
