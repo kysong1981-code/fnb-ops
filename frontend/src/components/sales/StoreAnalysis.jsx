@@ -474,7 +474,7 @@ function HolidayAnalysis({ startDate, endDate, organizationId }) {
     if (organizationId) params.organization_id = organizationId
     Promise.all([
       salesAnalysisAPI.getHolidays(params).catch(() => ({ data: null })),
-      salesAnalysisAPI.getUpcomingHolidays(6).catch(() => ({ data: null })),
+      salesAnalysisAPI.getUpcomingHolidays().catch(() => ({ data: null })),
     ]).then(([hRes, uRes]) => {
       setHolidays(hRes.data)
       setUpcoming(uRes.data)
@@ -556,37 +556,69 @@ function HolidayAnalysis({ startDate, endDate, organizationId }) {
           )}
         </div>
 
-        {/* Right: Upcoming Holidays */}
+        {/* Right: Upcoming Key Holidays with Last Year's Data */}
         {hasUpcoming && (
           <div className="space-y-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Upcoming Holidays</p>
-            <div className="space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Upcoming — Prepare Now</p>
+            <div className="space-y-3">
               {upcoming.upcoming.map(h => {
                 const cat = CATEGORY_LABELS[h.category] || CATEGORY_LABELS.OTHER
                 const fmtDate = (d) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                const ly = h.last_year
+                const isPositive = ly && ly.impact_pct >= 0
                 return (
-                  <Card key={h.id} className={`p-3 ${h.is_ongoing ? '!bg-amber-50 !border-amber-200' : ''}`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-bold text-gray-900 truncate">{h.name_ko || h.name}</p>
-                          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${cat.color}`}>
-                            {cat.label}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-gray-500 mt-0.5">
-                          {fmtDate(h.start_date)}
-                          {h.duration > 1 && ` — ${fmtDate(h.end_date)} (${h.duration}days)`}
-                        </p>
+                  <Card key={h.id} className="p-4">
+                    {/* Header: Name + D-day */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <p className="text-base font-bold text-gray-900">{h.name_ko || h.name}</p>
+                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${cat.color}`}>
+                          {cat.label}
+                        </span>
                       </div>
                       {h.is_ongoing ? (
-                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500 text-white ml-2">NOW</span>
+                        <span className="text-sm font-bold px-3 py-1 rounded-full bg-amber-500 text-white">NOW</span>
                       ) : (
-                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-600 text-white ml-2">
+                        <span className="text-sm font-bold px-3 py-1 rounded-full bg-blue-600 text-white">
                           D-{h.days_until}
                         </span>
                       )}
                     </div>
+
+                    {/* This year dates */}
+                    <p className="text-xs text-gray-500 mb-3">
+                      {fmtDate(h.start_date)} — {fmtDate(h.end_date)} ({h.duration}days)
+                    </p>
+
+                    {/* Last year's data */}
+                    {ly ? (
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase mb-2">
+                          Last Year ({ly.year}) — {fmtDate(ly.start_date)} ~ {fmtDate(ly.end_date)}
+                        </p>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <p className="text-[10px] text-gray-400 uppercase">Total</p>
+                            <p className="text-sm font-bold text-gray-900">{fmt(ly.total_sales)}</p>
+                            <p className="text-[10px] text-gray-400">{ly.days_with_data} days</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-400 uppercase">Avg Daily</p>
+                            <p className="text-sm font-bold text-gray-900">{fmt(ly.avg_daily)}</p>
+                            <p className="text-[10px] text-gray-400">vs {fmt(ly.normal_avg)} normal</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-400 uppercase">Impact</p>
+                            <p className={`text-sm font-bold ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {isPositive ? '↑' : '↓'} {Math.abs(ly.impact_pct).toFixed(1)}%
+                            </p>
+                            <p className="text-[10px] text-gray-400">vs normal days</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">No data from last year</p>
+                    )}
                   </Card>
                 )
               })}

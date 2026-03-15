@@ -2032,22 +2032,40 @@ class SalesAnalysisViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=['get'], url_path='upcoming-holidays',
             permission_classes=[IsAuthenticated])
     def upcoming_holidays(self, request):
-        """Get next upcoming holidays from today."""
-        from closing.models import Holiday
-        today = date_type.today()
-        limit = int(request.query_params.get('limit', 5))
+        """Get next upcoming key holidays (Easter + School) with last year's data."""
+        from closing.models import Holiday, DailyClosing
+        from closing.models import ClosingOtherSale
+        from django.db.models import Sum
+        from decimal import Decimal
 
+        today = date_type.today()
+        org = self._get_org(request)
+
+        # Find next Easter Holiday and next School Holiday
         upcoming = Holiday.objects.filter(
             end_date__gte=today,
-        ).order_by('start_date')[:limit]
+        ).order_by('start_date')
+
+        target_holidays = []
+        found_easter = False
+        found_school = False
+
+        for h in upcoming:
+            if not found_easter and 'Easter' in h.name:
+                target_holidays.append(h)
+                found_easter = True
+            elif not found_school and h.category == 'NZ_SCHOOL':
+                target_holidays.append(h)
+                found_school = True
+            if found_easter and found_school:
+                break
 
         result = []
-        for h in upcoming:
-            days_until = (h.start_date - today).days
-            if days_until < 0:
-                days_until = 0  # Currently ongoing
+        for h in target_holidays:
+            days_until = max((h.start_date - today).days, 0)
+            duration = (h.end_date - h.start_date).days + 1
 
-            result.append({
+            item = {
                 'id': h.id,
                 'name': h.name,
                 'name_ko': h.name_ko,
@@ -2057,8 +2075,76 @@ class SalesAnalysisViewSet(viewsets.GenericViewSet):
                 'impact': h.impact,
                 'days_until': days_until,
                 'is_ongoing': h.start_date <= today <= h.end_date,
-                'duration': (h.end_date - h.start_date).days + 1,
-            })
+                'duration': duration,
+                'last_year': None,
+            }
+
+            # Find same holiday last year
+            last_year_holiday = Holiday.objects.filter(
+                name=h.name,
+                year=h.year - 1,
+            ).first()
+
+            if last_year_holiday and org:
+                ly_start = last_year_holiday.start_date
+                ly_end = last_year_holiday.end_date
+                ly_duration = (ly_end - ly_start).days + 1
+
+                closings = DailyClosing.objects.filter(
+                    organization=org,
+                    closing_date__range=[ly_start, ly_end],
+                )
+                agg = closings.aggregate(
+                    card=Sum('actual_card'),
+                    cash=Sum('actual_cash'),
+                )
+                card = float(agg['card'] or 0)
+                cash = float(agg['cash'] or 0)
+
+                # Other sales
+                other = ClosingOtherSale.objects.filter(
+                    closing__organization=org,
+                    closing__closing_date__range=[ly_start, ly_end],
+                ).aggregate(total=Sum('amount'))
+                other_total = float(other['total'] or 0)
+
+                total = card + cash + other_total
+                days_count = closings.count()
+
+                # Non-holiday average for comparison (2 weeks before the holiday)
+                compare_start = ly_start - timedelta(days=14)
+                compare_end = ly_start - timedelta(days=1)
+                compare_closings = DailyClosing.objects.filter(
+                    organization=org,
+                    closing_date__range=[compare_start, compare_end],
+                )
+                compare_agg = compare_closings.aggregate(
+                    card=Sum('actual_card'), cash=Sum('actual_cash'),
+                )
+                compare_other = ClosingOtherSale.objects.filter(
+                    closing__organization=org,
+                    closing__closing_date__range=[compare_start, compare_end],
+                ).aggregate(total=Sum('amount'))
+                compare_total = float(compare_agg['card'] or 0) + float(compare_agg['cash'] or 0) + float(compare_other['total'] or 0)
+                compare_count = compare_closings.count()
+                compare_avg = compare_total / max(compare_count, 1)
+
+                avg_daily = total / max(days_count, 1)
+                impact_pct = ((avg_daily - compare_avg) / max(compare_avg, 1)) * 100 if compare_avg > 0 else 0
+
+                item['last_year'] = {
+                    'year': h.year - 1,
+                    'start_date': str(ly_start),
+                    'end_date': str(ly_end),
+                    'duration': ly_duration,
+                    'total_sales': round(total, 2),
+                    'avg_daily': round(avg_daily, 2),
+                    'days_with_data': days_count,
+                    'normal_avg': round(compare_avg, 2),
+                    'impact_pct': round(impact_pct, 1),
+                }
+
+            result.append(item)
 
         return Response({'upcoming': result})
 
