@@ -8,6 +8,7 @@ from .views import (
     CQAccountBalanceViewSet, CQExpenseViewSet,
     SalesAnalysisViewSet
 )
+from .import_views import ImportDataView, ImportTemplateView
 
 # Router for ViewSets
 router = DefaultRouter()
@@ -26,4 +27,6 @@ router.register(r'sales-analysis', SalesAnalysisViewSet, basename='salesanalysis
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('import-data/', ImportDataView.as_view(), name='import-data'),
+    path('import-template/', ImportTemplateView.as_view(), name='import-template'),
 ]

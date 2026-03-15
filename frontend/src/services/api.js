@@ -362,6 +362,17 @@ export const storeAPI = {
   testIntegration: (service) => api.post(`/users/integrations/${service}/test/`),
   syncIntegration: (service, data) => api.post(`/users/integrations/${service}/sync/`, data || {}, { timeout: 60000 }),
   selectStore: (service, data) => api.post(`/users/integrations/${service}/store-select/`, data),
+
+  // Data Import
+  importData: (formData, params) => api.post('/closing/import-data/', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    params,
+    timeout: 300000,  // 5 min for large files
+  }),
+  downloadTemplate: (params) => api.get('/closing/import-template/', {
+    params,
+    responseType: 'blob',
+  }),
 }
 
 // Safety Settings API
