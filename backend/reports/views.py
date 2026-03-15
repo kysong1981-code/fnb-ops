@@ -900,20 +900,28 @@ class ReportViewSet(viewsets.ModelViewSet):
                 end_date = today
                 start_date = end_date - timedelta(days=days)
 
+            # Use _compute_store_sales which includes Other Sales
+            result = self._compute_store_sales(org, start_date, end_date)
+
+            # Build daily data with status/variance (not in _compute_store_sales)
             closings = DailyClosing.objects.filter(
                 organization=org,
                 closing_date__range=[start_date, end_date]
             ).order_by('closing_date')
 
-            # Build daily data
+            from closing.models import ClosingOtherSale
             daily_data = []
             for c in closings:
+                other_sales_total = ClosingOtherSale.objects.filter(closing=c).aggregate(
+                    total=Sum('amount'))['total'] or Decimal('0')
+                total = float(c.actual_card + c.actual_cash) + float(other_sales_total)
                 daily_data.append({
                     'date': str(c.closing_date),
                     'pos_total': float(c.pos_total),
-                    'actual_total': float(c.actual_total),
+                    'actual_total': round(total, 2),
                     'card_sales': float(c.actual_card),
                     'cash_sales': float(c.actual_cash),
+                    'other_sales': float(other_sales_total),
                     'variance': float(c.total_variance),
                     'status': c.status,
                 })
@@ -928,11 +936,12 @@ class ReportViewSet(viewsets.ModelViewSet):
                     if week_key not in weeks_dict:
                         weeks_dict[week_key] = {
                             'period': week_key, 'actual_total': 0, 'card_sales': 0,
-                            'cash_sales': 0, 'variance': 0, 'day_count': 0,
+                            'cash_sales': 0, 'other_sales': 0, 'variance': 0, 'day_count': 0,
                         }
                     weeks_dict[week_key]['actual_total'] += item['actual_total']
                     weeks_dict[week_key]['card_sales'] += item['card_sales']
                     weeks_dict[week_key]['cash_sales'] += item['cash_sales']
+                    weeks_dict[week_key]['other_sales'] += item['other_sales']
                     weeks_dict[week_key]['variance'] += item['variance']
                     weeks_dict[week_key]['day_count'] += 1
                 result_data = sorted(weeks_dict.values(), key=lambda x: x['period'])
@@ -943,56 +952,33 @@ class ReportViewSet(viewsets.ModelViewSet):
                     if month_key not in months_dict:
                         months_dict[month_key] = {
                             'period': month_key, 'actual_total': 0, 'card_sales': 0,
-                            'cash_sales': 0, 'variance': 0, 'day_count': 0,
+                            'cash_sales': 0, 'other_sales': 0, 'variance': 0, 'day_count': 0,
                         }
                     months_dict[month_key]['actual_total'] += item['actual_total']
                     months_dict[month_key]['card_sales'] += item['card_sales']
                     months_dict[month_key]['cash_sales'] += item['cash_sales']
+                    months_dict[month_key]['other_sales'] += item['other_sales']
                     months_dict[month_key]['variance'] += item['variance']
                     months_dict[month_key]['day_count'] += 1
                 result_data = sorted(months_dict.values(), key=lambda x: x['period'])
             else:
                 result_data = daily_data
 
-            # Statistics
-            totals = [d.get('actual_total', 0) for d in result_data]
-            total_sales = sum(totals)
-            avg_daily = total_sales / max(len(result_data), 1)
-
-            best = max(result_data, key=lambda d: d.get('actual_total', 0), default=None)
-            worst = min(result_data, key=lambda d: d.get('actual_total', 0), default=None)
-
-            # Trend: compare second half vs first half
-            if len(result_data) >= 2:
-                mid = len(result_data) // 2
-                first_half = sum(d.get('actual_total', 0) for d in result_data[:mid])
-                second_half = sum(d.get('actual_total', 0) for d in result_data[mid:])
-                if first_half > 0:
-                    trend_pct = round(((second_half - first_half) / first_half) * 100, 1)
-                else:
-                    trend_pct = 0
-                trend = 'up' if trend_pct > 0 else 'down' if trend_pct < 0 else 'stable'
-            else:
-                trend = 'stable'
-                trend_pct = 0
-
+            # Statistics from _compute_store_sales (includes other_total, card_total, cash_total)
             return Response({
                 'period': period,
                 'start_date': str(start_date),
                 'end_date': str(end_date),
                 'statistics': {
-                    'total_sales': float(total_sales),
-                    'average_daily': float(avg_daily),
-                    'highest': {
-                        'date': best.get('date') or best.get('period', '') if best else None,
-                        'amount': best.get('actual_total', 0) if best else 0,
-                    },
-                    'lowest': {
-                        'date': worst.get('date') or worst.get('period', '') if worst else None,
-                        'amount': worst.get('actual_total', 0) if worst else 0,
-                    },
-                    'trend': trend,
-                    'trend_percentage': trend_pct,
+                    'total_sales': result['total_sales'],
+                    'average_daily': result['average_daily'],
+                    'card_total': result['card_total'],
+                    'cash_total': result['cash_total'],
+                    'other_total': result['other_total'],
+                    'highest': result['highest'],
+                    'lowest': result['lowest'],
+                    'trend': result['trend'],
+                    'trend_percentage': result['trend_percentage'],
                 },
                 'data': result_data,
             }, status=status.HTTP_200_OK)
