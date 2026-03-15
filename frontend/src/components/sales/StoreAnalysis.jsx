@@ -489,107 +489,108 @@ function HolidayAnalysis({ startDate, endDate, organizationId }) {
 
   const sorted = hasHolidays ? [...holidays.holidays].sort((a, b) => new Date(a.start_date) - new Date(b.start_date)) : []
 
+  // Responsive layout: if few impact cards, use 2-col, else use 3-col
+  const impactCount = sorted.length
+  const useWideLayout = hasUpcoming && impactCount > 0
+
   return (
     <>
       <SectionLabel>Holidays</SectionLabel>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Left: Holiday Impact (2 cols) */}
-        <div className="lg:col-span-2 space-y-4">
-          {hasHolidays && (
-            <>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">This Period&apos;s Holiday Impact</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {sorted.map(h => {
-                  const cat = CATEGORY_LABELS[h.category] || CATEGORY_LABELS.OTHER
-                  const isPositive = h.impact_pct >= 0
-                  return (
-                    <Card key={h.id} className="p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <p className="text-sm font-bold text-gray-900">{h.name}</p>
-                          {h.name_ko && <p className="text-xs text-gray-500">{h.name_ko}</p>}
-                        </div>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${cat.color}`}>
-                          {cat.label}
-                        </span>
+      <div className={`grid gap-4 ${useWideLayout ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+        {/* Left: Holiday Impact */}
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">This Period&apos;s Holiday Impact</p>
+          {hasHolidays ? (
+            <div className={`grid gap-3 ${impactCount === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+              {sorted.map(h => {
+                const cat = CATEGORY_LABELS[h.category] || CATEGORY_LABELS.OTHER
+                const isPositive = h.impact_pct >= 0
+                return (
+                  <Card key={h.id} className="p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">{h.name}</p>
+                        {h.name_ko && <p className="text-xs text-gray-500">{h.name_ko}</p>}
                       </div>
-                      <p className="text-[10px] text-gray-400 mb-3">
-                        {h.start_date === h.end_date
-                          ? new Date(h.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                          : `${new Date(h.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — ${new Date(h.end_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-                        }
-                      </p>
-                      {h.days_with_data > 0 ? (
-                        <div className="grid grid-cols-3 gap-3">
-                          <div>
-                            <p className="text-[10px] text-gray-400 uppercase">Total</p>
-                            <p className="text-sm font-bold text-gray-900">{fmt(h.total_sales)}</p>
-                            <p className="text-[10px] text-gray-400">{h.days_with_data} days</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-gray-400 uppercase">Avg Daily</p>
-                            <p className="text-sm font-bold text-gray-900">{fmt(h.avg_daily)}</p>
-                            <p className="text-[10px] text-gray-400">vs {fmt(h.non_holiday_avg)} normal</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-gray-400 uppercase">Impact</p>
-                            <p className={`text-sm font-bold ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
-                              {isPositive ? '↑' : '↓'} {Math.abs(h.impact_pct).toFixed(1)}%
-                            </p>
-                            <p className="text-[10px] text-gray-400">vs normal days</p>
-                          </div>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${cat.color}`}>
+                        {cat.label}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mb-3">
+                      {h.start_date === h.end_date
+                        ? new Date(h.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                        : `${new Date(h.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — ${new Date(h.end_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                      }
+                    </p>
+                    {h.days_with_data > 0 ? (
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <p className="text-[10px] text-gray-400 uppercase">Total</p>
+                          <p className="text-sm font-bold text-gray-900">{fmt(h.total_sales)}</p>
+                          <p className="text-[10px] text-gray-400">{h.days_with_data} days</p>
                         </div>
-                      ) : (
-                        <p className="text-xs text-gray-400">No sales data for this period</p>
-                      )}
-                    </Card>
-                  )
-                })}
-              </div>
-            </>
-          )}
-          {!hasHolidays && (
-            <Card className="p-6 text-center">
+                        <div>
+                          <p className="text-[10px] text-gray-400 uppercase">Avg Daily</p>
+                          <p className="text-sm font-bold text-gray-900">{fmt(h.avg_daily)}</p>
+                          <p className="text-[10px] text-gray-400">vs {fmt(h.non_holiday_avg)} normal</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-gray-400 uppercase">Impact</p>
+                          <p className={`text-sm font-bold ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {isPositive ? '↑' : '↓'} {Math.abs(h.impact_pct).toFixed(1)}%
+                          </p>
+                          <p className="text-[10px] text-gray-400">vs normal days</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400">No sales data for this period</p>
+                    )}
+                  </Card>
+                )
+              })}
+            </div>
+          ) : (
+            <Card className="p-4 text-center">
               <p className="text-sm text-gray-400">No holidays in selected period</p>
             </Card>
           )}
         </div>
 
-        {/* Right: Upcoming Holidays (1 col) */}
+        {/* Right: Upcoming Holidays */}
         {hasUpcoming && (
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Upcoming Holidays</p>
-            <Card className="p-4">
-              <div className="space-y-3">
-                {upcoming.upcoming.map(h => {
-                  const cat = CATEGORY_LABELS[h.category] || CATEGORY_LABELS.OTHER
-                  return (
-                    <div key={h.id} className={`p-3 rounded-xl border ${h.is_ongoing ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-100'}`}>
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-bold text-gray-900">{h.name_ko || h.name}</p>
-                        {h.is_ongoing ? (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white">NOW</span>
-                        ) : (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                            D-{h.days_until}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Upcoming Holidays</p>
+            <div className="space-y-2">
+              {upcoming.upcoming.map(h => {
+                const cat = CATEGORY_LABELS[h.category] || CATEGORY_LABELS.OTHER
+                const fmtDate = (d) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                return (
+                  <Card key={h.id} className={`p-3 ${h.is_ongoing ? '!bg-amber-50 !border-amber-200' : ''}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-bold text-gray-900 truncate">{h.name_ko || h.name}</p>
+                          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${cat.color}`}>
+                            {cat.label}
                           </span>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] text-gray-500">
-                          {new Date(h.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          {h.duration > 1 && ` — ${new Date(h.end_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
-                          {h.duration > 1 && ` (${h.duration}days)`}
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          {fmtDate(h.start_date)}
+                          {h.duration > 1 && ` — ${fmtDate(h.end_date)} (${h.duration}days)`}
                         </p>
-                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${cat.color}`}>
-                          {cat.label}
-                        </span>
                       </div>
+                      {h.is_ongoing ? (
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500 text-white ml-2">NOW</span>
+                      ) : (
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-600 text-white ml-2">
+                          D-{h.days_until}
+                        </span>
+                      )}
                     </div>
-                  )
-                })}
-              </div>
-            </Card>
+                  </Card>
+                )
+              })}
+            </div>
           </div>
         )}
       </div>
