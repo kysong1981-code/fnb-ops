@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from datetime import timedelta, date, datetime
 from django.db.models import Q, Count
+from django.http import HttpResponse
 from collections import defaultdict
 
 from .models import (
@@ -865,6 +866,242 @@ class SafetyRecordViewSet(viewsets.ModelViewSet):
             'total_days': total_days,
             'categories': result,
         })
+
+    @action(detail=False, methods=['get'], url_path='export-excel')
+    def export_excel(self, request):
+        """MPI-ready Excel export of safety records."""
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+        from io import BytesIO
+
+        user_profile = request.user.profile
+        org = user_profile.organization
+        date_from = request.query_params.get('date_from', (date.today() - timedelta(days=365)).isoformat())
+        date_to = request.query_params.get('date_to', date.today().isoformat())
+
+        records = SafetyRecord.objects.filter(
+            organization=org, date__gte=date_from, date__lte=date_to,
+        ).select_related(
+            'record_type', 'completed_by__user', 'reviewed_by__user'
+        ).order_by('record_type__category', 'record_type__sort_order', '-date', '-time')
+
+        wb = openpyxl.Workbook()
+
+        # Styles
+        header_font = Font(name='Arial', bold=True, size=11, color='FFFFFF')
+        header_fill = PatternFill(start_color='2B5797', end_color='2B5797', fill_type='solid')
+        subheader_fill = PatternFill(start_color='D6E4F0', end_color='D6E4F0', fill_type='solid')
+        flagged_fill = PatternFill(start_color='FFF2CC', end_color='FFF2CC', fill_type='solid')
+        event_fill = PatternFill(start_color='FCE4EC', end_color='FCE4EC', fill_type='solid')
+        thin_border = Border(
+            left=Side(style='thin'), right=Side(style='thin'),
+            top=Side(style='thin'), bottom=Side(style='thin'),
+        )
+        bold_font = Font(name='Arial', bold=True, size=10)
+        normal_font = Font(name='Arial', size=10)
+        small_font = Font(name='Arial', size=9, color='666666')
+        wrap_align = Alignment(wrap_text=True, vertical='top')
+
+        # ── Sheet 1: Summary ──
+        ws_sum = wb.active
+        ws_sum.title = 'Summary'
+        ws_sum.sheet_properties.tabColor = '2B5797'
+
+        # Title
+        ws_sum.merge_cells('A1:G1')
+        ws_sum['A1'] = f'Food Safety Records — {org.name}'
+        ws_sum['A1'].font = Font(name='Arial', bold=True, size=16, color='2B5797')
+        ws_sum['A2'] = f'Period: {date_from} to {date_to}'
+        ws_sum['A2'].font = small_font
+        ws_sum['A3'] = f'Generated: {date.today().isoformat()}'
+        ws_sum['A3'].font = small_font
+
+        # Summary table
+        from_date = date.fromisoformat(date_from)
+        to_date = date.fromisoformat(date_to)
+        total_days = (to_date - from_date).days + 1
+
+        row = 5
+        sum_headers = ['Record Type', 'Category', 'Total Records', 'Days Recorded', f'Total Days ({total_days})', 'Compliance %', 'Flagged']
+        for col, h in enumerate(sum_headers, 1):
+            cell = ws_sum.cell(row=row, column=col, value=h)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.border = thin_border
+            cell.alignment = Alignment(horizontal='center')
+
+        # Group by record type
+        from collections import defaultdict, Counter
+        type_stats = defaultdict(lambda: {'count': 0, 'dates': set(), 'flagged': 0, 'category': '', 'name': ''})
+        for r in records:
+            code = r.record_type.code
+            type_stats[code]['count'] += 1
+            type_stats[code]['dates'].add(r.date)
+            type_stats[code]['category'] = r.record_type.get_category_display()
+            type_stats[code]['name'] = r.record_type.name
+            if r.status == 'FLAGGED':
+                type_stats[code]['flagged'] += 1
+
+        row = 6
+        for code, st in sorted(type_stats.items(), key=lambda x: x[1]['category']):
+            comp = int(len(st['dates']) / total_days * 100) if total_days > 0 else 0
+            vals = [st['name'], st['category'], st['count'], len(st['dates']), total_days, f'{comp}%', st['flagged']]
+            for col, v in enumerate(vals, 1):
+                cell = ws_sum.cell(row=row, column=col, value=v)
+                cell.font = normal_font
+                cell.border = thin_border
+                if st['flagged'] > 0 and col == 7:
+                    cell.fill = flagged_fill
+            row += 1
+
+        # Column widths
+        ws_sum.column_dimensions['A'].width = 35
+        ws_sum.column_dimensions['B'].width = 18
+        for c in 'CDEFG':
+            ws_sum.column_dimensions[c].width = 15
+
+        # ── Sheet 2+: One sheet per category ──
+        cat_order = ['DAILY', 'WEEKLY', 'MONTHLY', 'EVENT', 'SPECIALIST', 'SETUP']
+        cat_labels = {
+            'DAILY': 'Daily Records', 'WEEKLY': 'Weekly Records',
+            'MONTHLY': 'Monthly Records', 'EVENT': 'Event Records',
+            'SPECIALIST': 'Specialist', 'SETUP': 'Setup',
+        }
+        cat_colors = {
+            'DAILY': '4472C4', 'WEEKLY': '548235', 'MONTHLY': 'BF8F00',
+            'EVENT': 'C00000', 'SPECIALIST': '7030A0', 'SETUP': '808080',
+        }
+
+        grouped = defaultdict(list)
+        for r in records:
+            grouped[r.record_type.category].append(r)
+
+        for cat in cat_order:
+            cat_records = grouped.get(cat, [])
+            if not cat_records:
+                continue
+
+            ws = wb.create_sheet(title=cat_labels.get(cat, cat)[:31])
+            ws.sheet_properties.tabColor = cat_colors.get(cat, '000000')
+
+            # Title
+            ws.merge_cells('A1:L1')
+            ws['A1'] = f'{cat_labels.get(cat, cat)} — {org.name}'
+            ws['A1'].font = Font(name='Arial', bold=True, size=14, color=cat_colors.get(cat, '000000'))
+            ws['A2'] = f'Period: {date_from} to {date_to} | Total: {len(cat_records)} records'
+            ws['A2'].font = small_font
+
+            # Group by record type within category
+            by_type = defaultdict(list)
+            for r in cat_records:
+                by_type[r.record_type.code].append(r)
+
+            row = 4
+            for code, type_records in by_type.items():
+                rt = type_records[0].record_type
+                unique_dates = len(set(r.date for r in type_records))
+                comp = int(unique_dates / total_days * 100) if total_days > 0 else 0
+
+                # Record type header
+                ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=12)
+                cell = ws.cell(row=row, column=1, value=f'{rt.name} — Compliance: {comp}% ({unique_dates}/{total_days} days)')
+                cell.font = Font(name='Arial', bold=True, size=11, color=cat_colors.get(cat, '000000'))
+                cell.fill = subheader_fill
+                row += 1
+
+                # Collect all data keys across records
+                all_keys = []
+                for r in type_records:
+                    if r.data:
+                        for k in r.data.keys():
+                            if k not in all_keys:
+                                all_keys.append(k)
+
+                # Column headers
+                base_headers = ['Date', 'Time', 'Completed By', 'Status']
+                data_headers = [k.replace('_', ' ').title() for k in all_keys]
+                extra_headers = ['Notes', 'Reviewed By', 'Review Date', 'Review Notes']
+                all_headers = base_headers + data_headers + extra_headers
+
+                for col, h in enumerate(all_headers, 1):
+                    cell = ws.cell(row=row, column=col, value=h)
+                    cell.font = Font(name='Arial', bold=True, size=9, color='FFFFFF')
+                    cell.fill = PatternFill(start_color=cat_colors.get(cat, '444444'), end_color=cat_colors.get(cat, '444444'), fill_type='solid')
+                    cell.border = thin_border
+                    cell.alignment = Alignment(horizontal='center', wrap_text=True)
+                row += 1
+
+                # Data rows
+                for r in type_records:
+                    col = 1
+                    # Base fields
+                    ws.cell(row=row, column=col, value=r.date.isoformat()).font = normal_font
+                    col += 1
+                    ws.cell(row=row, column=col, value=r.time.strftime('%H:%M') if r.time else '').font = normal_font
+                    col += 1
+                    ws.cell(row=row, column=col, value=r.completed_by.user.get_full_name() if r.completed_by else '').font = normal_font
+                    col += 1
+                    status_cell = ws.cell(row=row, column=col, value=r.status)
+                    status_cell.font = normal_font
+                    if r.status == 'FLAGGED':
+                        status_cell.fill = flagged_fill
+                    elif r.status == 'REVIEWED':
+                        status_cell.fill = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')
+                    col += 1
+
+                    # Data fields
+                    for key in all_keys:
+                        val = r.data.get(key, '') if r.data else ''
+                        if isinstance(val, bool):
+                            val = '✓' if val else '✗'
+                        cell = ws.cell(row=row, column=col, value=str(val) if val != '' else '')
+                        cell.font = normal_font
+                        cell.alignment = wrap_align
+                        cell.border = thin_border
+                        col += 1
+
+                    # Extra fields
+                    ws.cell(row=row, column=col, value=r.notes or '').font = small_font
+                    ws.cell(row=row, column=col).alignment = wrap_align
+                    col += 1
+                    ws.cell(row=row, column=col, value=r.reviewed_by.user.get_full_name() if r.reviewed_by else '').font = normal_font
+                    col += 1
+                    ws.cell(row=row, column=col, value=r.reviewed_at.strftime('%Y-%m-%d') if r.reviewed_at else '').font = normal_font
+                    col += 1
+                    ws.cell(row=row, column=col, value=r.review_notes or '').font = small_font
+                    ws.cell(row=row, column=col).alignment = wrap_align
+
+                    # Borders for base columns
+                    for c in range(1, 5):
+                        ws.cell(row=row, column=c).border = thin_border
+
+                    row += 1
+
+                row += 1  # gap between record types
+
+            # Auto-width for first 4 columns
+            ws.column_dimensions['A'].width = 12
+            ws.column_dimensions['B'].width = 8
+            ws.column_dimensions['C'].width = 18
+            ws.column_dimensions['D'].width = 12
+            for i in range(5, 5 + len(all_keys)):
+                ws.column_dimensions[get_column_letter(i)].width = 16
+            for i in range(5 + len(all_keys), 5 + len(all_keys) + 4):
+                ws.column_dimensions[get_column_letter(i)].width = 18
+
+        # Save to response
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        filename = f'food-safety-records_{org.name}_{date_from}_{date_to}.xlsx'
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
     @action(detail=False, methods=['get'])
     def weekly_summary(self, request):

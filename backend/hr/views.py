@@ -458,6 +458,24 @@ class RosterViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         return queryset.select_related('user__user', 'organization').order_by('-date')
 
+    @action(detail=False, methods=['post'], url_path='bulk-break')
+    def bulk_break(self, request):
+        """Update break_minutes for all unpublished rosters in a week."""
+        break_minutes = request.data.get('break_minutes', 30)
+        date_str = request.data.get('date')
+        target_date = timezone.now().date() if not date_str else timezone.datetime.strptime(date_str, '%Y-%m-%d').date()
+        week_start = target_date - timedelta(days=target_date.weekday())
+        week_end = week_start + timedelta(days=6)
+        org = self._resolve_org()
+
+        updated = Roster.objects.filter(
+            organization=org,
+            date__range=[week_start, week_end],
+            is_confirmed=False,
+        ).update(break_minutes=break_minutes)
+
+        return Response({'updated': updated, 'break_minutes': break_minutes})
+
     @action(detail=False, methods=['get'])
     def weekly(self, request):
         """주간 스케줄 조회"""
@@ -625,11 +643,35 @@ class ShiftTemplateViewSet(viewsets.ModelViewSet):
     pagination_class = None
 
     def get_queryset(self):
-        org = self.request.user.profile.organization
+        org = get_target_org(self.request)
         return ShiftTemplate.objects.filter(organization=org, is_active=True)
+
+    def create(self, request, *args, **kwargs):
+        from django.db import IntegrityError
+        try:
+            return super().create(request, *args, **kwargs)
+        except IntegrityError:
+            return Response(
+                {'name': ['A template with this name already exists.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     def perform_create(self, serializer):
         serializer.save(organization=get_target_org(self.request))
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        # Sync color/name/times to all unpublished rosters using this template
+        Roster.objects.filter(
+            shift_template=instance,
+            is_confirmed=False,
+        ).update(
+            shift_name=instance.name,
+            shift_color=instance.color,
+            shift_start=instance.start_time,
+            shift_end=instance.end_time,
+            break_minutes=instance.break_minutes,
+        )
 
 
 class TimesheetViewSet(viewsets.ModelViewSet):
@@ -927,6 +969,7 @@ class TeamViewSet(viewsets.ViewSet):
         profile = request.user.profile
         org = self._get_org(request)
         status_filter = request.query_params.get('status', 'ACTIVE')
+        search = request.query_params.get('search', '').strip()
 
         team = UserProfile.objects.filter(
             organization=org,
@@ -934,6 +977,17 @@ class TeamViewSet(viewsets.ViewSet):
 
         if status_filter and status_filter != 'ALL':
             team = team.filter(employment_status=status_filter)
+
+        if search:
+            from django.db.models import Q
+            team = team.filter(
+                Q(user__first_name__icontains=search) |
+                Q(user__last_name__icontains=search) |
+                Q(user__username__icontains=search) |
+                Q(user__email__icontains=search) |
+                Q(employee_id__icontains=search) |
+                Q(phone__icontains=search)
+            )
 
         data = []
         for p in team:
@@ -1034,18 +1088,29 @@ class TeamViewSet(viewsets.ViewSet):
         if not hourly_rate:
             return Response({'error': 'hourly_rate is required'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Support custom effective_from date (for future salary changes)
+        effective_from_str = request.data.get('effective_from')
+        if effective_from_str:
+            from datetime import date as date_cls
+            try:
+                effective_date = date_cls.fromisoformat(effective_from_str)
+            except (ValueError, TypeError):
+                return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            effective_date = timezone.now().date()
+
         with transaction.atomic():
-            # Deactivate current salary
+            # Deactivate current salary (set end date to day before new rate)
             Salary.objects.filter(user=member, is_active=True).update(
                 is_active=False,
-                effective_to=timezone.now().date(),
+                effective_to=effective_date - timedelta(days=1),
             )
             # Create new salary
             new_salary = Salary.objects.create(
                 organization=profile.organization,
                 user=member,
                 hourly_rate=hourly_rate,
-                effective_from=timezone.now().date(),
+                effective_from=effective_date,
                 is_active=True,
             )
 
@@ -1798,12 +1863,18 @@ class AcceptInviteView(APIView):
         from rest_framework_simplejwt.tokens import RefreshToken
         refresh = RefreshToken.for_user(user)
 
+        # Find onboarding record
+        onboarding = Onboarding.objects.filter(
+            employee=user_profile, status='IN_PROGRESS'
+        ).first()
+
         return Response({
             'message': 'Account activated successfully',
             'user_id': user.id,
             'profile_id': user_profile.id,
             'access': str(refresh.access_token),
             'refresh': str(refresh),
+            'onboarding_id': onboarding.id if onboarding else None,
         }, status=status.HTTP_200_OK)
 
 

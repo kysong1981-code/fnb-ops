@@ -111,9 +111,16 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         """신규 클로징 생성 (DRAFT 상태)"""
+        from users.models import Organization
         profile = request.user.profile
-        org = profile.organization
         is_manager = profile.role in self.MANAGER_ROLES
+
+        # Use store_id param if provided (CEO/HQ multi-store), else user's org
+        store_id = request.query_params.get('store_id')
+        if store_id:
+            org = Organization.objects.filter(id=int(store_id)).first() or profile.organization
+        else:
+            org = profile.organization
 
         # 직원 권한 체크 (매니저는 항상 가능)
         if not is_manager and not profile.can_daily_close:
@@ -146,7 +153,12 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
                     )
             except (ValueError, AttributeError):
                 pass
-        serializer = self.get_serializer(data=request.data)
+
+        # Override organization in request data with the correct store
+        data = request.data.copy()
+        data['organization'] = org.id
+
+        serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
@@ -2032,14 +2044,20 @@ class SalesAnalysisViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=['get'], url_path='upcoming-holidays',
             permission_classes=[IsAuthenticated])
     def upcoming_holidays(self, request):
-        """Get next upcoming key holidays (Easter + School) with last year's data."""
+        """Get next upcoming key holidays (Easter + School) with past 2 years' data."""
         from closing.models import Holiday, DailyClosing
         from closing.models import ClosingOtherSale
         from django.db.models import Sum
-        from decimal import Decimal
+        from users.models import Organization
+        from hr.models import Timesheet
 
         today = date_type.today()
-        org = self._get_org(request)
+        profile = request.user.profile
+        org_id = request.query_params.get('organization_id') or request.query_params.get('store_id')
+        if org_id:
+            org = Organization.objects.filter(id=int(org_id)).first()
+        else:
+            org = profile.organization
 
         # Find next Easter Holiday and next School Holiday
         upcoming = Holiday.objects.filter(
@@ -2060,6 +2078,82 @@ class SalesAnalysisViewSet(viewsets.GenericViewSet):
             if found_easter and found_school:
                 break
 
+        def _get_holiday_data(past_holiday, org):
+            """Get sales + staffing data for a past holiday period."""
+            if not past_holiday or not org:
+                return None
+            ly_start = past_holiday.start_date
+            ly_end = past_holiday.end_date
+            ly_duration = (ly_end - ly_start).days + 1
+
+            closings = DailyClosing.objects.filter(
+                organization=org,
+                closing_date__range=[ly_start, ly_end],
+            )
+            agg = closings.aggregate(card=Sum('actual_card'), cash=Sum('actual_cash'))
+            card = float(agg['card'] or 0)
+            cash = float(agg['cash'] or 0)
+            other = ClosingOtherSale.objects.filter(
+                closing__organization=org,
+                closing__closing_date__range=[ly_start, ly_end],
+            ).aggregate(total=Sum('amount'))
+            total = card + cash + float(other['total'] or 0)
+            days_count = closings.count()
+
+            # Normal period comparison (2 weeks before)
+            compare_start = ly_start - timedelta(days=14)
+            compare_end = ly_start - timedelta(days=1)
+            compare_closings = DailyClosing.objects.filter(
+                organization=org, closing_date__range=[compare_start, compare_end],
+            )
+            c_agg = compare_closings.aggregate(card=Sum('actual_card'), cash=Sum('actual_cash'))
+            c_other = ClosingOtherSale.objects.filter(
+                closing__organization=org, closing__closing_date__range=[compare_start, compare_end],
+            ).aggregate(total=Sum('amount'))
+            compare_total = float(c_agg['card'] or 0) + float(c_agg['cash'] or 0) + float(c_other['total'] or 0)
+            compare_count = compare_closings.count()
+            compare_avg = compare_total / max(compare_count, 1)
+            avg_daily = total / max(days_count, 1)
+            impact_pct = ((avg_daily - compare_avg) / max(compare_avg, 1)) * 100 if compare_avg > 0 else 0
+
+            # Staffing
+            timesheets = Timesheet.objects.filter(
+                organization=org, date__range=[ly_start, ly_end], check_in__isnull=False,
+            )
+            staff_count = timesheets.values('user').distinct().count()
+            total_shifts = timesheets.count()
+            total_hours = sum(t.worked_hours for t in timesheets if t.worked_hours)
+            avg_staff_per_day = round(total_shifts / max(ly_duration, 1), 1)
+
+            # Normal staffing
+            compare_ts = Timesheet.objects.filter(
+                organization=org, date__range=[compare_start, compare_end], check_in__isnull=False,
+            )
+            compare_staff_avg = round(compare_ts.count() / max((compare_end - compare_start).days + 1, 1), 1)
+            compare_hours = sum(t.worked_hours for t in compare_ts if t.worked_hours)
+
+            splh = round(total / max(total_hours, 1), 2) if total_hours > 0 else 0
+            normal_splh = round(compare_total / max(compare_hours, 1), 2) if compare_hours > 0 else 0
+
+            return {
+                'year': past_holiday.year,
+                'start_date': str(ly_start),
+                'end_date': str(ly_end),
+                'duration': ly_duration,
+                'total_sales': round(total, 2),
+                'avg_daily': round(avg_daily, 2),
+                'days_with_data': days_count,
+                'normal_avg': round(compare_avg, 2),
+                'impact_pct': round(impact_pct, 1),
+                'staff_count': staff_count,
+                'total_shifts': total_shifts,
+                'total_hours': round(total_hours, 1),
+                'avg_staff_per_day': avg_staff_per_day,
+                'normal_staff_avg': compare_staff_avg,
+                'splh': splh,
+                'normal_splh': normal_splh,
+            }
+
         result = []
         for h in target_holidays:
             days_until = max((h.start_date - today).days, 0)
@@ -2076,73 +2170,17 @@ class SalesAnalysisViewSet(viewsets.GenericViewSet):
                 'days_until': days_until,
                 'is_ongoing': h.start_date <= today <= h.end_date,
                 'duration': duration,
-                'last_year': None,
+                'history': [],
             }
 
-            # Find same holiday last year
-            last_year_holiday = Holiday.objects.filter(
-                name=h.name,
-                year=h.year - 1,
-            ).first()
-
-            if last_year_holiday and org:
-                ly_start = last_year_holiday.start_date
-                ly_end = last_year_holiday.end_date
-                ly_duration = (ly_end - ly_start).days + 1
-
-                closings = DailyClosing.objects.filter(
-                    organization=org,
-                    closing_date__range=[ly_start, ly_end],
-                )
-                agg = closings.aggregate(
-                    card=Sum('actual_card'),
-                    cash=Sum('actual_cash'),
-                )
-                card = float(agg['card'] or 0)
-                cash = float(agg['cash'] or 0)
-
-                # Other sales
-                other = ClosingOtherSale.objects.filter(
-                    closing__organization=org,
-                    closing__closing_date__range=[ly_start, ly_end],
-                ).aggregate(total=Sum('amount'))
-                other_total = float(other['total'] or 0)
-
-                total = card + cash + other_total
-                days_count = closings.count()
-
-                # Non-holiday average for comparison (2 weeks before the holiday)
-                compare_start = ly_start - timedelta(days=14)
-                compare_end = ly_start - timedelta(days=1)
-                compare_closings = DailyClosing.objects.filter(
-                    organization=org,
-                    closing_date__range=[compare_start, compare_end],
-                )
-                compare_agg = compare_closings.aggregate(
-                    card=Sum('actual_card'), cash=Sum('actual_cash'),
-                )
-                compare_other = ClosingOtherSale.objects.filter(
-                    closing__organization=org,
-                    closing__closing_date__range=[compare_start, compare_end],
-                ).aggregate(total=Sum('amount'))
-                compare_total = float(compare_agg['card'] or 0) + float(compare_agg['cash'] or 0) + float(compare_other['total'] or 0)
-                compare_count = compare_closings.count()
-                compare_avg = compare_total / max(compare_count, 1)
-
-                avg_daily = total / max(days_count, 1)
-                impact_pct = ((avg_daily - compare_avg) / max(compare_avg, 1)) * 100 if compare_avg > 0 else 0
-
-                item['last_year'] = {
-                    'year': h.year - 1,
-                    'start_date': str(ly_start),
-                    'end_date': str(ly_end),
-                    'duration': ly_duration,
-                    'total_sales': round(total, 2),
-                    'avg_daily': round(avg_daily, 2),
-                    'days_with_data': days_count,
-                    'normal_avg': round(compare_avg, 2),
-                    'impact_pct': round(impact_pct, 1),
-                }
+            # Get past 2 years of data
+            for years_back in [1, 2]:
+                past_holiday = Holiday.objects.filter(
+                    name=h.name, year=h.year - years_back,
+                ).first()
+                data = _get_holiday_data(past_holiday, org)
+                if data:
+                    item['history'].append(data)
 
             result.append(item)
 

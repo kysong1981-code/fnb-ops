@@ -182,8 +182,24 @@ class UserProfileView(APIView):
         try:
             profile = request.user.profile
             serializer = UserProfileSerializer(profile)
+            data = serializer.data
+
+            # Check for incomplete onboarding
+            from hr.models import Onboarding
+            onboarding = Onboarding.objects.filter(
+                employee=profile, status='IN_PROGRESS'
+            ).first()
+            if onboarding:
+                data['onboarding_id'] = onboarding.id
+                data['onboarding_status'] = onboarding.status
+                total_tasks = onboarding.tasks.count()
+                completed = onboarding.tasks.filter(is_completed=True).count()
+                data['onboarding_progress'] = int(completed / total_tasks * 100) if total_tasks > 0 else 0
+            else:
+                data['onboarding_id'] = None
+
             return Response(
-                {'message': 'Profile retrieved successfully', 'profile': serializer.data},
+                {'message': 'Profile retrieved successfully', 'profile': data},
                 status=status.HTTP_200_OK,
             )
         except UserProfile.DoesNotExist:

@@ -13,6 +13,7 @@ import SalesReport from './SalesReport'
 import SupplyReport from './SupplyReport'
 import CQReport from './CQReport'
 import SkyReport from './SkyReport'
+import HolidayReport from './HolidayReport'
 
 const REGIONAL_ROLES = ['REGIONAL_MANAGER', 'HQ', 'CEO']
 const ADMIN_ROLES = ['SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO']
@@ -68,6 +69,7 @@ export default function StoreReport() {
     { key: 'supply', label: 'Expense Report' },
     { key: 'cash', label: 'Cash Report' },
     { key: 'sky', label: 'Sky Report' },
+    { key: 'holiday', label: 'Holiday Report' },
     ...(isAdmin ? [{ key: 'cq', label: 'CQ Report' }] : []),
   ]
 
@@ -117,7 +119,7 @@ export default function StoreReport() {
   const showDatePicker = reportType === 'daily' || reportType === 'comparison'
 
   // Self-contained tabs (they handle their own data fetching & controls)
-  const isSelfContained = ['cash', 'sales', 'supply', 'cq', 'sky'].includes(reportType)
+  const isSelfContained = ['cash', 'sales', 'supply', 'cq', 'sky', 'holiday'].includes(reportType)
 
   // Compute chart date range for daily tab
   const getChartRange = () => {
@@ -219,6 +221,7 @@ export default function StoreReport() {
           {reportType === 'supply' && <SupplyReport />}
           {reportType === 'cq' && <CQReport />}
           {reportType === 'sky' && <SkyReport />}
+          {reportType === 'holiday' && <HolidayReport />}
         </>
       ) : loading ? (
         <div className="flex items-center justify-center h-40">

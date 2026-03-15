@@ -327,10 +327,17 @@ export default function RosterManagement() {
   const handleDragEnd = () => { dragRef.current = null; setDragOver(null) }
 
   /* ── break settings ── */
-  const saveDefaultBreak = (val) => {
+  const saveDefaultBreak = async (val) => {
     const v = parseInt(val) || 0
     setDefaultBreak(v)
     localStorage.setItem('defaultBreakMinutes', String(v))
+
+    // Bulk update all unpublished rosters in this week
+    try {
+      const weekDate = weekDays[0] // Monday of current week
+      await hrAPI.bulkBreak({ break_minutes: v, date: weekDate })
+      fetchData() // re-fetch to get updated hours
+    } catch { /* silent */ }
   }
 
   /* ═══════════════════════════════════════════════

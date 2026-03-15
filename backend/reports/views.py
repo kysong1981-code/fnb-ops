@@ -13,7 +13,7 @@ import io
 
 from .models import Report, GeneratedReport, SkyReport
 from .serializers import ReportSerializer, GeneratedReportSerializer, SkyReportSerializer
-from closing.models import DailyClosing, ClosingHRCash, ClosingCashExpense, ClosingSupplierCost, SupplierMonthlyStatement
+from closing.models import DailyClosing, ClosingHRCash, ClosingCashExpense, ClosingSupplierCost, SupplierMonthlyStatement, ClosingOtherSale, Holiday
 from sales.models import Sales
 from hr.models import Timesheet
 from users.models import Organization
@@ -1335,6 +1335,210 @@ class ReportViewSet(viewsets.ModelViewSet):
                 day_idx += 1
 
             return Response({'days': days}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['get'])
+    def holiday_report(self, request):
+        """
+        Holiday report — sales + labor analysis for all holidays in a given year.
+
+        Query params:
+        - year: target year (default: current year)
+        - store_id: optional store override for CEO/HQ
+        """
+        try:
+            org = self._get_organization(request)
+            if not org:
+                return Response(
+                    {'error': '조직 정보를 찾을 수 없습니다.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            current_year = timezone.now().year
+            year = int(request.query_params.get('year', current_year))
+
+            holidays = Holiday.objects.filter(year=year).order_by('start_date')
+            available_years = sorted(set(
+                Holiday.objects.values_list('year', flat=True)
+            ))
+
+            holiday_results = []
+            total_holiday_sales = 0
+            total_holiday_days = 0
+            total_normal_sales_for_avg = 0
+            total_normal_days = 0
+            total_holiday_hours = 0
+
+            for h in holidays:
+                h_start = h.start_date
+                h_end = h.end_date
+                duration = (h_end - h_start).days + 1
+
+                # --- Sales ---
+                closings = DailyClosing.objects.filter(
+                    organization=org,
+                    closing_date__range=[h_start, h_end],
+                )
+                sales_agg = closings.aggregate(
+                    card=Sum('actual_card'),
+                    cash=Sum('actual_cash'),
+                )
+                other_agg = ClosingOtherSale.objects.filter(
+                    closing__organization=org,
+                    closing__closing_date__range=[h_start, h_end],
+                ).aggregate(total=Sum('amount'))
+
+                card = float(sales_agg['card'] or 0)
+                cash = float(sales_agg['cash'] or 0)
+                other_total = float(other_agg['total'] or 0)
+                holiday_total = card + cash + other_total
+                days_with_data = closings.count()
+                avg_daily = holiday_total / max(days_with_data, 1)
+
+                # --- Normal period comparison (2 weeks before holiday) ---
+                compare_start = h_start - timedelta(days=14)
+                compare_end = h_start - timedelta(days=1)
+                compare_closings = DailyClosing.objects.filter(
+                    organization=org,
+                    closing_date__range=[compare_start, compare_end],
+                )
+                compare_sales_agg = compare_closings.aggregate(
+                    card=Sum('actual_card'),
+                    cash=Sum('actual_cash'),
+                )
+                compare_other = ClosingOtherSale.objects.filter(
+                    closing__organization=org,
+                    closing__closing_date__range=[compare_start, compare_end],
+                ).aggregate(total=Sum('amount'))
+                compare_total = (
+                    float(compare_sales_agg['card'] or 0)
+                    + float(compare_sales_agg['cash'] or 0)
+                    + float(compare_other['total'] or 0)
+                )
+                compare_count = compare_closings.count()
+                compare_avg = compare_total / max(compare_count, 1)
+
+                impact_pct = (
+                    round(((avg_daily - compare_avg) / compare_avg) * 100, 1)
+                    if compare_avg > 0
+                    else 0
+                )
+
+                # --- Staffing (holiday period) ---
+                timesheets = Timesheet.objects.filter(
+                    organization=org,
+                    date__range=[h_start, h_end],
+                    check_in__isnull=False,
+                )
+                staff_count = timesheets.values('user').distinct().count()
+                total_shifts = timesheets.count()
+                total_hours = sum(
+                    t.worked_hours for t in timesheets if t.worked_hours
+                )
+                avg_staff_per_day = round(total_shifts / max(duration, 1), 1)
+                splh = (
+                    round(holiday_total / total_hours, 2)
+                    if total_hours > 0
+                    else 0
+                )
+
+                # --- Staffing (normal period) ---
+                compare_ts = Timesheet.objects.filter(
+                    organization=org,
+                    date__range=[compare_start, compare_end],
+                    check_in__isnull=False,
+                )
+                compare_shifts = compare_ts.count()
+                normal_period_days = (compare_end - compare_start).days + 1
+                normal_staff_avg = round(
+                    compare_shifts / max(normal_period_days, 1), 1
+                )
+                compare_hours = sum(
+                    t.worked_hours for t in compare_ts if t.worked_hours
+                )
+                normal_splh = (
+                    round(compare_total / compare_hours, 2)
+                    if compare_hours > 0
+                    else 0
+                )
+
+                # Accumulate for summary
+                total_holiday_sales += holiday_total
+                total_holiday_days += days_with_data
+                total_holiday_hours += total_hours
+                total_normal_sales_for_avg += compare_total
+                total_normal_days += compare_count
+
+                holiday_results.append({
+                    'id': h.id,
+                    'name': h.name,
+                    'name_ko': h.name_ko,
+                    'category': h.category,
+                    'start_date': str(h_start),
+                    'end_date': str(h_end),
+                    'impact': h.impact,
+                    'sales': {
+                        'total': round(holiday_total, 2),
+                        'avg_daily': round(avg_daily, 2),
+                        'days_with_data': days_with_data,
+                        'normal_avg': round(compare_avg, 2),
+                        'impact_pct': impact_pct,
+                    },
+                    'staffing': {
+                        'staff_count': staff_count,
+                        'total_shifts': total_shifts,
+                        'total_hours': round(total_hours, 1),
+                        'avg_staff_per_day': avg_staff_per_day,
+                        'normal_staff_avg': normal_staff_avg,
+                        'splh': splh,
+                        'normal_splh': normal_splh,
+                    },
+                })
+
+            # --- Yearly summary ---
+            avg_holiday_daily = (
+                round(total_holiday_sales / total_holiday_days, 2)
+                if total_holiday_days > 0
+                else 0
+            )
+            avg_normal_daily = (
+                round(total_normal_sales_for_avg / total_normal_days, 2)
+                if total_normal_days > 0
+                else 0
+            )
+            overall_impact_pct = (
+                round(
+                    ((avg_holiday_daily - avg_normal_daily) / avg_normal_daily) * 100,
+                    1,
+                )
+                if avg_normal_daily > 0
+                else 0
+            )
+            avg_holiday_splh = (
+                round(total_holiday_sales / total_holiday_hours, 2)
+                if total_holiday_hours > 0
+                else 0
+            )
+
+            return Response(
+                {
+                    'year': year,
+                    'holidays': holiday_results,
+                    'summary': {
+                        'total_holiday_sales': round(total_holiday_sales, 2),
+                        'total_holiday_days': total_holiday_days,
+                        'avg_holiday_daily': avg_holiday_daily,
+                        'avg_normal_daily': avg_normal_daily,
+                        'overall_impact_pct': overall_impact_pct,
+                        'total_holiday_hours': round(total_holiday_hours, 1),
+                        'avg_holiday_splh': avg_holiday_splh,
+                    },
+                    'available_years': available_years,
+                },
+                status=status.HTTP_200_OK,
+            )
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

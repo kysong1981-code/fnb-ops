@@ -197,6 +197,7 @@ export const hrAPI = {
   updateRoster: (id, data) => api.patch(`/hr/rosters/${id}/`, data),
   deleteRoster: (id) => api.delete(`/hr/rosters/${id}/`),
   bulkDeleteRosters: (ids) => api.post('/hr/rosters/bulk-delete/', { ids }),
+  bulkBreak: (data) => api.post('/hr/rosters/bulk-break/', data),
 
   // Timesheet
   getTimesheets: () => api.get('/hr/timesheets/'),
@@ -457,6 +458,7 @@ export const safetyAPI = {
   quickComplete: (data, params) => api.post('/safety/records/quick_complete/', data, { params }),
   reviewRecord: (id, data) => api.post(`/safety/records/${id}/review/`, data),
   getInspectionReport: (params) => api.get('/safety/records/inspection_report/', { params }),
+  exportExcel: (params) => api.get('/safety/records/export-excel/', { params, responseType: 'blob' }),
   getWeeklySummary: () => api.get('/safety/records/weekly_summary/'),
 }
 
@@ -577,6 +579,9 @@ export const reportsAPI = {
     api.get('/reports/multi_store_sales/', {
       params: { start_date: startDate, end_date: endDate, store_ids: storeIds?.join(',') },
     }),
+
+  // Holiday Report
+  getHolidayReport: (year) => api.get('/reports/holiday_report/', { params: { year } }),
 
   // AI Insights
   getAIInsights: (startDate, endDate, storeId) =>

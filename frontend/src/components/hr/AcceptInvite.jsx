@@ -38,9 +38,12 @@ export default function AcceptInvite() {
 
       setActivated(true)
 
-      // Redirect to dashboard after a brief moment
+      // Redirect to onboarding if available, otherwise dashboard
+      const target = res.data.onboarding_id
+        ? `/hr/onboarding/${res.data.onboarding_id}`
+        : '/dashboard'
       setTimeout(() => {
-        window.location.href = '/dashboard'
+        window.location.href = target
       }, 1500)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to activate account')
@@ -85,7 +88,7 @@ export default function AcceptInvite() {
             <span className="text-3xl">&#10003;</span>
           </div>
           <h1 className="text-lg font-bold text-gray-900 mb-2">Account Activated!</h1>
-          <p className="text-sm text-gray-500">Redirecting to dashboard...</p>
+          <p className="text-sm text-gray-500">Redirecting to onboarding...</p>
         </div>
       </div>
     )

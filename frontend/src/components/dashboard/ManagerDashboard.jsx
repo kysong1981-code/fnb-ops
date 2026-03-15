@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { hrAPI, closingAPI } from '../../services/api'
+import { hrAPI, closingAPI, salesAnalysisAPI } from '../../services/api'
 import { getNowNZ, formatDateNZ } from '../../utils/date'
 import Card from '../ui/Card'
 import SectionLabel from '../ui/SectionLabel'
@@ -32,6 +32,7 @@ export default function ManagerDashboard() {
   const [pendingClosings, setPendingClosings] = useState([])
   const [recentClosings, setRecentClosings] = useState([])
   const [approvingId, setApprovingId] = useState(null)
+  const [upcomingHolidays, setUpcomingHolidays] = useState(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -92,6 +93,9 @@ export default function ManagerDashboard() {
           setWeeklyData({ weekDays, revenues, totalRevenue })
         }
       } catch {}
+
+      // Load upcoming holidays
+      salesAnalysisAPI.getUpcomingHolidays().then(res => setUpcomingHolidays(res.data?.upcoming)).catch(() => {})
     }
     fetchData()
   }, [])
@@ -287,6 +291,97 @@ export default function ManagerDashboard() {
           <CheckCircleIcon size={24} className="text-green-500 mx-auto mb-1" />
           <p className="text-sm text-gray-400">All closings approved</p>
         </Card>
+      )}
+
+      {/* Upcoming Holidays */}
+      {upcomingHolidays && upcomingHolidays.length > 0 && (
+        <>
+          <SectionLabel>Upcoming Holidays</SectionLabel>
+          <div className="space-y-4">
+            {upcomingHolidays.map((h, i) => {
+              const catColors = {
+                NZ_PUBLIC: 'bg-blue-100 text-blue-700',
+                NZ_SCHOOL: 'bg-purple-100 text-purple-700',
+                CN_MAJOR: 'bg-red-100 text-red-700',
+              }
+              const catCls = catColors[h.category] || 'bg-gray-100 text-gray-700'
+              const dDay = h.is_ongoing ? 'NOW' : `D-${h.days_until}`
+              const dBadgeCls = h.is_ongoing
+                ? 'bg-emerald-500 text-white'
+                : h.days_until <= 7
+                  ? 'bg-red-500 text-white'
+                  : h.days_until <= 30
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-blue-600 text-white'
+              const fmtD = (d) => new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { month: 'short', day: 'numeric' })
+              const history = h.history || []
+              return (
+                <Card key={i} className="p-4">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-bold px-3 py-1 rounded-full ${dBadgeCls}`}>
+                        {dDay}
+                      </span>
+                      <div>
+                        <p className="text-base font-bold text-gray-900">{h.name_ko || h.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {fmtD(h.start_date)} — {fmtD(h.end_date)} ({h.duration}days)
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${catCls}`}>
+                      {(h.category || '').replace('NZ_', '').replace('CN_', '').replace('_', ' ')}
+                    </span>
+                  </div>
+
+                  {/* Past years data */}
+                  {history.length > 0 ? (
+                    <div className="space-y-2">
+                      {/* Column headers */}
+                      <div className="grid grid-cols-6 gap-2 text-[10px] font-semibold text-gray-400 uppercase px-1">
+                        <span>Year</span>
+                        <span className="text-right">Total Sales</span>
+                        <span className="text-right">Avg Daily</span>
+                        <span className="text-right">Impact</span>
+                        <span className="text-right">Staff/Day</span>
+                        <span className="text-right">SPLH</span>
+                      </div>
+                      {history.map((yr, j) => {
+                        const isPositive = yr.impact_pct >= 0
+                        return (
+                          <div key={j} className={`grid grid-cols-6 gap-2 items-center px-2 py-2 rounded-lg text-xs ${j === 0 ? 'bg-blue-50' : 'bg-gray-50'}`}>
+                            <span className="font-bold text-gray-700">{yr.year}</span>
+                            <span className="text-right font-semibold text-gray-900">{fmt(yr.total_sales)}</span>
+                            <span className="text-right text-gray-700">{fmt(yr.avg_daily)}</span>
+                            <span className={`text-right font-semibold ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {isPositive ? '↑' : '↓'}{Math.abs(yr.impact_pct).toFixed(1)}%
+                            </span>
+                            <span className="text-right text-gray-700">{yr.avg_staff_per_day}</span>
+                            <span className="text-right font-semibold text-gray-900">{fmt(yr.splh)}</span>
+                          </div>
+                        )
+                      })}
+                      {/* Detail row for most recent year */}
+                      {history[0] && (
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 px-2 pt-1 text-[10px] text-gray-400">
+                          <span>Staff: <strong className="text-gray-600">{history[0].staff_count} people</strong></span>
+                          <span>Shifts: <strong className="text-gray-600">{history[0].total_shifts}</strong></span>
+                          <span>Hours: <strong className="text-gray-600">{history[0].total_hours}h</strong></span>
+                          <span>Normal Avg: <strong className="text-gray-600">{fmt(history[0].normal_avg)}</strong></span>
+                          <span>Normal SPLH: <strong className="text-gray-600">{fmt(history[0].normal_splh)}</strong></span>
+                          <span>Normal Staff: <strong className="text-gray-600">{history[0].normal_staff_avg}/day</strong></span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 py-2">No historical data available</p>
+                  )}
+                </Card>
+              )
+            })}
+          </div>
+        </>
       )}
 
       {/* Safety Tasks Widget */}

@@ -85,20 +85,64 @@ export default function InspectionReport() {
 
   const inputCls = 'px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white'
 
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownloadExcel = async () => {
+    setDownloading(true)
+    try {
+      const res = await safetyAPI.exportExcel({ date_from: dateFrom, date_to: dateTo })
+      const url = URL.createObjectURL(new Blob([res.data]))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `food-safety-records_${dateFrom}_${dateTo}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Excel export failed:', err)
+      alert('Failed to download. Please try again.')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  const handlePrintDetailed = () => {
+    // Expand all categories and types before printing
+    const allCats = {}
+    const allTypes = {}
+    report?.categories?.forEach(cat => {
+      allCats[cat.category] = true
+      cat.record_types.forEach(rt => { allTypes[rt.record_type.code] = true })
+    })
+    setExpandedCategories(allCats)
+    setExpandedTypes(allTypes)
+    // Also select no specific record so all show
+    setSelectedRecord(null)
+    setTimeout(() => window.print(), 300)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <PageHeader
           title="Food Safety Records"
-          subtitle="Inspection-ready record viewer"
+          subtitle="MPI inspection-ready record viewer"
           icon={<ShieldIcon size={24} />}
         />
-        <button
-          onClick={() => window.print()}
-          className="px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition print:hidden"
-        >
-          🖨 Print
-        </button>
+        <div className="flex gap-2 print:hidden">
+          <button
+            onClick={handleDownloadExcel}
+            disabled={downloading || !report?.categories?.length}
+            className="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition"
+          >
+            {downloading ? '⏳ Downloading...' : '⬇ Download Excel'}
+          </button>
+          <button
+            onClick={handlePrintDetailed}
+            className="px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition"
+          >
+            🖨 Print All
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -326,12 +370,74 @@ export default function InspectionReport() {
         </div>
       )}
 
+      {/* Print-only: Full detail view for MPI */}
+      <div className="hidden print:block mt-8 border-t-2 border-gray-300 pt-4">
+        <h2 className="text-lg font-bold mb-4">Detailed Food Safety Records — MPI Submission</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          Period: {dateFrom} to {dateTo} | Generated: {new Date().toLocaleString('en-NZ')}
+        </p>
+        {report?.categories?.map(cat => (
+          <div key={cat.category} className="mb-6">
+            <h3 className="text-sm font-bold bg-gray-200 px-3 py-1 mb-2">
+              {CATEGORY_LABELS[cat.category]?.emoji} {CATEGORY_LABELS[cat.category]?.label || cat.category}
+            </h3>
+            {cat.record_types.map(rtGroup => (
+              <div key={rtGroup.record_type.code} className="mb-4 ml-2">
+                <h4 className="text-xs font-bold text-gray-700 border-b border-gray-300 pb-1 mb-2">
+                  {rtGroup.record_type.name} — Compliance: {rtGroup.compliance_rate}% ({rtGroup.unique_dates}/{rtGroup.total_days} days)
+                </h4>
+                <table className="w-full text-[10px] border-collapse mb-2">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="border border-gray-300 px-1 py-0.5 text-left">Date</th>
+                      <th className="border border-gray-300 px-1 py-0.5 text-left">Time</th>
+                      <th className="border border-gray-300 px-1 py-0.5 text-left">Staff</th>
+                      <th className="border border-gray-300 px-1 py-0.5 text-left">Status</th>
+                      <th className="border border-gray-300 px-1 py-0.5 text-left">Details</th>
+                      <th className="border border-gray-300 px-1 py-0.5 text-left">Notes</th>
+                      <th className="border border-gray-300 px-1 py-0.5 text-left">Reviewed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rtGroup.records.map(rec => (
+                      <tr key={rec.id}>
+                        <td className="border border-gray-300 px-1 py-0.5">{rec.date}</td>
+                        <td className="border border-gray-300 px-1 py-0.5">{rec.time || '-'}</td>
+                        <td className="border border-gray-300 px-1 py-0.5">{rec.completed_by_name || '-'}</td>
+                        <td className="border border-gray-300 px-1 py-0.5">{rec.status}</td>
+                        <td className="border border-gray-300 px-1 py-0.5">
+                          {rec.data && Object.keys(rec.data).length > 0
+                            ? Object.entries(rec.data).map(([k, v]) => (
+                                <span key={k} className="mr-2">
+                                  <strong>{k.replace(/_/g, ' ')}:</strong> {typeof v === 'boolean' ? (v ? '✓' : '✗') : String(v)}
+                                </span>
+                              ))
+                            : '—'
+                          }
+                        </td>
+                        <td className="border border-gray-300 px-1 py-0.5">{rec.notes || '-'}</td>
+                        <td className="border border-gray-300 px-1 py-0.5">
+                          {rec.reviewed_by_name ? `${rec.reviewed_by_name} ${rec.reviewed_at ? new Date(rec.reviewed_at).toLocaleDateString() : ''}` : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
       {/* Print styles */}
       <style>{`
         @media print {
-          body { font-size: 12px; }
+          body { font-size: 11px; }
           .print\\:hidden { display: none !important; }
           .print\\:block { display: block !important; }
+          @page { margin: 10mm; size: A4 landscape; }
+          table { page-break-inside: auto; }
+          tr { page-break-inside: avoid; }
         }
       `}</style>
     </div>

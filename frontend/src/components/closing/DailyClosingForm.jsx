@@ -171,7 +171,7 @@ export default function DailyClosingForm() {
     if (closingId) return closingId
     try {
       const res = await closingAPI.create({
-        organization: user?.organization,
+        organization: parseInt(localStorage.getItem('selected_store_id')) || user?.organization,
         closing_date: closingDate,
         pos_card: posCard || 0,
         pos_cash: posCash || 0,
@@ -200,7 +200,7 @@ export default function DailyClosingForm() {
     setError('')
     try {
       const payload = {
-        organization: user?.organization,
+        organization: parseInt(localStorage.getItem('selected_store_id')) || user?.organization,
         closing_date: closingDate,
         pos_card: posCard || 0,
         pos_cash: posCash || 0,
@@ -253,7 +253,7 @@ export default function DailyClosingForm() {
     setError('')
     try {
       const payload = {
-        organization: user?.organization,
+        organization: parseInt(localStorage.getItem('selected_store_id')) || user?.organization,
         closing_date: closingDate,
         pos_card: posCard || 0,
         pos_cash: posCash || 0,

@@ -7,6 +7,8 @@ import { XIcon, DocumentIcon } from '../icons'
 const STATUS_FILTERS = [
   { key: 'ACTIVE', label: 'Active' },
   { key: 'LEAVE', label: 'On Leave' },
+  { key: 'RESIGNED', label: 'Resigned' },
+  { key: 'TERMINATED', label: 'Terminated' },
   { key: 'ALL', label: 'All' },
 ]
 
@@ -42,17 +44,27 @@ export default function TeamTab() {
   const [resettingPw, setResettingPw] = useState(null)
   const [resetResult, setResetResult] = useState(null)
   const [permSaving, setPermSaving] = useState(false)
+  const [search, setSearch] = useState('')
+  const [effectiveDate, setEffectiveDate] = useState('')
+  const [showNoteModal, setShowNoteModal] = useState(null)
+  const [noteForm, setNoteForm] = useState({ subject: '', content: '', category: 'MEETING' })
+  const [noteSaving, setNoteSaving] = useState(false)
+  const [isComposing, setIsComposing] = useState(false)
 
-  const loadTeam = async () => {
-    setLoading(true)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const loadTeam = async (showSpinner = true) => {
+    if (showSpinner) setLoading(true)
     try {
-      const res = await hrAPI.getTeam({ status: filter })
+      const params = { status: filter }
+      if (searchQuery.trim()) params.search = searchQuery.trim()
+      const res = await hrAPI.getTeam(params)
       setTeam(res.data)
     } catch { setTeam([]) }
     finally { setLoading(false) }
   }
 
-  useEffect(() => { loadTeam() }, [filter])
+  useEffect(() => { loadTeam(true) }, [filter, searchQuery])
 
   const loadDetail = async (id) => {
     setDetailLoading(true)
@@ -102,12 +114,32 @@ export default function TeamTab() {
     if (!newRate || !selected) return
     setSaving(true)
     try {
-      await hrAPI.updateSalary(selected, { hourly_rate: newRate })
+      const payload = { hourly_rate: newRate }
+      if (effectiveDate) payload.effective_from = effectiveDate
+      await hrAPI.updateSalary(selected, payload)
       setNewRate('')
+      setEffectiveDate('')
       loadDetail(selected)
       loadTeam()
     } catch {}
     finally { setSaving(false) }
+  }
+
+  const handleSaveNote = async () => {
+    if (!noteForm.subject || !noteForm.content || !showNoteModal) return
+    setNoteSaving(true)
+    try {
+      await hrAPI.createEmployeeNote({
+        employee: showNoteModal,
+        category: noteForm.category,
+        date: new Date().toISOString().split('T')[0],
+        subject: noteForm.subject,
+        content: noteForm.content,
+      })
+      setShowNoteModal(null)
+      setNoteForm({ subject: '', content: '', category: 'MEETING' })
+    } catch {}
+    finally { setNoteSaving(false) }
   }
 
   if (loading) {
@@ -120,8 +152,40 @@ export default function TeamTab() {
 
   return (
     <div className="space-y-4">
+      {/* Search */}
+      <div className="relative">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+              setSearchQuery(search.trim())
+            }
+          }}
+          placeholder="Search and press Enter..."
+          className="w-full px-4 py-2.5 pl-10 pr-20 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          {search && (
+            <button onClick={() => { setSearch(''); setSearchQuery('') }} className="text-gray-400 hover:text-gray-600 p-1">
+              <XIcon size={14} />
+            </button>
+          )}
+          <button
+            onClick={() => setSearchQuery(search.trim())}
+            className="px-2 py-1 bg-gray-100 text-gray-500 text-xs font-semibold rounded-lg hover:bg-gray-200"
+          >
+            Search
+          </button>
+        </div>
+      </div>
+
       {/* Filters */}
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 flex-wrap">
         {STATUS_FILTERS.map((f) => (
           <button
             key={f.key}
@@ -153,7 +217,19 @@ export default function TeamTab() {
                   }`}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-gray-900">{m.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-gray-900">{m.name}</p>
+                      {m.employment_status && m.employment_status !== 'ACTIVE' && (
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                          m.employment_status === 'RESIGNED' ? 'bg-gray-100 text-gray-500' :
+                          m.employment_status === 'TERMINATED' ? 'bg-red-100 text-red-600' :
+                          m.employment_status === 'LEAVE' || m.employment_status === 'ON_LEAVE' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-gray-100 text-gray-500'
+                        }`}>
+                          {m.employment_status}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs text-gray-400">{m.job_title_display || m.role_display}</span>
                       <span className="text-xs text-gray-300">·</span>
@@ -175,13 +251,21 @@ export default function TeamTab() {
                       </div>
                     ) : detail ? (
                       <div className="space-y-4">
-                        {/* View Employee File Button */}
-                        <button
-                          onClick={() => navigate(`/hr/employee-file/${m.profile_id}`)}
-                          className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm"
-                        >
-                          View Employee File
-                        </button>
+                        {/* Action Buttons */}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => navigate(`/hr/employee-file/${m.profile_id}`)}
+                            className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm"
+                          >
+                            Employee File
+                          </button>
+                          <button
+                            onClick={() => { setShowNoteModal(m.profile_id); setNoteForm({ subject: '', content: '', category: 'MEETING' }) }}
+                            className="flex-1 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium text-sm"
+                          >
+                            + Meeting Note
+                          </button>
+                        </div>
                         {/* Basic Info */}
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
@@ -252,7 +336,8 @@ export default function TeamTab() {
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold text-gray-900">{fmt(detail.hourly_rate)}</span>
                             <span className="text-xs text-gray-400">/hr</span>
-                            <div className="flex-1" />
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
                             <input
                               type="number"
                               step="0.01"
@@ -260,6 +345,12 @@ export default function TeamTab() {
                               onChange={(e) => setNewRate(e.target.value)}
                               placeholder="New rate"
                               className="w-24 px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <input
+                              type="date"
+                              value={effectiveDate}
+                              onChange={(e) => setEffectiveDate(e.target.value)}
+                              className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                             <button
                               onClick={handleUpdateSalary}
@@ -269,6 +360,9 @@ export default function TeamTab() {
                               {saving ? '...' : 'Update'}
                             </button>
                           </div>
+                          {!effectiveDate && newRate && (
+                            <p className="text-[10px] text-gray-400 mt-1">No date selected — applies from today</p>
+                          )}
                         </div>
 
                         {/* Permissions */}
@@ -360,6 +454,70 @@ export default function TeamTab() {
             ))}
           </div>
         </Card>
+      )}
+
+      {/* Meeting Note Modal */}
+      {showNoteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900">Add Meeting Note</h3>
+              <button onClick={() => setShowNoteModal(null)} className="text-gray-400 hover:text-gray-600">
+                <XIcon size={20} />
+              </button>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">Category</label>
+              <select
+                value={noteForm.category}
+                onChange={(e) => setNoteForm({ ...noteForm, category: e.target.value })}
+                className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="MEETING">Meeting</option>
+                <option value="RETURN_TO_WORK">Return to Work</option>
+                <option value="COMPLAINT">Complaint</option>
+                <option value="GRIEVANCE">Grievance</option>
+                <option value="GENERAL">General</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">Subject</label>
+              <input
+                type="text"
+                value={noteForm.subject}
+                onChange={(e) => setNoteForm({ ...noteForm, subject: e.target.value })}
+                placeholder="e.g. Performance discussion, Return to work..."
+                className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">Content</label>
+              <textarea
+                value={noteForm.content}
+                onChange={(e) => setNoteForm({ ...noteForm, content: e.target.value })}
+                rows={5}
+                placeholder="Meeting details, discussion points, agreed actions..."
+                className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowNoteModal(null)}
+                className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveNote}
+                disabled={!noteForm.subject || !noteForm.content || noteSaving}
+                className="flex-1 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm font-semibold"
+              >
+                {noteSaving ? 'Saving...' : 'Save Note'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
