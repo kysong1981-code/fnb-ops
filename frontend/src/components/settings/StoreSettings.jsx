@@ -2410,7 +2410,7 @@ function ImportDataTab({ storeId }) {
                   <label className="flex-1">
                     <input
                       type="file"
-                      accept=".xlsx,.xls"
+                      accept=".xlsx,.xls,.csv"
                       onChange={(e) => setFile(e.target.files[0])}
                       className="hidden"
                     />
@@ -2418,7 +2418,7 @@ function ImportDataTab({ storeId }) {
                       {file ? (
                         <p className="text-sm font-medium text-emerald-800">{file.name}</p>
                       ) : (
-                        <p className="text-sm text-emerald-600">Click to select Excel file (.xlsx)</p>
+                        <p className="text-sm text-emerald-600">Click to select file (.xlsx or .csv)</p>
                       )}
                     </div>
                   </label>
