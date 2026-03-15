@@ -800,14 +800,21 @@ class TimesheetViewSet(viewsets.ModelViewSet):
             assigned_to=profile, due_date=today
         ).exclude(status='COMPLETED')
 
-        # Validation: FCP daily checklist
-        from safety.models import DailyChecklistResponse
-        fcp_done = DailyChecklistResponse.objects.filter(
+        # Validation: FCP daily checklist (only if store has active templates)
+        from safety.models import DailyChecklistResponse, SafetyChecklistTemplate
+        has_fcp_templates = SafetyChecklistTemplate.objects.filter(
             organization=profile.organization,
-            date=today,
-            completed_by=profile,
-            is_completed=True,
+            is_active=True,
         ).exists()
+
+        fcp_done = True  # default: no blocker
+        if has_fcp_templates:
+            fcp_done = DailyChecklistResponse.objects.filter(
+                organization=profile.organization,
+                date=today,
+                completed_by=profile,
+                is_completed=True,
+            ).exists()
 
         blockers = []
         if incomplete_tasks.exists():
