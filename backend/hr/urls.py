@@ -6,6 +6,8 @@ from .views import (
     EmployeeInviteViewSet, AcceptInviteView, DocumentTemplateViewSet,
     TrainingModuleViewSet, IR330ViewSet, SaveBankAccountView, InquiryViewSet,
     ResignationRequestViewSet,
+    DisciplinaryRecordViewSet, PerformanceReviewViewSet,
+    WorkplaceAccidentViewSet, EmployeeNoteViewSet,
 )
 
 # Router for ViewSets
@@ -24,6 +26,10 @@ router.register(r'training-modules', TrainingModuleViewSet, basename='training-m
 router.register(r'ir330', IR330ViewSet, basename='ir330')
 router.register(r'inquiries', InquiryViewSet, basename='inquiry')
 router.register(r'resignation-requests', ResignationRequestViewSet, basename='resignation-request')
+router.register(r'disciplinary-records', DisciplinaryRecordViewSet, basename='disciplinary-record')
+router.register(r'performance-reviews', PerformanceReviewViewSet, basename='performance-review')
+router.register(r'workplace-accidents', WorkplaceAccidentViewSet, basename='workplace-accident')
+router.register(r'employee-notes', EmployeeNoteViewSet, basename='employee-note')
 
 urlpatterns = [
     path('', include(router.urls)),

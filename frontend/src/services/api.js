@@ -324,6 +324,45 @@ export const hrAPI = {
   createResignation: (data) => api.post('/hr/resignation-requests/', data),
   confirmResignation: (id, data) => api.post(`/hr/resignation-requests/${id}/confirm/`, data),
   withdrawResignation: (id) => api.post(`/hr/resignation-requests/${id}/withdraw/`),
+
+  // Employee File (aggregated view)
+  getEmployeeFile: (id) => api.get(`/hr/team/${id}/employee-file/`),
+
+  // Disciplinary Records
+  getDisciplinaryRecords: (params) => api.get('/hr/disciplinary-records/', { params }),
+  createDisciplinaryRecord: (data) => {
+    const fd = data instanceof FormData ? data : (() => { const f = new FormData(); Object.entries(data).forEach(([k,v]) => f.append(k,v)); return f })()
+    return api.post('/hr/disciplinary-records/', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
+  updateDisciplinaryRecord: (id, data) => api.patch(`/hr/disciplinary-records/${id}/`, data),
+  deleteDisciplinaryRecord: (id) => api.delete(`/hr/disciplinary-records/${id}/`),
+
+  // Performance Reviews
+  getPerformanceReviews: (params) => api.get('/hr/performance-reviews/', { params }),
+  createPerformanceReview: (data) => {
+    const fd = data instanceof FormData ? data : (() => { const f = new FormData(); Object.entries(data).forEach(([k,v]) => f.append(k,v)); return f })()
+    return api.post('/hr/performance-reviews/', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
+  updatePerformanceReview: (id, data) => api.patch(`/hr/performance-reviews/${id}/`, data),
+  deletePerformanceReview: (id) => api.delete(`/hr/performance-reviews/${id}/`),
+
+  // Workplace Accidents
+  getWorkplaceAccidents: (params) => api.get('/hr/workplace-accidents/', { params }),
+  createWorkplaceAccident: (data) => {
+    const fd = data instanceof FormData ? data : (() => { const f = new FormData(); Object.entries(data).forEach(([k,v]) => f.append(k,v)); return f })()
+    return api.post('/hr/workplace-accidents/', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
+  updateWorkplaceAccident: (id, data) => api.patch(`/hr/workplace-accidents/${id}/`, data),
+  deleteWorkplaceAccident: (id) => api.delete(`/hr/workplace-accidents/${id}/`),
+
+  // Employee Notes
+  getEmployeeNotes: (params) => api.get('/hr/employee-notes/', { params }),
+  createEmployeeNote: (data) => {
+    const fd = data instanceof FormData ? data : (() => { const f = new FormData(); Object.entries(data).forEach(([k,v]) => f.append(k,v)); return f })()
+    return api.post('/hr/employee-notes/', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
+  updateEmployeeNote: (id, data) => api.patch(`/hr/employee-notes/${id}/`, data),
+  deleteEmployeeNote: (id) => api.delete(`/hr/employee-notes/${id}/`),
 }
 
 // Store Settings API

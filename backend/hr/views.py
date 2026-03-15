@@ -26,6 +26,7 @@ from utils.pdf_zones import extract_and_clean_sign_zones, get_default_zones
 from .models import (
     Onboarding, OnboardingTask, EmployeeDocument, ShiftTemplate, Roster, Timesheet, Task,
     EmployeeInvite, DocumentTemplate, IR330Declaration, TrainingModule, Inquiry, ResignationRequest,
+    DisciplinaryRecord, PerformanceReview, WorkplaceAccident, EmployeeNote,
 )
 from .serializers import (
     OnboardingDetailSerializer, OnboardingListSerializer,
@@ -34,6 +35,8 @@ from .serializers import (
     EmployeeInviteSerializer, DocumentTemplateSerializer, IR330DeclarationSerializer,
     TrainingModuleSerializer, TeamMemberListSerializer, TeamMemberDetailSerializer,
     InquirySerializer, ResignationRequestSerializer,
+    DisciplinaryRecordSerializer, PerformanceReviewSerializer,
+    WorkplaceAccidentSerializer, EmployeeNoteSerializer,
 )
 from users.models import UserProfile, ROLE_CHOICES, JOB_TITLE_CHOICES, WORK_TYPE_CHOICES
 from users.serializers import UserProfileDetailSerializer
@@ -1174,6 +1177,297 @@ class TeamViewSet(viewsets.ViewSet):
         )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @action(detail=True, methods=['get'], url_path='employee-file')
+    def employee_file(self, request, pk=None):
+        """직원 파일 - 모든 기록 통합 조회 (NZ compliance)"""
+        org = self._get_org(request)
+        try:
+            member = UserProfile.objects.select_related('user').get(id=pk, organization=org)
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Employee basic info
+        employee_info = {
+            'id': member.id,
+            'name': member.user.get_full_name() or member.user.username,
+            'email': member.user.email,
+            'employee_id': member.employee_id,
+            'role': member.role,
+            'job_title': member.job_title,
+            'job_title_display': dict(JOB_TITLE_CHOICES).get(member.job_title) if member.job_title else None,
+            'work_type': member.work_type,
+            'work_type_display': dict(WORK_TYPE_CHOICES).get(member.work_type, member.work_type),
+            'employment_status': member.employment_status,
+            'date_of_joining': member.date_of_joining,
+            'phone': member.phone,
+        }
+
+        # 1. Employment Agreements
+        employment_types = ['CONTRACT', 'JOB_OFFER', 'JOB_DESCRIPTION', 'VARIATION']
+        employment_docs = EmployeeDocument.objects.filter(
+            employee=member, document_type__in=employment_types
+        ).order_by('-uploaded_at')
+
+        # 2. Tax Declarations
+        ir330s = IR330Declaration.objects.filter(employee=member).order_by('-created_at')
+
+        # 3. Wage & Time Records
+        from payroll.models import Salary, PaySlip
+        salaries = Salary.objects.filter(user=member).order_by('-effective_from')
+        recent_payslips = PaySlip.objects.filter(user=member).order_by('-pay_period_end')[:6]
+        timesheet_count = Timesheet.objects.filter(user=member).count()
+        timesheet_range = Timesheet.objects.filter(user=member).order_by('date').values_list('date', flat=True)
+        timesheet_dates = list(timesheet_range[:1]) + list(timesheet_range.reverse()[:1])
+
+        # 4. Leave Records
+        from payroll.models import LeaveRequest, LeaveBalance
+        leave_balances = LeaveBalance.objects.filter(user=member)
+        leave_requests = LeaveRequest.objects.filter(user=member).order_by('-created_at')[:20]
+
+        # 5. Training & Certifications
+        cert_docs = EmployeeDocument.objects.filter(
+            employee=member, document_type__in=['CERTIFICATE']
+        ).order_by('-uploaded_at')
+        try:
+            onboarding = member.onboarding
+            training_tasks = OnboardingTask.objects.filter(
+                onboarding=onboarding, step_type='TRAINING'
+            ).order_by('order')
+        except Onboarding.DoesNotExist:
+            training_tasks = OnboardingTask.objects.none()
+
+        # 6. Disciplinary Records
+        disciplinary = DisciplinaryRecord.objects.filter(employee=member).order_by('-date')
+
+        # 7. Performance Reviews
+        performance = PerformanceReview.objects.filter(employee=member).order_by('-review_period_end')
+
+        # 8. Health & Safety (Workplace Accidents)
+        accidents = WorkplaceAccident.objects.filter(employee=member).order_by('-date')
+
+        # 9. Other Documents (visa, ID, medical, police vetting, etc.)
+        other_doc_types = ['VISA', 'ID_DOCUMENT', 'MEDICAL', 'POLICE_VET', 'OTHER']
+        other_docs = EmployeeDocument.objects.filter(
+            employee=member, document_type__in=other_doc_types
+        ).order_by('-uploaded_at')
+
+        # 10. File Notes
+        notes = EmployeeNote.objects.filter(employee=member).order_by('-date')
+
+        # 11. Inquiries
+        inquiries = Inquiry.objects.filter(employee=member).order_by('-created_at')
+
+        # 12. Resignation
+        resignations = ResignationRequest.objects.filter(employee=member).order_by('-created_at')
+
+        # 13. Onboarding
+        onboarding_data = None
+        try:
+            ob = member.onboarding
+            onboarding_data = {
+                'status': ob.status,
+                'completed_percentage': ob.completed_percentage,
+                'completed_at': ob.completed_at,
+                'created_at': ob.created_at,
+            }
+        except Onboarding.DoesNotExist:
+            pass
+
+        # Build timeline (chronological events from all categories)
+        timeline = []
+
+        for doc in employment_docs:
+            timeline.append({
+                'date': str(doc.uploaded_at.date()) if doc.uploaded_at else None,
+                'type': 'document',
+                'category': 'employment',
+                'title': f'{doc.get_document_type_display()}: {doc.title}',
+                'detail': f'Signed: {"Yes" if doc.is_signed else "No"}',
+                'id': doc.id,
+            })
+
+        for ir in ir330s:
+            timeline.append({
+                'date': str(ir.created_at.date()),
+                'type': 'tax',
+                'category': 'tax',
+                'title': f'IR330 Tax Declaration - {ir.get_tax_code_display()}',
+                'detail': f'IRD: {ir.ird_number}',
+                'id': ir.id,
+            })
+
+        for d in disciplinary:
+            timeline.append({
+                'date': str(d.date),
+                'type': 'disciplinary',
+                'category': 'disciplinary',
+                'title': f'{d.get_record_type_display()}: {d.subject}',
+                'detail': d.description[:100],
+                'id': d.id,
+            })
+
+        for p in performance:
+            timeline.append({
+                'date': str(p.review_period_end),
+                'type': 'performance',
+                'category': 'performance',
+                'title': f'Performance Review - {p.get_overall_rating_display()}',
+                'detail': f'{p.review_period_start} ~ {p.review_period_end}',
+                'id': p.id,
+            })
+
+        for a in accidents:
+            timeline.append({
+                'date': str(a.date),
+                'type': 'accident',
+                'category': 'health_safety',
+                'title': f'Workplace Accident - {a.get_injury_type_display()}',
+                'detail': a.description[:100],
+                'id': a.id,
+            })
+
+        for n in notes:
+            timeline.append({
+                'date': str(n.date),
+                'type': 'note',
+                'category': 'notes',
+                'title': f'{n.get_category_display()}: {n.subject}',
+                'detail': n.content[:100],
+                'id': n.id,
+            })
+
+        for inq in inquiries:
+            timeline.append({
+                'date': str(inq.created_at.date()),
+                'type': 'inquiry',
+                'category': 'inquiries',
+                'title': f'Inquiry: {inq.subject}',
+                'detail': f'Status: {inq.get_status_display()}',
+                'id': inq.id,
+            })
+
+        for r in resignations:
+            timeline.append({
+                'date': str(r.created_at.date()),
+                'type': 'resignation',
+                'category': 'resignation',
+                'title': f'Resignation - {r.get_status_display()}',
+                'detail': f'Last day: {r.requested_last_day}',
+                'id': r.id,
+            })
+
+        # Sort timeline by date descending
+        timeline.sort(key=lambda x: x.get('date') or '', reverse=True)
+
+        # Serialize categories
+        response_data = {
+            'employee': employee_info,
+            'categories': {
+                'employment': {
+                    'label': 'Employment Agreements',
+                    'count': employment_docs.count(),
+                    'items': EmployeeDocumentSerializer(employment_docs, many=True, context={'request': request}).data,
+                },
+                'tax': {
+                    'label': 'Tax Declarations (IR330)',
+                    'count': ir330s.count(),
+                    'items': IR330DeclarationSerializer(ir330s, many=True).data,
+                },
+                'wages_time': {
+                    'label': 'Wage & Time Records',
+                    'count': timesheet_count,
+                    'salary_history': [{
+                        'id': s.id,
+                        'hourly_rate': str(s.hourly_rate),
+                        'effective_from': s.effective_from,
+                        'effective_to': s.effective_to,
+                        'is_active': s.is_active,
+                    } for s in salaries],
+                    'recent_payslips': [{
+                        'id': p.id,
+                        'pay_period_start': p.pay_period_start,
+                        'pay_period_end': p.pay_period_end,
+                        'gross_pay': str(p.gross_pay),
+                        'net_pay': str(p.net_pay),
+                        'status': p.status,
+                    } for p in recent_payslips],
+                    'timesheet_summary': {
+                        'total_records': timesheet_count,
+                        'earliest': str(timesheet_dates[0]) if timesheet_dates else None,
+                        'latest': str(timesheet_dates[-1]) if len(timesheet_dates) > 1 else None,
+                    },
+                },
+                'leave': {
+                    'label': 'Leave Records',
+                    'balances': [{
+                        'leave_type': lb.leave_type,
+                        'total_days': float(lb.total_days),
+                        'used_days': float(lb.used_days),
+                        'remaining_days': float(lb.remaining_days),
+                    } for lb in leave_balances],
+                    'recent_requests': [{
+                        'id': lr.id,
+                        'leave_type': lr.leave_type,
+                        'start_date': lr.start_date,
+                        'end_date': lr.end_date,
+                        'status': lr.status,
+                        'reason': lr.reason,
+                    } for lr in leave_requests],
+                },
+                'training': {
+                    'label': 'Training & Certifications',
+                    'certificates': EmployeeDocumentSerializer(cert_docs, many=True, context={'request': request}).data,
+                    'training_tasks': [{
+                        'id': t.id,
+                        'title': t.title,
+                        'is_completed': t.is_completed,
+                        'completed_at': t.completed_at,
+                    } for t in training_tasks],
+                },
+                'disciplinary': {
+                    'label': 'Disciplinary Records',
+                    'count': disciplinary.count(),
+                    'items': DisciplinaryRecordSerializer(disciplinary, many=True).data,
+                },
+                'performance': {
+                    'label': 'Performance Reviews',
+                    'count': performance.count(),
+                    'items': PerformanceReviewSerializer(performance, many=True).data,
+                },
+                'health_safety': {
+                    'label': 'Health & Safety',
+                    'count': accidents.count(),
+                    'items': WorkplaceAccidentSerializer(accidents, many=True).data,
+                },
+                'documents': {
+                    'label': 'Other Documents',
+                    'count': other_docs.count(),
+                    'items': EmployeeDocumentSerializer(other_docs, many=True, context={'request': request}).data,
+                },
+                'notes': {
+                    'label': 'File Notes',
+                    'count': notes.count(),
+                    'items': EmployeeNoteSerializer(notes, many=True).data,
+                },
+                'inquiries': {
+                    'label': 'Inquiries',
+                    'count': inquiries.count(),
+                    'items': InquirySerializer(inquiries, many=True).data,
+                },
+                'resignation': {
+                    'label': 'Resignation',
+                    'items': ResignationRequestSerializer(resignations, many=True).data,
+                },
+                'onboarding': {
+                    'label': 'Onboarding',
+                    'data': onboarding_data,
+                },
+            },
+            'timeline': timeline,
+        }
+
+        return Response(response_data)
+
 
 def send_invite_email(invite, temp_password, org_name):
     """초대 이메일 발송"""
@@ -1857,3 +2151,97 @@ class ResignationRequestViewSet(viewsets.ModelViewSet):
         resignation.status = 'WITHDRAWN'
         resignation.save(update_fields=['status'])
         return Response(ResignationRequestSerializer(resignation).data)
+
+
+class DisciplinaryRecordViewSet(viewsets.ModelViewSet):
+    """징계 기록 CRUD — 매니저 전용"""
+    serializer_class = DisciplinaryRecordSerializer
+    permission_classes = [IsAuthenticated]
+
+    MANAGER_ROLES = ['MANAGER', 'SENIOR_MANAGER', 'REGIONAL_MANAGER', 'HQ', 'CEO']
+
+    def get_queryset(self):
+        user = self.request.user.profile
+        qs = DisciplinaryRecord.objects.filter(
+            organization=user.organization
+        ).select_related('employee__user', 'issued_by__user')
+        employee_id = self.request.query_params.get('employee')
+        if employee_id:
+            qs = qs.filter(employee_id=employee_id)
+        return qs
+
+    def perform_create(self, serializer):
+        profile = self.request.user.profile
+        serializer.save(
+            organization=profile.organization,
+            issued_by=profile,
+        )
+
+
+class PerformanceReviewViewSet(viewsets.ModelViewSet):
+    """성과 평가 CRUD — 매니저 전용"""
+    serializer_class = PerformanceReviewSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user.profile
+        qs = PerformanceReview.objects.filter(
+            organization=user.organization
+        ).select_related('employee__user', 'reviewer__user')
+        employee_id = self.request.query_params.get('employee')
+        if employee_id:
+            qs = qs.filter(employee_id=employee_id)
+        return qs
+
+    def perform_create(self, serializer):
+        profile = self.request.user.profile
+        serializer.save(
+            organization=profile.organization,
+            reviewer=profile,
+        )
+
+
+class WorkplaceAccidentViewSet(viewsets.ModelViewSet):
+    """산업재해/사고 기록 CRUD — 매니저 전용"""
+    serializer_class = WorkplaceAccidentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user.profile
+        qs = WorkplaceAccident.objects.filter(
+            organization=user.organization
+        ).select_related('employee__user', 'reported_by__user')
+        employee_id = self.request.query_params.get('employee')
+        if employee_id:
+            qs = qs.filter(employee_id=employee_id)
+        return qs
+
+    def perform_create(self, serializer):
+        profile = self.request.user.profile
+        serializer.save(
+            organization=profile.organization,
+            reported_by=profile,
+        )
+
+
+class EmployeeNoteViewSet(viewsets.ModelViewSet):
+    """직원 파일 노트 CRUD — 매니저 전용"""
+    serializer_class = EmployeeNoteSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user.profile
+        qs = EmployeeNote.objects.filter(
+            organization=user.organization
+        ).select_related('employee__user', 'created_by__user')
+        employee_id = self.request.query_params.get('employee')
+        if employee_id:
+            qs = qs.filter(employee_id=employee_id)
+        return qs
+
+    def perform_create(self, serializer):
+        profile = self.request.user.profile
+        serializer.save(
+            organization=profile.organization,
+            created_by=profile,
+        )

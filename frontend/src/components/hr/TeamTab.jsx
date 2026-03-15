@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { hrAPI } from '../../services/api'
 import Card from '../ui/Card'
 import { XIcon, DocumentIcon } from '../icons'
@@ -29,6 +30,7 @@ const JOB_TITLES = [
 const fmt = (v) => v != null ? `$${parseFloat(v).toFixed(2)}` : '-'
 
 export default function TeamTab() {
+  const navigate = useNavigate()
   const [team, setTeam] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('ACTIVE')
@@ -173,6 +175,13 @@ export default function TeamTab() {
                       </div>
                     ) : detail ? (
                       <div className="space-y-4">
+                        {/* View Employee File Button */}
+                        <button
+                          onClick={() => navigate(`/hr/employee-file/${m.profile_id}`)}
+                          className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm"
+                        >
+                          View Employee File
+                        </button>
                         {/* Basic Info */}
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>

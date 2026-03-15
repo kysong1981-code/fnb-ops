@@ -99,9 +99,15 @@ class OnboardingTask(models.Model):
 class EmployeeDocument(models.Model):
     """직원 문서 (계약서, JD, Offer 등)"""
     DOCUMENT_TYPE_CHOICES = (
-        ('CONTRACT', 'Contract'),
+        ('CONTRACT', 'Employment Agreement'),
         ('JOB_DESCRIPTION', 'Job Description'),
         ('JOB_OFFER', 'Job Offer'),
+        ('VARIATION', 'Agreement Variation'),
+        ('VISA', 'Visa / Work Permit'),
+        ('ID_DOCUMENT', 'ID Document'),
+        ('CERTIFICATE', 'Certificate / Licence'),
+        ('MEDICAL', 'Medical Certificate'),
+        ('POLICE_VET', 'Police Vetting'),
         ('OTHER', 'Other'),
     )
 
@@ -532,3 +538,151 @@ class ResignationRequest(models.Model):
 
     def __str__(self):
         return f"{self.employee.user.get_full_name()} - Resignation ({self.status})"
+
+
+class DisciplinaryRecord(models.Model):
+    """징계 기록 - NZ Employment Law compliance"""
+    RECORD_TYPE_CHOICES = (
+        ('VERBAL_WARNING', 'Verbal Warning'),
+        ('WRITTEN_WARNING', 'Written Warning'),
+        ('FINAL_WARNING', 'Final Warning'),
+        ('DISCIPLINARY_MEETING', 'Disciplinary Meeting'),
+        ('SUSPENSION', 'Suspension'),
+        ('TERMINATION', 'Termination'),
+    )
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='disciplinary_records')
+    employee = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='disciplinary_records')
+    record_type = models.CharField(max_length=30, choices=RECORD_TYPE_CHOICES)
+    date = models.DateField()
+    subject = models.CharField(max_length=255)
+    description = models.TextField(help_text='What happened, what was discussed')
+    outcome = models.TextField(blank=True, default='', help_text='Agreed actions, next steps')
+    witness = models.CharField(max_length=255, blank=True, default='', help_text='Support person / witness name')
+    follow_up_date = models.DateField(null=True, blank=True)
+    acknowledged_by_employee = models.BooleanField(default=False)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    file = models.FileField(upload_to='disciplinary/%Y/%m/', null=True, blank=True)
+    issued_by = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, related_name='issued_disciplinary')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date']
+        indexes = [
+            models.Index(fields=['organization', 'employee']),
+            models.Index(fields=['employee', 'date']),
+        ]
+
+    def __str__(self):
+        return f"{self.employee.user.get_full_name()} - {self.get_record_type_display()} ({self.date})"
+
+
+class PerformanceReview(models.Model):
+    """성과 평가 기록"""
+    RATING_CHOICES = (
+        ('EXCEEDS', 'Exceeds Expectations'),
+        ('MEETS', 'Meets Expectations'),
+        ('BELOW', 'Below Expectations'),
+        ('UNSATISFACTORY', 'Unsatisfactory'),
+    )
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='performance_reviews')
+    employee = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='performance_reviews')
+    reviewer = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, related_name='conducted_reviews')
+    review_period_start = models.DateField()
+    review_period_end = models.DateField()
+    overall_rating = models.CharField(max_length=20, choices=RATING_CHOICES)
+    strengths = models.TextField(blank=True, default='')
+    areas_for_improvement = models.TextField(blank=True, default='')
+    goals = models.TextField(blank=True, default='', help_text='Agreed goals for next period')
+    employee_comments = models.TextField(blank=True, default='')
+    acknowledged_by_employee = models.BooleanField(default=False)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    file = models.FileField(upload_to='performance_reviews/%Y/%m/', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-review_period_end']
+        indexes = [
+            models.Index(fields=['organization', 'employee']),
+        ]
+
+    def __str__(self):
+        return f"{self.employee.user.get_full_name()} - Review ({self.review_period_start} ~ {self.review_period_end})"
+
+
+class WorkplaceAccident(models.Model):
+    """산업재해/사고 기록 - WorkSafe NZ compliance"""
+    INJURY_TYPE_CHOICES = (
+        ('MINOR', 'Minor (first aid only)'),
+        ('MODERATE', 'Moderate (medical treatment)'),
+        ('SERIOUS', 'Serious Harm'),
+        ('NOTIFIABLE', 'Notifiable Event'),
+    )
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='workplace_accidents')
+    employee = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='workplace_accidents')
+    date = models.DateField()
+    time = models.TimeField(null=True, blank=True)
+    location = models.CharField(max_length=255, help_text='Where in the store')
+    description = models.TextField()
+    injury_type = models.CharField(max_length=20, choices=INJURY_TYPE_CHOICES)
+    body_part_affected = models.CharField(max_length=255, blank=True, default='')
+    first_aid_given = models.BooleanField(default=False)
+    first_aid_details = models.TextField(blank=True, default='')
+    medical_treatment_sought = models.BooleanField(default=False)
+    days_off_work = models.IntegerField(default=0)
+    worksafe_notified = models.BooleanField(default=False, help_text='Required for notifiable events')
+    worksafe_reference = models.CharField(max_length=100, blank=True, default='')
+    corrective_actions = models.TextField(blank=True, default='')
+    reported_by = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, related_name='reported_accidents')
+    witness_names = models.TextField(blank=True, default='')
+    file = models.FileField(upload_to='accidents/%Y/%m/', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date']
+        indexes = [
+            models.Index(fields=['organization', 'employee']),
+            models.Index(fields=['employee', 'date']),
+        ]
+
+    def __str__(self):
+        return f"{self.employee.user.get_full_name()} - Accident ({self.date})"
+
+
+class EmployeeNote(models.Model):
+    """직원 파일 노트 - 미팅 기록, 그리밴스, 기타"""
+    CATEGORY_CHOICES = (
+        ('MEETING', 'Meeting Notes'),
+        ('RETURN_TO_WORK', 'Return to Work'),
+        ('COMPLAINT', 'Complaint'),
+        ('GRIEVANCE', 'Grievance'),
+        ('GENERAL', 'General Note'),
+        ('OTHER', 'Other'),
+    )
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='employee_notes')
+    employee = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='employee_notes')
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='GENERAL')
+    date = models.DateField()
+    subject = models.CharField(max_length=255)
+    content = models.TextField()
+    is_confidential = models.BooleanField(default=False)
+    created_by = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, related_name='created_notes')
+    file = models.FileField(upload_to='employee_notes/%Y/%m/', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date']
+        indexes = [
+            models.Index(fields=['organization', 'employee']),
+            models.Index(fields=['employee', 'date']),
+        ]
+
+    def __str__(self):
+        return f"{self.employee.user.get_full_name()} - {self.subject} ({self.date})"

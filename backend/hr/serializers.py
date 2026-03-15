@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import (
     Onboarding, OnboardingTask, EmployeeDocument, ShiftTemplate, Roster, Timesheet, Task,
     EmployeeInvite, DocumentTemplate, IR330Declaration, TrainingModule, Inquiry, ResignationRequest,
+    DisciplinaryRecord, PerformanceReview, WorkplaceAccident, EmployeeNote,
 )
 
 
@@ -356,3 +357,76 @@ class ResignationRequestSerializer(serializers.ModelSerializer):
             'work_type', 'work_type_display',
             'created_at',
         ]
+
+
+class DisciplinaryRecordSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.user.get_full_name', read_only=True)
+    issued_by_name = serializers.CharField(source='issued_by.user.get_full_name', read_only=True, allow_null=True)
+    record_type_display = serializers.CharField(source='get_record_type_display', read_only=True)
+
+    class Meta:
+        model = DisciplinaryRecord
+        fields = [
+            'id', 'employee', 'employee_name', 'organization',
+            'record_type', 'record_type_display', 'date', 'subject', 'description',
+            'outcome', 'witness', 'follow_up_date',
+            'acknowledged_by_employee', 'acknowledged_at',
+            'file', 'issued_by', 'issued_by_name',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'organization', 'issued_by', 'created_at', 'updated_at']
+
+
+class PerformanceReviewSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.user.get_full_name', read_only=True)
+    reviewer_name = serializers.CharField(source='reviewer.user.get_full_name', read_only=True, allow_null=True)
+    overall_rating_display = serializers.CharField(source='get_overall_rating_display', read_only=True)
+
+    class Meta:
+        model = PerformanceReview
+        fields = [
+            'id', 'employee', 'employee_name', 'organization',
+            'reviewer', 'reviewer_name',
+            'review_period_start', 'review_period_end', 'overall_rating', 'overall_rating_display',
+            'strengths', 'areas_for_improvement', 'goals', 'employee_comments',
+            'acknowledged_by_employee', 'acknowledged_at',
+            'file', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'organization', 'reviewer', 'created_at', 'updated_at']
+
+
+class WorkplaceAccidentSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.user.get_full_name', read_only=True)
+    reported_by_name = serializers.CharField(source='reported_by.user.get_full_name', read_only=True, allow_null=True)
+    injury_type_display = serializers.CharField(source='get_injury_type_display', read_only=True)
+
+    class Meta:
+        model = WorkplaceAccident
+        fields = [
+            'id', 'employee', 'employee_name', 'organization',
+            'date', 'time', 'location', 'description',
+            'injury_type', 'injury_type_display', 'body_part_affected',
+            'first_aid_given', 'first_aid_details',
+            'medical_treatment_sought', 'days_off_work',
+            'worksafe_notified', 'worksafe_reference',
+            'corrective_actions', 'reported_by', 'reported_by_name',
+            'witness_names', 'file',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'organization', 'reported_by', 'created_at', 'updated_at']
+
+
+class EmployeeNoteSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.user.get_full_name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.user.get_full_name', read_only=True, allow_null=True)
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+
+    class Meta:
+        model = EmployeeNote
+        fields = [
+            'id', 'employee', 'employee_name', 'organization',
+            'category', 'category_display', 'date', 'subject', 'content',
+            'is_confidential', 'created_by', 'created_by_name',
+            'file', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'organization', 'created_by', 'created_at', 'updated_at']

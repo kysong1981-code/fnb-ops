@@ -13,6 +13,7 @@ import SalesAnalysis from './components/sales/SalesAnalysis'
 import StoreReport from './components/reports/StoreReport'
 import SkyReport from './components/reports/SkyReport'
 import HRHub from './components/hr/HRHub'
+import EmployeeFilePage from './components/hr/EmployeeFilePage'
 import OnboardingDetail from './components/hr/OnboardingDetail'
 import AcceptInvite from './components/hr/AcceptInvite'
 import MyPayslips from './components/payroll/MyPayslips'
@@ -187,6 +188,15 @@ function App() {
             element={
               <ProtectedWithLayout>
                 <HRHub />
+              </ProtectedWithLayout>
+            }
+          />
+
+          <Route
+            path="/hr/employee-file/:id"
+            element={
+              <ProtectedWithLayout>
+                <EmployeeFilePage />
               </ProtectedWithLayout>
             }
           />
