@@ -69,9 +69,14 @@ export default function RosterManagement() {
   const [clipboard, setClipboard] = useState(null)
   const [copyMode, setCopyMode] = useState(false)
 
-  // Drag
+  // Drag (shift cards)
   const dragRef = useRef(null)
   const [dragOver, setDragOver] = useState(null)
+
+  // Staff row reorder
+  const [staffOrder, setStaffOrder] = useState([])
+  const rowDragRef = useRef(null)
+  const [rowDragOverId, setRowDragOverId] = useState(null)
 
   // Copy last week
   const [copying, setCopying] = useState(false)
@@ -141,6 +146,21 @@ export default function RosterManagement() {
     const saved = localStorage.getItem('defaultBreakMinutes')
     if (saved) setDefaultBreak(parseInt(saved) || 30)
   }, [])
+
+  // Apply saved staff order when team loads
+  useEffect(() => {
+    if (team.length === 0) return
+    const storeId = localStorage.getItem('selected_store_id') || 'default'
+    const saved = localStorage.getItem(`staffOrder_${storeId}`)
+    if (saved) {
+      try {
+        const order = JSON.parse(saved)
+        setStaffOrder(order)
+      } catch { setStaffOrder([]) }
+    } else {
+      setStaffOrder([])
+    }
+  }, [team])
 
   /* ── actions ── */
   const handleSaveShift = async () => {
@@ -325,6 +345,50 @@ export default function RosterManagement() {
   }
 
   const handleDragEnd = () => { dragRef.current = null; setDragOver(null) }
+
+  /* ── staff row reorder ── */
+  const handleRowDragStart = (e, empId) => {
+    e.stopPropagation()
+    rowDragRef.current = empId
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/row', String(empId))
+  }
+
+  const handleRowDragOver = (e, empId) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // Only accept row drags (not shift card drags)
+    if (rowDragRef.current == null) return
+    if (rowDragRef.current === empId) return
+    e.dataTransfer.dropEffect = 'move'
+    setRowDragOverId(empId)
+  }
+
+  const handleRowDrop = (e, targetEmpId) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setRowDragOverId(null)
+    const sourceEmpId = rowDragRef.current
+    rowDragRef.current = null
+    if (!sourceEmpId || sourceEmpId === targetEmpId) return
+
+    // Reorder
+    const currentOrder = orderedTeam.map((t) => t.id)
+    const fromIdx = currentOrder.indexOf(sourceEmpId)
+    const toIdx = currentOrder.indexOf(targetEmpId)
+    if (fromIdx === -1 || toIdx === -1) return
+
+    const newOrder = [...currentOrder]
+    newOrder.splice(fromIdx, 1)
+    newOrder.splice(toIdx, 0, sourceEmpId)
+    setStaffOrder(newOrder)
+
+    // Save to localStorage
+    const storeId = localStorage.getItem('selected_store_id') || 'default'
+    localStorage.setItem(`staffOrder_${storeId}`, JSON.stringify(newOrder))
+  }
+
+  const handleRowDragEnd = () => { rowDragRef.current = null; setRowDragOverId(null) }
 
   /* ── break settings ── */
   const saveDefaultBreak = async (val) => {
@@ -516,6 +580,17 @@ export default function RosterManagement() {
   const getDayNum = (d) => new Date(d + 'T00:00:00').getDate()
   const unpublishedCount = rosters.filter((r) => !r.is_confirmed).length
 
+  // Sorted team by saved order
+  const orderedTeam = (() => {
+    if (staffOrder.length === 0) return team
+    const orderMap = new Map(staffOrder.map((id, idx) => [id, idx]))
+    return [...team].sort((a, b) => {
+      const aIdx = orderMap.has(a.id) ? orderMap.get(a.id) : 9999
+      const bIdx = orderMap.has(b.id) ? orderMap.get(b.id) : 9999
+      return aIdx - bIdx
+    })
+  })()
+
   const avatarColors = [
     'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500',
     'bg-purple-500', 'bg-cyan-500', 'bg-indigo-500', 'bg-pink-500',
@@ -669,7 +744,7 @@ export default function RosterManagement() {
                           {selected.size === rosters.length && rosters.length > 0 ? '✓' : ''}
                         </button>
                       )}
-                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{team.length} Staff</span>
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{orderedTeam.length} Staff</span>
                     </div>
                   </th>
                   {weekDays.map((date, i) => {
@@ -686,17 +761,41 @@ export default function RosterManagement() {
                 </tr>
               </thead>
               <tbody>
-                {team.map((emp) => {
+                {orderedTeam.map((emp) => {
                   const weeklyHrs = getWeeklyHours(emp.id)
                   const initial = (emp.name || '?')[0].toUpperCase()
                   const avatarColor = avatarColors[emp.id % avatarColors.length]
                   const empRosters = rosters.filter((r) => r.user === emp.id)
                   const allEmpSelected = empRosters.length > 0 && empRosters.every((r) => selected.has(r.id))
+                  const isRowDragTarget = rowDragOverId === emp.id
 
                   return (
-                    <tr key={emp.id} className="border-b border-gray-50 hover:bg-gray-50/30">
-                      <td className="py-3 px-4 sticky left-0 bg-white z-10">
-                        <div className="flex items-center gap-3">
+                    <tr
+                      key={emp.id}
+                      className={`border-b border-gray-50 hover:bg-gray-50/30 transition ${
+                        isRowDragTarget ? 'border-t-2 border-t-blue-400' : ''
+                      }`}
+                      onDragOver={(e) => handleRowDragOver(e, emp.id)}
+                      onDrop={(e) => handleRowDrop(e, emp.id)}
+                    >
+                      <td className="py-3 px-2 sticky left-0 bg-white z-10">
+                        <div className="flex items-center gap-2">
+                          {/* Drag handle */}
+                          {!selectMode && (
+                            <div
+                              draggable
+                              onDragStart={(e) => handleRowDragStart(e, emp.id)}
+                              onDragEnd={handleRowDragEnd}
+                              className="w-5 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 flex-shrink-0 touch-none"
+                              title="Drag to reorder"
+                            >
+                              <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
+                                <circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/>
+                                <circle cx="2" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/>
+                                <circle cx="2" cy="14" r="1.5"/><circle cx="8" cy="14" r="1.5"/>
+                              </svg>
+                            </div>
+                          )}
                           {selectMode && (
                             <button
                               onClick={() => selectAllForEmployee(emp.id)}
