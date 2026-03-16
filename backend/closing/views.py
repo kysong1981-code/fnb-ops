@@ -470,12 +470,17 @@ class ClosingCashExpenseViewSet(mixins.CreateModelMixin,
 
 
 class SupplierViewSet(viewsets.ModelViewSet):
-    """공급사 관리 ViewSet (Store Settings에서 사용)"""
+    """공급사 관리 ViewSet — 조회는 전 직원, 생성/수정/삭제는 매니저"""
     queryset = Supplier.objects.all()
     serializer_class = SupplierSerializer
-    permission_classes = [IsAuthenticated, IsManager]
+    permission_classes = [IsAuthenticated]
     filter_backends = [OrganizationFilterBackend]
     pagination_class = None
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsManager()]
 
     def perform_create(self, serializer):
         serializer.save(organization=get_target_org(self.request))
@@ -485,12 +490,17 @@ class SupplierViewSet(viewsets.ModelViewSet):
 
 
 class SalesCategoryViewSet(viewsets.ModelViewSet):
-    """매출 카테고리 관리 ViewSet (Store Settings에서 사용)"""
+    """매출 카테고리 관리 ViewSet — 조회는 전 직원, 생성/수정/삭제는 매니저"""
     queryset = SalesCategory.objects.all()
     serializer_class = SalesCategorySerializer
-    permission_classes = [IsAuthenticated, IsManager]
+    permission_classes = [IsAuthenticated]
     filter_backends = [OrganizationFilterBackend]
     pagination_class = None
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsManager()]
 
     def perform_create(self, serializer):
         serializer.save(organization=get_target_org(self.request))
