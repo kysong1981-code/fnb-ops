@@ -110,6 +110,16 @@ export default function TeamTab() {
     finally { setPermSaving(false) }
   }
 
+  const handleToggleAllowanceAmount = async (field, value) => {
+    if (!selected || !detail) return
+    setPermSaving(true)
+    try {
+      const res = await hrAPI.updatePermissions(selected, { [field]: value })
+      setDetail({ ...detail, ...res.data })
+    } catch {}
+    finally { setPermSaving(false) }
+  }
+
   const handleUpdateSalary = async () => {
     if (!newRate || !selected) return
     setSaving(true)
@@ -301,7 +311,25 @@ export default function TeamTab() {
                           </div>
                           <div>
                             <span className="text-xs text-gray-400">Work Type</span>
-                            <p className="text-gray-900">{detail.work_type_display || '-'}</p>
+                            <select
+                              value={detail.work_type || ''}
+                              onChange={async (e) => {
+                                setPermSaving(true)
+                                try {
+                                  const res = await hrAPI.updatePermissions(selected, { work_type: e.target.value })
+                                  setDetail({ ...detail, ...res.data })
+                                } catch {}
+                                finally { setPermSaving(false) }
+                              }}
+                              className="mt-0.5 w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="FULL_TIME">Full Time</option>
+                              <option value="PART_TIME">Part Time</option>
+                              <option value="CASUAL">Casual</option>
+                              <option value="SALARY">Salary</option>
+                              <option value="SALARY_FULLTIME">Salary Full Time</option>
+                              <option value="VISA_FULL_TIME">Visa Full Time</option>
+                            </select>
                           </div>
                           <div>
                             <span className="text-xs text-gray-400">Joined</span>
@@ -390,6 +418,71 @@ export default function TeamTab() {
                               <span className="text-sm text-gray-700">Safety Tasks</span>
                             </label>
                             {permSaving && <span className="text-xs text-gray-400">Saving...</span>}
+                          </div>
+                        </div>
+
+                        {/* Allowances */}
+                        <div>
+                          <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Allowances (Weekly)</h4>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-3">
+                              <label className="flex items-center gap-2 cursor-pointer min-w-[140px]">
+                                <input
+                                  type="checkbox"
+                                  checked={detail.housing_support || false}
+                                  onChange={() => handleTogglePermission('housing_support')}
+                                  disabled={permSaving}
+                                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-700">Housing</span>
+                              </label>
+                              {detail.housing_support && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-sm text-gray-400">$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={detail.housing_amount || ''}
+                                    onChange={(e) => setDetail({ ...detail, housing_amount: e.target.value })}
+                                    onBlur={(e) => {
+                                      if (e.target.value) handleToggleAllowanceAmount('housing_amount', e.target.value)
+                                    }}
+                                    placeholder="0.00"
+                                    className="w-24 px-2 py-1 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  />
+                                  <span className="text-xs text-gray-400">/wk</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <label className="flex items-center gap-2 cursor-pointer min-w-[140px]">
+                                <input
+                                  type="checkbox"
+                                  checked={detail.transport_support || false}
+                                  onChange={() => handleTogglePermission('transport_support')}
+                                  disabled={permSaving}
+                                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-700">Transport</span>
+                              </label>
+                              {detail.transport_support && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-sm text-gray-400">$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={detail.transport_amount || ''}
+                                    onChange={(e) => setDetail({ ...detail, transport_amount: e.target.value })}
+                                    onBlur={(e) => {
+                                      if (e.target.value) handleToggleAllowanceAmount('transport_amount', e.target.value)
+                                    }}
+                                    placeholder="0.00"
+                                    className="w-24 px-2 py-1 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  />
+                                  <span className="text-xs text-gray-400">/wk</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
 

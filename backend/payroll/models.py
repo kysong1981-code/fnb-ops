@@ -92,6 +92,11 @@ class PaySlip(models.Model):
     overtime_pay = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     public_holiday_pay = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Time & half extra (0.5x portion)")
     holiday_pay = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="8% for CASUAL employees")
+
+    # Allowances (주당 금액 × 주수 비례)
+    housing_allowance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    transport_allowance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
     gross_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     # Employee deductions (NZ)
@@ -157,8 +162,20 @@ class PaySlip(models.Model):
         else:
             self.holiday_pay = Decimal('0')
 
-        # 4. Gross salary
-        self.gross_salary = base_pay + self.holiday_pay
+        # 3.5. Allowances (주당 금액 × period 주수 비례)
+        periods_weeks = {'WEEKLY': 1, 'FORTNIGHTLY': 2, 'MONTHLY': Decimal('4.33')}
+        weeks = periods_weeks.get(self.pay_period.period_type, 1)
+        if self.user.housing_support:
+            self.housing_allowance = (self.user.housing_amount * weeks).quantize(Decimal('0.01'))
+        else:
+            self.housing_allowance = Decimal('0')
+        if self.user.transport_support:
+            self.transport_allowance = (self.user.transport_amount * weeks).quantize(Decimal('0.01'))
+        else:
+            self.transport_allowance = Decimal('0')
+
+        # 4. Gross salary (allowances included — taxable)
+        self.gross_salary = base_pay + self.holiday_pay + self.housing_allowance + self.transport_allowance
 
         # 5. PAYE — annualized calculation with NZ 2025-2026 tax brackets
         periods_map = {'WEEKLY': 52, 'FORTNIGHTLY': 26, 'MONTHLY': 12}

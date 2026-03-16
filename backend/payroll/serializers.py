@@ -62,7 +62,8 @@ class PaySlipDetailSerializer(serializers.ModelSerializer):
             # Rates
             'hourly_rate', 'overtime_rate',
             # Earnings
-            'regular_pay', 'overtime_pay', 'public_holiday_pay', 'holiday_pay', 'gross_salary',
+            'regular_pay', 'overtime_pay', 'public_holiday_pay', 'holiday_pay',
+            'housing_allowance', 'transport_allowance', 'gross_salary',
             # Employee deductions
             'paye_tax', 'kiwisaver', 'student_loan_deduction', 'acc_levy',
             'other_deductions', 'total_deductions',
@@ -79,7 +80,8 @@ class PaySlipDetailSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'created_at', 'updated_at',
             'user_name', 'employee_id', 'work_type', 'tax_file_number', 'kiwisaver_rate',
-            'regular_pay', 'overtime_pay', 'public_holiday_pay', 'holiday_pay', 'gross_salary',
+            'regular_pay', 'overtime_pay', 'public_holiday_pay', 'holiday_pay',
+            'housing_allowance', 'transport_allowance', 'gross_salary',
             'paye_tax', 'kiwisaver', 'student_loan_deduction', 'acc_levy',
             'total_deductions', 'net_salary',
             'kiwisaver_employer', 'esct', 'employer_acc',

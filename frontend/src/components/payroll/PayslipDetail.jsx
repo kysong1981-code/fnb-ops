@@ -54,6 +54,9 @@ export default function PayslipDetail() {
     FULL_TIME: 'Full-time',
     PART_TIME: 'Part-time',
     CASUAL: 'Casual',
+    SALARY: 'Salary',
+    SALARY_FULLTIME: 'Salary Full Time',
+    VISA_FULL_TIME: 'Visa Full Time',
   }
 
   return (
@@ -140,6 +143,12 @@ export default function PayslipDetail() {
           )}
           {summary.earnings.holiday_pay > 0 && (
             <Row label="Holiday Pay (8%)" value={fmt(summary.earnings.holiday_pay)} />
+          )}
+          {parseFloat(payslip.housing_allowance || 0) > 0 && (
+            <Row label="Housing Support" value={fmt(payslip.housing_allowance)} />
+          )}
+          {parseFloat(payslip.transport_allowance || 0) > 0 && (
+            <Row label="Transport Allowance" value={fmt(payslip.transport_allowance)} />
           )}
           <div className="border-t border-gray-200 pt-2">
             <Row label="Gross Pay" value={fmt(summary.earnings.gross_salary)} bold />

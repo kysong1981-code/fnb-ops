@@ -1080,6 +1080,10 @@ class TeamViewSet(viewsets.ViewSet):
             'onboarding_status': onboarding_status,
             'can_daily_close': member.can_daily_close,
             'can_safety_tasks': member.can_safety_tasks,
+            'housing_support': member.housing_support,
+            'housing_amount': str(member.housing_amount),
+            'transport_support': member.transport_support,
+            'transport_amount': str(member.transport_amount),
         }
         return Response(data)
 
@@ -1143,14 +1147,31 @@ class TeamViewSet(viewsets.ViewSet):
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
         updated = []
-        for field in ['can_daily_close', 'can_safety_tasks']:
+        for field in ['can_daily_close', 'can_safety_tasks', 'housing_support', 'transport_support']:
             if field in request.data:
                 setattr(member, field, bool(request.data[field]))
                 updated.append(field)
 
+        # Allowance amounts
+        from decimal import Decimal, InvalidOperation
+        for field in ['housing_amount', 'transport_amount']:
+            if field in request.data:
+                try:
+                    setattr(member, field, Decimal(str(request.data[field])))
+                    updated.append(field)
+                except (InvalidOperation, ValueError):
+                    pass
+
         if 'job_title' in request.data:
             member.job_title = request.data['job_title'] or None
             updated.append('job_title')
+
+        if 'work_type' in request.data:
+            from users.models import WORK_TYPE_CHOICES
+            valid_types = [c[0] for c in WORK_TYPE_CHOICES]
+            if request.data['work_type'] in valid_types:
+                member.work_type = request.data['work_type']
+                updated.append('work_type')
 
         if updated:
             member.save(update_fields=updated + ['updated_at'])
@@ -1159,6 +1180,12 @@ class TeamViewSet(viewsets.ViewSet):
             'message': 'Updated',
             'can_daily_close': member.can_daily_close,
             'can_safety_tasks': member.can_safety_tasks,
+            'housing_support': member.housing_support,
+            'housing_amount': str(member.housing_amount),
+            'transport_support': member.transport_support,
+            'transport_amount': str(member.transport_amount),
+            'work_type': member.work_type,
+            'work_type_display': dict(WORK_TYPE_CHOICES).get(member.work_type, member.work_type),
             'job_title': member.job_title,
             'job_title_display': dict(JOB_TITLE_CHOICES).get(member.job_title) if member.job_title else None,
         })

@@ -19,6 +19,7 @@ WORK_TYPE_CHOICES = (
     ('PART_TIME', 'Part Time'),
     ('CASUAL', 'Casual'),
     ('SALARY', 'Salary'),
+    ('SALARY_FULLTIME', 'Salary Full Time'),
     ('VISA_FULL_TIME', 'Visa Full Time'),
 )
 
@@ -177,6 +178,12 @@ class UserProfile(models.Model):
     # Task permissions (매니저가 HR에서 설정)
     can_daily_close = models.BooleanField(default=False, help_text="Daily Close 수행 권한")
     can_safety_tasks = models.BooleanField(default=False, help_text="Safety Tasks 수행 권한")
+
+    # Allowances (주급에 포함)
+    housing_support = models.BooleanField(default=False, help_text="Housing support 활성화")
+    housing_amount = models.DecimalField(max_digits=8, decimal_places=2, default=0, help_text="Housing support 주당 금액 (NZD)")
+    transport_support = models.BooleanField(default=False, help_text="Transport allowance 활성화")
+    transport_amount = models.DecimalField(max_digits=8, decimal_places=2, default=0, help_text="Transport allowance 주당 금액 (NZD)")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
