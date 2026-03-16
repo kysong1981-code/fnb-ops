@@ -585,17 +585,51 @@ class StoreRecordConfigViewSet(viewsets.ModelViewSet):
     filter_backends = [OrganizationFilterBackend]
     pagination_class = None
 
+    def _get_org(self, request):
+        """CEO/HQ는 store_id로 조직 전환 가능"""
+        profile = request.user.profile
+        if profile.role in ['CEO', 'HQ', 'REGIONAL_MANAGER', 'SENIOR_MANAGER']:
+            store_id = request.query_params.get('store_id')
+            if store_id:
+                from users.models import Organization
+                try:
+                    return Organization.objects.get(id=store_id)
+                except Organization.DoesNotExist:
+                    pass
+        return profile.organization
+
+    def _auto_initialize(self, org):
+        """설정이 없으면 자동으로 기본 레코드 타입 초기화"""
+        if StoreRecordConfig.objects.filter(organization=org).exists():
+            return
+        record_types = SafetyRecordType.objects.filter(is_active=True)
+        for rt in record_types:
+            StoreRecordConfig.objects.get_or_create(
+                organization=org,
+                record_type=rt,
+                defaults={
+                    'is_enabled': rt.category != 'SPECIALIST',
+                    'assigned_role': 'MANAGER' if rt.category in ['MONTHLY', 'SETUP'] else 'EMPLOYEE' if rt.category == 'DAILY' else 'BOTH',
+                }
+            )
+
     def get_queryset(self):
+        org = self._get_org(self.request)
         return StoreRecordConfig.objects.filter(
-            organization=self.request.user.profile.organization
+            organization=org
         ).select_related('record_type')
+
+    def list(self, request, *args, **kwargs):
+        org = self._get_org(request)
+        self._auto_initialize(org)
+        return super().list(request, *args, **kwargs)
 
     @action(detail=False, methods=['post'])
     def initialize(self, request):
         """모든 시스템 기록 유형을 매장에 초기화
         Daily/Weekly/Monthly/Event → enabled, Specialist → disabled
         """
-        org = request.user.profile.organization
+        org = self._get_org(request)
         record_types = SafetyRecordType.objects.filter(is_active=True)
         created_count = 0
 
