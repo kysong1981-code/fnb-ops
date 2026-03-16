@@ -520,6 +520,47 @@ export default function TeamTab() {
                           </div>
                         </div>
 
+                        {/* KiwiSaver */}
+                        <div>
+                          <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">KiwiSaver</h4>
+                          <div className="flex items-center gap-3">
+                            <select
+                              value={detail.kiwisaver_status || 'NOT_ENROLLED'}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setDetail(prev => ({ ...prev, kiwisaver_status: val }))
+                                hrAPI.updatePermissions(selected, { kiwisaver_status: val })
+                                  .then(res => setDetail(prev => ({ ...prev, ...res.data })))
+                                  .catch(() => {})
+                              }}
+                              className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="NOT_ENROLLED">Not Enrolled</option>
+                              <option value="ENROLLED">Enrolled</option>
+                              <option value="OPTED_OUT">Opted Out</option>
+                            </select>
+                            {detail.kiwisaver_status === 'ENROLLED' && (
+                              <select
+                                value={detail.kiwisaver_rate || '3%'}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  setDetail(prev => ({ ...prev, kiwisaver_rate: val }))
+                                  hrAPI.updatePermissions(selected, { kiwisaver_rate: val })
+                                    .then(res => setDetail(prev => ({ ...prev, ...res.data })))
+                                    .catch(() => {})
+                                }}
+                                className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                <option value="3%">3%</option>
+                                <option value="4%">4%</option>
+                                <option value="6%">6%</option>
+                                <option value="8%">8%</option>
+                                <option value="10%">10%</option>
+                              </select>
+                            )}
+                          </div>
+                        </div>
+
                         {/* Salary History */}
                         {detail.salary_history?.length > 0 && (
                           <div>

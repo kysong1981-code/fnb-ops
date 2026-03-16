@@ -1173,6 +1173,18 @@ class TeamViewSet(viewsets.ViewSet):
                 member.work_type = request.data['work_type']
                 updated.append('work_type')
 
+        if 'kiwisaver_status' in request.data:
+            valid_statuses = ['NOT_ENROLLED', 'ENROLLED', 'OPTED_OUT']
+            if request.data['kiwisaver_status'] in valid_statuses:
+                member.kiwisaver_status = request.data['kiwisaver_status']
+                updated.append('kiwisaver_status')
+
+        if 'kiwisaver_rate' in request.data:
+            valid_rates = ['3%', '4%', '6%', '8%', '10%']
+            if request.data['kiwisaver_rate'] in valid_rates:
+                member.kiwisaver_rate = request.data['kiwisaver_rate']
+                updated.append('kiwisaver_rate')
+
         if updated:
             member.save(update_fields=updated + ['updated_at'])
 
@@ -1189,6 +1201,8 @@ class TeamViewSet(viewsets.ViewSet):
             'work_type_display': dict(WORK_TYPE_CHOICES).get(member.work_type, member.work_type),
             'job_title': member.job_title,
             'job_title_display': dict(JOB_TITLE_CHOICES).get(member.job_title) if member.job_title else None,
+            'kiwisaver_status': member.kiwisaver_status,
+            'kiwisaver_rate': member.kiwisaver_rate,
         })
 
     @action(detail=True, methods=['post'], url_path='reset-password')
