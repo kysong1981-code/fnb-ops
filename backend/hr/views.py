@@ -1168,7 +1168,6 @@ class TeamViewSet(viewsets.ViewSet):
             updated.append('job_title')
 
         if 'work_type' in request.data:
-            from users.models import WORK_TYPE_CHOICES
             valid_types = [c[0] for c in WORK_TYPE_CHOICES]
             if request.data['work_type'] in valid_types:
                 member.work_type = request.data['work_type']
