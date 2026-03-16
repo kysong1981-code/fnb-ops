@@ -145,15 +145,25 @@ class PaySlip(models.Model):
         """
         from .calculations import calculate_annual_paye, calculate_esct
 
-        # 1. Regular & Overtime Pay
-        self.regular_pay = self.regular_hours * self.hourly_rate
-        self.overtime_pay = self.overtime_hours * self.overtime_rate
-        self.total_hours = self.regular_hours + self.overtime_hours
+        # Period weeks mapping
+        periods_weeks = {'WEEKLY': 1, 'FORTNIGHTLY': 2, 'MONTHLY': Decimal('4.33')}
+        weeks = periods_weeks.get(self.pay_period.period_type, 1)
 
-        # 2. Public Holiday Pay (time & half: extra 0.5x portion only)
-        # public_holiday_hours already included in regular_hours at 1x rate
-        # This is the additional 0.5x bonus
-        self.public_holiday_pay = self.public_holiday_hours * self.hourly_rate * Decimal('0.5')
+        # 1. Regular & Overtime Pay
+        if self.user.work_type == 'SALARY_FULLTIME' and self.user.annual_salary > 0:
+            # Salary Full Time: 고정 주급 (연봉 / 52 × 주수)
+            weekly_salary = (self.user.annual_salary / Decimal('52')).quantize(Decimal('0.01'))
+            self.regular_pay = (weekly_salary * weeks).quantize(Decimal('0.01'))
+            self.overtime_pay = Decimal('0')
+            self.total_hours = self.regular_hours + self.overtime_hours
+            self.public_holiday_pay = Decimal('0')
+        else:
+            self.regular_pay = self.regular_hours * self.hourly_rate
+            self.overtime_pay = self.overtime_hours * self.overtime_rate
+            self.total_hours = self.regular_hours + self.overtime_hours
+
+            # 2. Public Holiday Pay (time & half: extra 0.5x portion only)
+            self.public_holiday_pay = self.public_holiday_hours * self.hourly_rate * Decimal('0.5')
 
         # 3. Holiday Pay (CASUAL employees only — 8% per NZ Holidays Act)
         base_pay = self.regular_pay + self.overtime_pay + self.public_holiday_pay
@@ -163,8 +173,6 @@ class PaySlip(models.Model):
             self.holiday_pay = Decimal('0')
 
         # 3.5. Allowances (주당 금액 × period 주수 비례)
-        periods_weeks = {'WEEKLY': 1, 'FORTNIGHTLY': 2, 'MONTHLY': Decimal('4.33')}
-        weeks = periods_weeks.get(self.pay_period.period_type, 1)
         if self.user.housing_support:
             self.housing_allowance = (self.user.housing_amount * weeks).quantize(Decimal('0.01'))
         else:

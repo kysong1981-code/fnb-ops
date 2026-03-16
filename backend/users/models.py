@@ -179,6 +179,9 @@ class UserProfile(models.Model):
     can_daily_close = models.BooleanField(default=False, help_text="Daily Close 수행 권한")
     can_safety_tasks = models.BooleanField(default=False, help_text="Safety Tasks 수행 권한")
 
+    # Annual salary (SALARY_FULLTIME only — 고정 주급 = annual_salary / 52)
+    annual_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="연봉 (NZD) - Salary Full Time 전용")
+
     # Allowances (주급에 포함)
     housing_support = models.BooleanField(default=False, help_text="Housing support 활성화")
     housing_amount = models.DecimalField(max_digits=8, decimal_places=2, default=0, help_text="Housing support 주당 금액 (NZD)")

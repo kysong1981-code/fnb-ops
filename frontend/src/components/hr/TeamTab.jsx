@@ -330,6 +330,31 @@ export default function TeamTab() {
                               <option value="SALARY_FULLTIME">Salary Full Time</option>
                               <option value="VISA_FULL_TIME">Visa Full Time</option>
                             </select>
+                            {detail.work_type === 'SALARY_FULLTIME' && (
+                              <div className="mt-2">
+                                <span className="text-xs text-gray-400">Annual Salary (NZD)</span>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <span className="text-sm text-gray-400">$</span>
+                                  <input
+                                    type="number"
+                                    step="1000"
+                                    value={detail.annual_salary || ''}
+                                    onChange={(e) => setDetail({ ...detail, annual_salary: e.target.value })}
+                                    onBlur={(e) => {
+                                      if (e.target.value) handleToggleAllowanceAmount('annual_salary', e.target.value)
+                                    }}
+                                    placeholder="62000"
+                                    className="w-32 px-2 py-1 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  />
+                                  <span className="text-xs text-gray-400">/yr</span>
+                                  {detail.annual_salary > 0 && (
+                                    <span className="text-xs text-green-600 ml-1">
+                                      (${(parseFloat(detail.annual_salary) / 52).toFixed(2)}/wk)
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                           <div>
                             <span className="text-xs text-gray-400">Joined</span>

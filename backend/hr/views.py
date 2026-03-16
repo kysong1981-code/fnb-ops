@@ -1084,6 +1084,7 @@ class TeamViewSet(viewsets.ViewSet):
             'housing_amount': str(member.housing_amount),
             'transport_support': member.transport_support,
             'transport_amount': str(member.transport_amount),
+            'annual_salary': str(member.annual_salary),
         }
         return Response(data)
 
@@ -1152,9 +1153,9 @@ class TeamViewSet(viewsets.ViewSet):
                 setattr(member, field, bool(request.data[field]))
                 updated.append(field)
 
-        # Allowance amounts
+        # Decimal fields
         from decimal import Decimal, InvalidOperation
-        for field in ['housing_amount', 'transport_amount']:
+        for field in ['housing_amount', 'transport_amount', 'annual_salary']:
             if field in request.data:
                 try:
                     setattr(member, field, Decimal(str(request.data[field])))
@@ -1184,6 +1185,7 @@ class TeamViewSet(viewsets.ViewSet):
             'housing_amount': str(member.housing_amount),
             'transport_support': member.transport_support,
             'transport_amount': str(member.transport_amount),
+            'annual_salary': str(member.annual_salary),
             'work_type': member.work_type,
             'work_type_display': dict(WORK_TYPE_CHOICES).get(member.work_type, member.work_type),
             'job_title': member.job_title,
