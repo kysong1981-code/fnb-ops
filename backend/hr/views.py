@@ -731,6 +731,28 @@ class TimesheetViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=False, methods=['get'], url_path='range')
+    def date_range(self, request):
+        """커스텀 날짜 범위로 타임시트 조회"""
+        try:
+            start = request.query_params.get('start')
+            end = request.query_params.get('end')
+            if not start or not end:
+                return Response({'error': 'start and end required'}, status=status.HTTP_400_BAD_REQUEST)
+            start_date = timezone.datetime.strptime(start, '%Y-%m-%d').date()
+            end_date = timezone.datetime.strptime(end, '%Y-%m-%d').date()
+            timesheets = self.filter_queryset(self.get_queryset()).filter(
+                date__range=[start_date, end_date]
+            )
+            serializer = self.get_serializer(timesheets, many=True)
+            return Response({
+                'start': start_date,
+                'end': end_date,
+                'timesheets': serializer.data
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
     # ---- Employee Time Clock Actions ----
 
     @action(detail=False, methods=['get'])

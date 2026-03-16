@@ -202,6 +202,7 @@ export const hrAPI = {
   // Timesheet
   getTimesheets: () => api.get('/hr/timesheets/'),
   getTimesheetWeekly: (date) => api.get('/hr/timesheets/weekly/', { params: { date } }),
+  getTimesheetRange: (start, end) => api.get('/hr/timesheets/range/', { params: { start, end } }),
   approveTimesheet: (id) => api.post(`/hr/timesheets/${id}/approve/`),
   approveOvertime: (id) => api.post(`/hr/timesheets/${id}/approve-overtime/`),
 
