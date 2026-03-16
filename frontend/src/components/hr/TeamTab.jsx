@@ -102,11 +102,18 @@ export default function TeamTab() {
 
   const handleTogglePermission = async (field) => {
     if (!selected || !detail) return
+    const newVal = !detail[field]
+    // Optimistic update
+    setDetail(prev => ({ ...prev, [field]: newVal }))
     setPermSaving(true)
     try {
-      const res = await hrAPI.updatePermissions(selected, { [field]: !detail[field] })
-      setDetail({ ...detail, ...res.data })
-    } catch {}
+      const res = await hrAPI.updatePermissions(selected, { [field]: newVal })
+      setDetail(prev => ({ ...prev, ...res.data }))
+    } catch (err) {
+      // Revert on error
+      console.error('Permission update failed:', err)
+      setDetail(prev => ({ ...prev, [field]: !newVal }))
+    }
     finally { setPermSaving(false) }
   }
 
@@ -115,8 +122,10 @@ export default function TeamTab() {
     setPermSaving(true)
     try {
       const res = await hrAPI.updatePermissions(selected, { [field]: value })
-      setDetail({ ...detail, ...res.data })
-    } catch {}
+      setDetail(prev => ({ ...prev, ...res.data }))
+    } catch (err) {
+      console.error('Amount update failed:', err)
+    }
     finally { setPermSaving(false) }
   }
 
