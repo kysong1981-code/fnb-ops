@@ -21,7 +21,7 @@ SESSION_COOKIE_HTTPONLY = True
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_SECURITY_POLICY = {
     'default-src': ("'self'",),
-    'script-src': ("'self'", "'unsafe-inline'", "'unsafe-eval'"),
+    'script-src': ("'self'",),
     'style-src': ("'self'", "'unsafe-inline'", "fonts.googleapis.com"),
     'font-src': ("'self'", "fonts.gstatic.com"),
     'img-src': ("'self'", "data:", "https:"),
