@@ -60,6 +60,7 @@ import ResetPassword from './components/auth/ResetPassword'
 import StoreApplications from './components/admin/StoreApplications'
 import StoreAssignment from './components/admin/StoreAssignment'
 import ManagerRoute from './components/auth/ManagerRoute'
+import ImportPage from './components/import/ImportPage'
 
 // Helper component to wrap protected routes with Layout
 function ProtectedWithLayout({ children }) {
@@ -151,6 +152,16 @@ function App() {
 
           {/* HR Cash redirect to Cash Up */}
           <Route path="/hr-cash" element={<Navigate to="/cashup" replace />} />
+
+          {/* Data Import */}
+          <Route
+            path="/import"
+            element={
+              <ProtectedWithLayout>
+                <ImportPage />
+              </ProtectedWithLayout>
+            }
+          />
 
           {/* Sales Analysis (with sidebar) */}
           <Route

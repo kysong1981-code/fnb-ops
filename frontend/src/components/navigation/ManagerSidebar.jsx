@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import {
   HomeIcon, UserIcon, CalendarIcon, ClockIcon, CheckCircleIcon, ShieldIcon,
   TeamIcon, ClipboardIcon, ChartIcon, DocumentIcon, SettingsIcon,
-  LogoutIcon, MenuIcon, XIcon, MoneyIcon, BellIcon
+  LogoutIcon, MenuIcon, XIcon, MoneyIcon, BellIcon, UploadIcon
 } from '../icons'
 
 // Roles that can access manager-level features
@@ -39,6 +39,7 @@ const menuSections = [
       { label: 'HR Management', path: '/hr', icon: TeamIcon, module: 'HR' },
       { label: 'Assign Tasks', path: '/manager/assign-tasks', icon: CheckCircleIcon, module: 'TASKS' },
       { label: 'Safety Records', path: '/safety/inspection', icon: ShieldIcon, module: 'SAFETY' },
+      { label: 'Data Import', path: '/import', icon: UploadIcon, module: 'REPORTS' },
     ]
   },
   {
