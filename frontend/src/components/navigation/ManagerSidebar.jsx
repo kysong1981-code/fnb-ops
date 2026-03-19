@@ -15,7 +15,6 @@ const menuSections = [
     title: null,
     items: [
       { label: 'Dashboard', path: '/dashboard', icon: HomeIcon },
-      { label: 'My Page', path: '/mypage', icon: UserIcon },
     ]
   },
   {
@@ -141,15 +140,18 @@ export default function ManagerSidebar() {
 
       {/* User Footer */}
       <div className="px-3 py-4 border-t border-gray-100">
-        <div className="flex items-center gap-2 px-2 mb-3">
+        <button
+          onClick={() => handleNav('/mypage')}
+          className="flex items-center gap-2 px-2 mb-3 w-full rounded-xl hover:bg-gray-50 py-2 transition"
+        >
           <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
             {initials}
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 text-left">
             <p className="text-sm font-semibold text-gray-700 truncate">{firstName}</p>
             <p className="text-xs text-gray-400">{user?.role?.replace('_', ' ')}</p>
           </div>
-        </div>
+        </button>
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-2 justify-center px-3 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition"
