@@ -28,6 +28,13 @@ const menuSections = [
     ]
   },
   {
+    title: null,
+    roles: ['CEO', 'HQ'],
+    items: [
+      { label: 'CQ Report', path: '/cq-report', icon: MoneyIcon },
+    ]
+  },
+  {
     title: 'Manager',
     roles: MANAGER_ROLES,
     items: [

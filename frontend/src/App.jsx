@@ -61,6 +61,7 @@ import StoreApplications from './components/admin/StoreApplications'
 import StoreAssignment from './components/admin/StoreAssignment'
 import ManagerRoute from './components/auth/ManagerRoute'
 import ImportPage from './components/import/ImportPage'
+import CQReport from './components/reports/CQReport'
 
 // Helper component to wrap protected routes with Layout
 function ProtectedWithLayout({ children }) {
@@ -159,6 +160,16 @@ function App() {
             element={
               <ProtectedWithLayout>
                 <ImportPage />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* CQ Report (admin only) */}
+          <Route
+            path="/cq-report"
+            element={
+              <ProtectedWithLayout>
+                <CQReport />
               </ProtectedWithLayout>
             }
           />
