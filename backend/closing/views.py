@@ -9,14 +9,17 @@ from django.http import FileResponse
 
 from datetime import date as date_type, datetime, timedelta
 import zoneinfo
-from decimal import Decimal
-from django.db.models import Sum, Count, Avg
+import csv
+import io
+from decimal import Decimal, InvalidOperation
+from django.db.models import Sum, Count, Avg, Case, When, CharField as DBCharField
 from django.db.models.functions import Coalesce
 
 from .models import (
     DailyClosing, ClosingHRCash, ClosingCashExpense, Supplier, SalesCategory,
     ClosingSupplierCost, ClosingOtherSale, SupplierMonthlyStatement, MonthlyClose,
-    CQAccountBalance, CQExpense
+    CQAccountBalance, CQExpense, CQTransaction,
+    CQ_TRANSACTION_TYPE_CHOICES, CQ_ACCOUNT_TYPE_CHOICES
 )
 from .serializers import (
     DailyClosingListSerializer, DailyClosingDetailSerializer,
@@ -24,7 +27,7 @@ from .serializers import (
     ClosingSupplierCostSerializer, ClosingOtherSaleSerializer,
     SupplierSerializer, SalesCategorySerializer,
     SupplierMonthlyStatementSerializer, MonthlyCloseSerializer,
-    CQAccountBalanceSerializer, CQExpenseSerializer
+    CQAccountBalanceSerializer, CQExpenseSerializer, CQTransactionSerializer
 )
 from users.permissions import IsEmployee, IsManager, IsSeniorManager, IsRegionalManager, IsHQ
 from users.filters import OrganizationFilterBackend, get_target_org
@@ -1142,6 +1145,350 @@ class CQExpenseViewSet(viewsets.ModelViewSet):
         # Sort by date desc
         results.sort(key=lambda x: x['date'], reverse=True)
         return Response(results)
+
+
+class CQTransactionViewSet(viewsets.ModelViewSet):
+    """CQ 거래 내역 ViewSet - 매장↔사람 돈의 흐름"""
+    queryset = CQTransaction.objects.all()
+    serializer_class = CQTransactionSerializer
+    permission_classes = [IsAuthenticated, IsSeniorManager]
+    filter_backends = [OrganizationFilterBackend]
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # Filters
+        store = self.request.query_params.get('store_name')
+        person = self.request.query_params.get('person')
+        tx_type = self.request.query_params.get('transaction_type')
+        date_start = self.request.query_params.get('date_start')
+        date_end = self.request.query_params.get('date_end')
+        period = self.request.query_params.get('period')
+
+        if store:
+            qs = qs.filter(store_name__icontains=store)
+        if person:
+            qs = qs.filter(person__icontains=person)
+        if tx_type:
+            qs = qs.filter(transaction_type=tx_type)
+        if date_start:
+            qs = qs.filter(date__gte=date_start)
+        if date_end:
+            qs = qs.filter(date__lte=date_end)
+        if period:
+            qs = qs.filter(period=period)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(
+            organization=self.request.user.profile.organization,
+            created_by=self.request.user.profile,
+        )
+
+    @action(detail=False, methods=['get'], url_path='summary')
+    def summary(self, request):
+        """거래 요약 - 수금/배분/비용 총합"""
+        qs = self.get_queryset()
+
+        collections = qs.filter(transaction_type='COLLECTION').aggregate(
+            total=Sum('amount'))['total'] or 0
+        incentives = qs.filter(transaction_type='INCENTIVE').aggregate(
+            total=Sum('amount'))['total'] or 0
+        profits = qs.filter(transaction_type='PROFIT').aggregate(
+            total=Sum('amount'))['total'] or 0
+        expenses = qs.filter(transaction_type='EXPENSE').aggregate(
+            total=Sum('amount'))['total'] or 0
+        exchanges = qs.filter(transaction_type='EXCHANGE').aggregate(
+            total=Sum('amount'))['total'] or 0
+
+        # Per-store summary
+        store_summary = []
+        stores = qs.values_list('store_name', flat=True).distinct()
+        for store_name in stores:
+            if not store_name:
+                continue
+            store_qs = qs.filter(store_name=store_name)
+            store_summary.append({
+                'store_name': store_name,
+                'collection': store_qs.filter(transaction_type='COLLECTION').aggregate(
+                    total=Sum('amount'))['total'] or 0,
+                'incentive': store_qs.filter(transaction_type='INCENTIVE').aggregate(
+                    total=Sum('amount'))['total'] or 0,
+                'profit': store_qs.filter(transaction_type='PROFIT').aggregate(
+                    total=Sum('amount'))['total'] or 0,
+            })
+        store_summary.sort(key=lambda x: float(x['collection']), reverse=True)
+
+        # Per-person summary
+        person_summary = []
+        persons = qs.exclude(person='').values_list('person', flat=True).distinct()
+        for person_name in persons:
+            p_qs = qs.filter(person=person_name)
+            person_summary.append({
+                'person': person_name,
+                'total_received': p_qs.filter(
+                    transaction_type__in=['INCENTIVE', 'PROFIT', 'COLLECTION']
+                ).aggregate(total=Sum('amount'))['total'] or 0,
+                'total_expense': p_qs.filter(
+                    transaction_type='EXPENSE'
+                ).aggregate(total=Sum('amount'))['total'] or 0,
+                'by_type': {
+                    'incentive': p_qs.filter(transaction_type='INCENTIVE').aggregate(
+                        total=Sum('amount'))['total'] or 0,
+                    'profit': p_qs.filter(transaction_type='PROFIT').aggregate(
+                        total=Sum('amount'))['total'] or 0,
+                }
+            })
+        person_summary.sort(key=lambda x: float(x['total_received']), reverse=True)
+
+        return Response({
+            'totals': {
+                'collection': collections,
+                'incentive': incentives,
+                'profit': profits,
+                'expense': expenses,
+                'exchange': exchanges,
+                'net': collections - incentives - profits - expenses - exchanges,
+            },
+            'stores': store_summary,
+            'persons': person_summary,
+        })
+
+    @action(detail=False, methods=['get'], url_path='personal-ledger')
+    def personal_ledger(self, request):
+        """개인 장부 - 특정 사람의 수입/지출 내역"""
+        person = request.query_params.get('person')
+        if not person:
+            return Response(
+                {'detail': 'person parameter is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        qs = self.get_queryset().filter(person__icontains=person).order_by('date', 'created_at')
+
+        ledger = []
+        balance = Decimal('0')
+        for tx in qs:
+            if tx.transaction_type in ['COLLECTION', 'INCENTIVE', 'PROFIT']:
+                balance += tx.amount
+                ledger.append({
+                    'id': tx.id,
+                    'date': tx.date,
+                    'income': float(tx.amount),
+                    'expense': 0,
+                    'note': tx.note or f"{tx.store_name} {tx.get_transaction_type_display()}",
+                    'store_name': tx.store_name,
+                    'transaction_type': tx.transaction_type,
+                    'account_type': tx.account_type,
+                    'balance': float(balance),
+                })
+            else:
+                balance -= tx.amount
+                ledger.append({
+                    'id': tx.id,
+                    'date': tx.date,
+                    'income': 0,
+                    'expense': float(tx.amount),
+                    'note': tx.note or f"{tx.store_name} {tx.get_transaction_type_display()}",
+                    'store_name': tx.store_name,
+                    'transaction_type': tx.transaction_type,
+                    'account_type': tx.account_type,
+                    'balance': float(balance),
+                })
+
+        return Response({
+            'person': person,
+            'ledger': ledger,
+            'total_income': sum(item['income'] for item in ledger),
+            'total_expense': sum(item['expense'] for item in ledger),
+            'balance': float(balance),
+        })
+
+    @action(detail=False, methods=['get'], url_path='store-ledger')
+    def store_ledger(self, request):
+        """매장 장부 - 특정 매장의 수금/배분 내역"""
+        store = request.query_params.get('store_name')
+        if not store:
+            return Response(
+                {'detail': 'store_name parameter is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        qs = self.get_queryset().filter(store_name__icontains=store).order_by('date', 'created_at')
+
+        ledger = []
+        balance = Decimal('0')
+        for tx in qs:
+            if tx.transaction_type == 'COLLECTION':
+                balance += tx.amount
+                ledger.append({
+                    'id': tx.id,
+                    'date': tx.date,
+                    'income': float(tx.amount),
+                    'expense': 0,
+                    'person': tx.person,
+                    'note': tx.note,
+                    'transaction_type': tx.transaction_type,
+                    'account_type': tx.account_type,
+                    'balance': float(balance),
+                })
+            else:
+                balance -= tx.amount
+                ledger.append({
+                    'id': tx.id,
+                    'date': tx.date,
+                    'income': 0,
+                    'expense': float(tx.amount),
+                    'person': tx.person,
+                    'note': tx.note or tx.get_transaction_type_display(),
+                    'transaction_type': tx.transaction_type,
+                    'account_type': tx.account_type,
+                    'balance': float(balance),
+                })
+
+        return Response({
+            'store_name': store,
+            'ledger': ledger,
+            'total_collection': sum(item['income'] for item in ledger),
+            'total_distributed': sum(item['expense'] for item in ledger),
+            'balance': float(balance),
+        })
+
+    @action(detail=False, methods=['get'], url_path='stores-list')
+    def stores_list(self, request):
+        """등록된 매장명 목록"""
+        qs = self.get_queryset()
+        stores = list(qs.exclude(store_name='').values_list('store_name', flat=True).distinct().order_by('store_name'))
+        return Response({'stores': stores})
+
+    @action(detail=False, methods=['get'], url_path='persons-list')
+    def persons_list(self, request):
+        """등록된 사람 목록"""
+        qs = self.get_queryset()
+        persons = list(qs.exclude(person='').values_list('person', flat=True).distinct().order_by('person'))
+        return Response({'persons': persons})
+
+    @action(detail=False, methods=['post'], url_path='import-csv')
+    def import_csv(self, request):
+        """CSV 파일로 거래 일괄 등록"""
+        file = request.FILES.get('file')
+        if not file:
+            return Response(
+                {'detail': 'CSV file is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            content = file.read().decode('utf-8-sig')  # BOM 처리
+        except UnicodeDecodeError:
+            try:
+                file.seek(0)
+                content = file.read().decode('euc-kr')
+            except UnicodeDecodeError:
+                return Response(
+                    {'detail': 'File encoding not supported. Use UTF-8 or EUC-KR.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        reader = csv.DictReader(io.StringIO(content))
+        org = request.user.profile.organization
+        profile = request.user.profile
+
+        valid_types = dict(CQ_TRANSACTION_TYPE_CHOICES).keys()
+        valid_account_types = dict(CQ_ACCOUNT_TYPE_CHOICES).keys()
+
+        created = []
+        errors = []
+
+        for i, row in enumerate(reader, start=2):  # Row 2 = first data row
+            try:
+                # Required fields
+                date_str = row.get('date', '').strip()
+                tx_type = row.get('type', '').strip().upper()
+                amount_str = row.get('amount', '').strip()
+
+                if not date_str or not amount_str:
+                    errors.append(f"Row {i}: date and amount are required")
+                    continue
+
+                if tx_type not in valid_types:
+                    errors.append(f"Row {i}: invalid type '{tx_type}'. Use: {', '.join(valid_types)}")
+                    continue
+
+                try:
+                    amount = Decimal(amount_str.replace(',', ''))
+                except (InvalidOperation, ValueError):
+                    errors.append(f"Row {i}: invalid amount '{amount_str}'")
+                    continue
+
+                account_type = row.get('account_type', 'CASH').strip().upper()
+                if account_type not in valid_account_types:
+                    account_type = 'CASH'
+
+                tx = CQTransaction.objects.create(
+                    organization=org,
+                    date=date_str,
+                    store_name=row.get('store', '').strip(),
+                    transaction_type=tx_type,
+                    person=row.get('person', '').strip(),
+                    amount=amount,
+                    account_type=account_type,
+                    note=row.get('note', '').strip(),
+                    period=row.get('period', '').strip(),
+                    incentive_rate=Decimal(row['incentive_rate']) if row.get('incentive_rate', '').strip() else None,
+                    created_by=profile,
+                )
+                created.append(tx.id)
+
+            except Exception as e:
+                errors.append(f"Row {i}: {str(e)}")
+
+        return Response({
+            'created_count': len(created),
+            'error_count': len(errors),
+            'errors': errors[:20],  # Max 20 errors shown
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['get'], url_path='export-csv')
+    def export_csv(self, request):
+        """거래 내역 CSV 내보내기"""
+        from django.http import HttpResponse
+
+        qs = self.get_queryset()
+
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response['Content-Disposition'] = 'attachment; filename="cq_transactions.csv"'
+        response.write('\ufeff')  # BOM for Excel
+
+        writer = csv.writer(response)
+        writer.writerow(['date', 'store', 'type', 'person', 'amount', 'account_type', 'note', 'period', 'incentive_rate'])
+
+        for tx in qs:
+            writer.writerow([
+                tx.date, tx.store_name, tx.transaction_type,
+                tx.person, tx.amount, tx.account_type,
+                tx.note, tx.period, tx.incentive_rate or '',
+            ])
+
+        return response
+
+    @action(detail=False, methods=['delete'], url_path='bulk-delete')
+    def bulk_delete(self, request):
+        """기간별 일괄 삭제"""
+        date_start = request.query_params.get('date_start')
+        date_end = request.query_params.get('date_end')
+
+        if not date_start or not date_end:
+            return Response(
+                {'detail': 'date_start and date_end are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        qs = self.get_queryset().filter(date__gte=date_start, date__lte=date_end)
+        count = qs.count()
+        qs.delete()
+
+        return Response({'deleted_count': count})
 
 
 class SalesAnalysisViewSet(viewsets.GenericViewSet):

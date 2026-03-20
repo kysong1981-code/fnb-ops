@@ -396,6 +396,22 @@ CQ_EXPENSE_CATEGORY_CHOICES = (
     ('EXCHANGE', 'Exchange'),
 )
 
+# CQ Transaction Types
+CQ_TRANSACTION_TYPE_CHOICES = (
+    ('COLLECTION', 'Collection'),      # 가게에서 현금 수금
+    ('INCENTIVE', 'Incentive'),        # 매니저 인센티브
+    ('PROFIT', 'Profit Distribution'), # 수익배분
+    ('EXPENSE', 'Expense'),            # 비용 지출
+    ('TRANSFER', 'Transfer'),          # 계좌 이체
+    ('EXCHANGE', 'Exchange'),          # 환전
+)
+
+CQ_ACCOUNT_TYPE_CHOICES = (
+    ('CASH', 'Cash'),
+    ('ACCOUNT', 'Account'),
+    ('KRW', 'KRW'),
+)
+
 
 class CQAccountBalance(models.Model):
     """CQ 계정 발란스 (직접 입력)"""
@@ -458,6 +474,48 @@ class CQExpense(models.Model):
 
     def __str__(self):
         return f"{self.get_account_display()} - {self.description} ({self.amount})"
+
+
+class CQTransaction(models.Model):
+    """CQ 거래 내역 - 매장 → 사람 돈의 흐름 추적"""
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name='cq_transactions'
+    )
+    date = models.DateField()
+    store_name = models.CharField(max_length=100, blank=True, default='')
+    transaction_type = models.CharField(max_length=15, choices=CQ_TRANSACTION_TYPE_CHOICES)
+    person = models.CharField(max_length=100, blank=True, default='')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    account_type = models.CharField(
+        max_length=10, choices=CQ_ACCOUNT_TYPE_CHOICES, default='CASH'
+    )
+    note = models.CharField(max_length=300, blank=True, default='')
+    period = models.CharField(
+        max_length=20, blank=True, default='',
+        help_text='반기 기간 (e.g. 2025-Oct, 2026-Apr)'
+    )
+    incentive_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text='인센티브 비율 (0.1 = 10%)'
+    )
+    created_by = models.ForeignKey(
+        UserProfile, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='cq_transactions_created'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date', '-created_at']
+        indexes = [
+            models.Index(fields=['organization', 'date']),
+            models.Index(fields=['store_name']),
+            models.Index(fields=['person']),
+            models.Index(fields=['transaction_type']),
+        ]
+
+    def __str__(self):
+        return f"{self.date} {self.store_name} {self.get_transaction_type_display()} {self.person} {self.amount}"
 
 
 # Holiday Category Choices

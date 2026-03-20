@@ -5,7 +5,7 @@ from .views import (
     SupplierViewSet, SalesCategoryViewSet,
     ClosingSupplierCostViewSet, ClosingOtherSaleViewSet,
     SupplierMonthlyStatementViewSet, MonthlyCloseViewSet,
-    CQAccountBalanceViewSet, CQExpenseViewSet,
+    CQAccountBalanceViewSet, CQExpenseViewSet, CQTransactionViewSet,
     SalesAnalysisViewSet
 )
 from .import_views import ImportDataView, ImportTemplateView
@@ -23,6 +23,7 @@ router.register(r'supplier-statements', SupplierMonthlyStatementViewSet, basenam
 router.register(r'monthly-close', MonthlyCloseViewSet, basename='monthlyclose')
 router.register(r'cq-balance', CQAccountBalanceViewSet, basename='cqbalance')
 router.register(r'cq-expenses', CQExpenseViewSet, basename='cqexpense')
+router.register(r'cq-transactions', CQTransactionViewSet, basename='cqtransaction')
 router.register(r'sales-analysis', SalesAnalysisViewSet, basename='salesanalysis')
 
 urlpatterns = [

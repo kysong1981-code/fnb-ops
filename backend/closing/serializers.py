@@ -4,7 +4,7 @@ from .models import (
     DailyClosing, ClosingSupplierCost, Supplier, SalesCategory,
     ClosingHRCash, ClosingCashExpense, ClosingOtherSale,
     SupplierMonthlyStatement, EXPENSE_CATEGORY_CHOICES,
-    CQAccountBalance, CQExpense
+    CQAccountBalance, CQExpense, CQTransaction
 )
 from users.models import UserProfile
 from django.contrib.auth.models import User
@@ -370,3 +370,31 @@ class CQExpenseSerializer(serializers.ModelSerializer):
             if file_ext not in allowed_extensions:
                 raise serializers.ValidationError(f"Allowed formats: {', '.join(allowed_extensions)}")
         return value
+
+
+class CQTransactionSerializer(serializers.ModelSerializer):
+    """CQ Transaction 시리얼라이저"""
+    transaction_type_display = serializers.CharField(source='get_transaction_type_display', read_only=True)
+    account_type_display = serializers.CharField(source='get_account_type_display', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CQTransaction
+        fields = [
+            'id', 'organization', 'date', 'store_name',
+            'transaction_type', 'transaction_type_display',
+            'person', 'amount',
+            'account_type', 'account_type_display',
+            'note', 'period', 'incentive_rate',
+            'created_by', 'created_by_name',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'organization': {'required': False},
+        }
+
+    def get_created_by_name(self, obj):
+        if obj.created_by and obj.created_by.user:
+            return obj.created_by.user.get_full_name() or obj.created_by.user.username
+        return None

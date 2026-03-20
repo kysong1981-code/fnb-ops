@@ -639,6 +639,26 @@ export const cqAPI = {
   combinedLedger: (params) => api.get('/closing/cq-expenses/combined-ledger/', { params }),
 }
 
+// CQ Transaction API (매장↔사람 돈 흐름)
+export const cqTransactionAPI = {
+  list: (params) => api.get('/closing/cq-transactions/', { params }),
+  create: (data) => api.post('/closing/cq-transactions/', data),
+  update: (id, data) => api.put(`/closing/cq-transactions/${id}/`, data),
+  delete: (id) => api.delete(`/closing/cq-transactions/${id}/`),
+  summary: (params) => api.get('/closing/cq-transactions/summary/', { params }),
+  personalLedger: (params) => api.get('/closing/cq-transactions/personal-ledger/', { params }),
+  storeLedger: (params) => api.get('/closing/cq-transactions/store-ledger/', { params }),
+  storesList: () => api.get('/closing/cq-transactions/stores-list/'),
+  personsList: () => api.get('/closing/cq-transactions/persons-list/'),
+  importCSV: (formData) => api.post('/closing/cq-transactions/import-csv/', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  exportCSV: (params) => api.get('/closing/cq-transactions/export-csv/', {
+    params, responseType: 'blob',
+  }),
+  bulkDelete: (params) => api.delete('/closing/cq-transactions/bulk-delete/', { params }),
+}
+
 // Sales Analysis API (역할별 매출 분석)
 export const salesAnalysisAPI = {
   getStoreAnalysis: (params) => api.get('/closing/sales-analysis/store/', { params }),

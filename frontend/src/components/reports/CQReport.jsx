@@ -4,6 +4,7 @@ import { cqAPI } from '../../services/api'
 import { getTodayNZ } from '../../utils/date'
 import Card from '../ui/Card'
 import { PlusIcon, TrashIcon, CheckCircleIcon, CameraIcon } from '../icons'
+import CQCashFlow from './CQCashFlow'
 
 const ACCOUNTS = [
   { key: 'CHCH', label: 'ChCh', currency: 'NZD' },
@@ -203,9 +204,34 @@ export default function CQReport() {
   const pendingToApprove = expenses.filter(e => e.status === 'PENDING' && user && e.created_by !== user.id)
   const pendingWaiting = expenses.filter(e => e.status === 'PENDING' && user && e.created_by === user.id)
 
+  // Top-level mode: expenses vs cash flow
+  const [topMode, setTopMode] = useState('cashflow')
 
   return (
     <div className="space-y-6">
+      {/* Top-level Mode Switch */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+        <button
+          onClick={() => setTopMode('cashflow')}
+          className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+            topMode === 'cashflow' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+          }`}>
+          💰 Cash Flow
+        </button>
+        <button
+          onClick={() => setTopMode('expenses')}
+          className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+            topMode === 'expenses' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+          }`}>
+          💳 Expenses
+        </button>
+      </div>
+
+      {/* Cash Flow View */}
+      {topMode === 'cashflow' && <CQCashFlow />}
+
+      {/* Expenses View (existing) */}
+      {topMode === 'expenses' && <>
       {/* Date Controls */}
       <Card className="p-4">
         <div className="flex flex-wrap items-end gap-4">
@@ -850,6 +876,7 @@ export default function CQReport() {
           </Card>
         </>
       )}
+      </>}
     </div>
   )
 }
