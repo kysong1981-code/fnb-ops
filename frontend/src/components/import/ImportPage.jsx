@@ -33,7 +33,10 @@ export default function ImportPage() {
   }
 
   const handleUpload = async () => {
-    if (!file) return
+    if (!file) {
+      alert('Please select a file first')
+      return
+    }
     setUploading(true)
     setResult(null)
     try {
@@ -44,7 +47,9 @@ export default function ImportPage() {
       setResult(res.data)
       setFile(null)
     } catch (err) {
-      setResult({ error: err.response?.data?.error || 'Upload failed' })
+      console.error('Import error:', err)
+      const msg = err.response?.data?.error || err.response?.data?.detail || err.message || 'Upload failed'
+      setResult({ error: msg })
     } finally {
       setUploading(false)
     }

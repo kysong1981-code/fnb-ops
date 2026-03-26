@@ -159,7 +159,14 @@ class ImportDataView(APIView):
         }
 
         if filename.endswith('.csv'):
-            self._process_csv(file, org, stats)
+            content = file.read().decode('utf-8-sig')
+            reader = csv.reader(io.StringIO(content))
+            rows = list(reader)
+            # Detect simple format: Date,Daily Total
+            if rows and len(rows[0]) == 2 and rows[0][0].strip().lower() == 'date':
+                self._process_simple_csv(rows, org, stats)
+            else:
+                self._process_csv_from_rows(rows, org, stats)
         elif filename.endswith(('.xlsx', '.xls')):
             self._process_excel(file, org, stats)
         else:
@@ -167,7 +174,40 @@ class ImportDataView(APIView):
 
         return Response(stats)
 
-    def _process_csv(self, file, org, stats):
+    def _process_simple_csv(self, rows, org, stats):
+        """
+        Process simple CSV format:
+        Date,Daily Total
+        2024-01-01,3913.51
+        """
+        months_seen = set()
+        for row in rows[1:]:  # skip header
+            if len(row) < 2 or not row[0].strip():
+                continue
+            try:
+                d = date.fromisoformat(row[0].strip())
+                amount = _safe_decimal(row[1])
+                if amount is None:
+                    continue
+                closing, created = DailyClosing.objects.get_or_create(
+                    organization=org,
+                    closing_date=d,
+                    defaults={'status': 'APPROVED'}
+                )
+                closing.pos_cash = amount
+                closing.actual_cash = amount
+                closing.save()
+                month_key = (d.year, d.month)
+                months_seen.add(month_key)
+                if created:
+                    stats['closings_created'] += 1
+                else:
+                    stats['closings_updated'] += 1
+            except (ValueError, Exception) as e:
+                stats['errors'].append(f'Row {row[0]}: {str(e)}')
+        stats['months_processed'] = len(months_seen)
+
+    def _process_csv_from_rows(self, rows, org, stats):
         """
         Process CSV in SkyT2 format:
         Store Name,Sky T2
@@ -184,10 +224,6 @@ class ImportDataView(APIView):
         COGs Total,...
         (repeats for each month)
         """
-        content = file.read().decode('utf-8-sig')  # Handle BOM
-        reader = csv.reader(io.StringIO(content))
-        rows = list(reader)
-
         month_blocks = []
         current_block = {'year': None, 'month': None, 'income': [], 'cogs': []}
         current_section = None
