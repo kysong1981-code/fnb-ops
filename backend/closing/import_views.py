@@ -195,7 +195,11 @@ class ImportDataView(APIView):
                     defaults={'status': 'APPROVED'}
                 )
                 closing.pos_cash = amount
+                closing.pos_card = Decimal('0')
                 closing.actual_cash = amount
+                closing.actual_card = Decimal('0')
+                closing.other_sales.all().delete()
+                closing.supplier_costs.all().delete()
                 closing.save()
                 month_key = (d.year, d.month)
                 months_seen.add(month_key)
