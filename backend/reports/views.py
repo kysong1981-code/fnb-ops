@@ -1614,8 +1614,8 @@ class SkyReportViewSet(viewsets.ModelViewSet):
         # EXCL GST = (Total Sales - HQ Cash) / 1.15 + HQ Cash
         excl_gst = ((instance.total_sales_inc_gst - instance.hq_cash) / d('1.15') + instance.hq_cash).quantize(d('0.01')) if instance.total_sales_inc_gst else d('0')
 
-        # COGS (GST 제외)
-        instance.cogs = instance.total_cogs_xero
+        # COGS (GST 제외 = raw / 1.15)
+        instance.cogs = (instance.total_cogs_xero / d('1.15')).quantize(d('0.01')) if instance.total_cogs_xero else d('0')
 
         # Operating Expenses = (Total Expense - Labour - Sub)
         op_exp_excl = instance.total_expense_xero - instance.labour_xero - instance.sub_contractor_xero
@@ -1637,8 +1637,8 @@ class SkyReportViewSet(viewsets.ModelViewSet):
         # Total labour cost = wages + sub_inc_gst - sub_gst
         total_labour = instance.wages + sub_inc_gst - instance.sub_gst
 
-        # Payable GST = (sales - hq_cash - cogs*1.15 - op_exp*1.15 - sub_gst) * 3/23
-        gst_base = instance.total_sales_inc_gst - instance.hq_cash - (instance.cogs * d('1.15')) - (op_exp_excl * d('1.15')) - instance.sub_gst
+        # Payable GST = (sales - hq_cash - cogs_inc_gst - op_exp_inc_gst - sub_gst) * 3/23
+        gst_base = instance.total_sales_inc_gst - instance.hq_cash - instance.total_cogs_xero - (op_exp_excl * d('1.15')) - instance.sub_gst
         instance.payable_gst = (gst_base * d('3') / d('23')).quantize(d('0.01')) if gst_base > 0 else d('0')
 
         # Operating Profit = EXCL GST Sales - COGS - Operating Expenses - Wages
