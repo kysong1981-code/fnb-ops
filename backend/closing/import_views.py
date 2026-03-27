@@ -380,7 +380,7 @@ class ImportDataView(APIView):
                     )
                     stats['supplier_costs_created'] += 1
 
-                # Cash Tracking | Deposit → Expense
+                # Cash Tracking | Deposit → Expense (comes out of HR Cash)
                 if ct_deposit is not None and ct_deposit != 0:
                     ClosingCashExpense.objects.create(
                         daily_closing=closing,
@@ -390,15 +390,9 @@ class ImportDataView(APIView):
                         created_by=user,
                     )
 
-                # Cash Tracking | Cash Movement → HR Cash
-                if ct_movement is not None and ct_movement != 0:
-                    ClosingHRCash.objects.create(
-                        daily_closing=closing,
-                        amount=abs(ct_movement),
-                        recipient_name='Import',
-                        notes='CSV Import - Cash Movement',
-                        created_by=user,
-                    )
+                # Cash Movement is NOT stored as HR Cash entry.
+                # HR Cash is auto-calculated as: actual_cash - bank_deposit
+                # This ensures Total Cash = Bank Deposit + HR Cash (100%)
 
                 months_seen.add((d.year, d.month))
 
