@@ -2325,14 +2325,43 @@ class SalesAnalysisViewSet(viewsets.GenericViewSet):
     def holidays(self, request):
         """Get holidays for a date range, with sales data overlay."""
         from closing.models import Holiday
+        from payroll.holidays import get_regional_anniversary
         start, end = self._parse_dates(request)
         profile = request.user.profile
 
         # Get holidays in range
-        holidays = Holiday.objects.filter(
+        holidays = list(Holiday.objects.filter(
             start_date__lte=end,
             end_date__gte=start,
-        ).values('id', 'name', 'name_ko', 'category', 'start_date', 'end_date', 'year', 'impact')
+        ).values('id', 'name', 'name_ko', 'category', 'start_date', 'end_date', 'year', 'impact'))
+
+        # Add regional anniversary days dynamically based on store's region
+        org = profile.organization
+        region = org.region if org else None
+        if region:
+            existing_names = {h['name'].lower() for h in holidays}
+            years = set()
+            d = start
+            while d <= end:
+                years.add(d.year)
+                d = d.replace(year=d.year + 1, month=1, day=1) if d.month == 12 and d.day == 31 else d + timedelta(days=365)
+            years.add(start.year)
+            years.add(end.year)
+            for yr in years:
+                result = get_regional_anniversary(region, yr)
+                if result:
+                    actual, observed, name = result
+                    if start <= observed <= end and name.lower() not in existing_names:
+                        holidays.append({
+                            'id': None,
+                            'name': name,
+                            'name_ko': f'{name} (지역 공휴일)',
+                            'category': 'NZ_PUBLIC',
+                            'start_date': observed,
+                            'end_date': observed,
+                            'year': yr,
+                            'impact': 'MEDIUM',
+                        })
 
         # Get org sales data
         org_id = request.query_params.get('organization_id')
