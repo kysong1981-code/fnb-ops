@@ -470,6 +470,22 @@ class ReportViewSet(viewsets.ModelViewSet):
             # 미완료 일수 (오늘까지 중 has_data=False인 날)
             missing_count = sum(1 for d in daily_reports if not d['has_data'])
 
+            # 전달 HR Balance 계산 (조회 시작일 이전 모든 데이터)
+            previous_hr_balance = Decimal('0')
+            prev_closings = DailyClosing.objects.filter(
+                organization=org,
+                closing_date__lt=start,
+            ).prefetch_related('hr_cash_entries', 'cash_expenses')
+
+            for pc in prev_closings:
+                pc_hr = sum(e.amount for e in pc.hr_cash_entries.all())
+                if not pc.hr_cash_entries.exists():
+                    implicit = pc.actual_cash - pc.bank_deposit
+                    if implicit > 0:
+                        pc_hr = implicit
+                pc_exp = sum(e.amount for e in pc.cash_expenses.all())
+                previous_hr_balance += pc_hr - pc_exp
+
             return Response({
                 'period': {
                     'start_date': str(start),
@@ -477,6 +493,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                     'days': (end - start).days + 1,
                 },
                 'totals': {k: float(v) for k, v in totals.items()},
+                'previous_hr_balance': float(previous_hr_balance),
                 'missing_count': missing_count,
                 'daily_reports': daily_reports,
             }, status=status.HTTP_200_OK)

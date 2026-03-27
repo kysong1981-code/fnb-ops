@@ -227,10 +227,19 @@ export default function CashReport() {
             <KpiCard label="Expenses" value={fmt(data.totals.cash_expenses_total)} />
             <KpiCard
               label="HR Balance"
-              value={fmt(data.totals.hr_cash_total - data.totals.cash_expenses_total)}
-              alert={(data.totals.hr_cash_total - data.totals.cash_expenses_total) < 0 ? 'Negative' : undefined}
+              value={fmt((data.previous_hr_balance || 0) + data.totals.hr_cash_total - data.totals.cash_expenses_total)}
+              alert={((data.previous_hr_balance || 0) + data.totals.hr_cash_total - data.totals.cash_expenses_total) < 0 ? 'Negative' : undefined}
             />
           </div>
+          {/* Previous month balance */}
+          {data.previous_hr_balance !== 0 && data.previous_hr_balance != null && (
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+              <span className="text-blue-500 text-lg">📋</span>
+              <p className="text-blue-700 text-sm font-medium">
+                Previous Balance: <span className="font-bold">{fmt(data.previous_hr_balance)}</span>
+              </p>
+            </div>
+          )}
 
           {/* Missing days warning */}
           {data.missing_count > 0 && (
@@ -244,7 +253,7 @@ export default function CashReport() {
 
           {/* Month mode: Summary Table */}
           {dateMode === 'month' ? (
-            <MonthlyTable reports={data.daily_reports} fmt={fmt} />
+            <MonthlyTable reports={data.daily_reports} fmt={fmt} previousBalance={data.previous_hr_balance || 0} />
           ) : (
             /* Day / Week / Custom: Detail Cards */
             <>
@@ -328,7 +337,7 @@ export default function CashReport() {
  * Monthly Summary Table
  * Date → Cash Sales → Bank Deposit → HR Cash → Balance → Expenses(내역) → HR Balance
  * ────────────────────────────────────────────── */
-function MonthlyTable({ reports, fmt }) {
+function MonthlyTable({ reports, fmt, previousBalance = 0 }) {
   const [expandedDate, setExpandedDate] = useState(null)
 
   if (!reports || reports.length === 0) {
@@ -349,7 +358,7 @@ function MonthlyTable({ reports, fmt }) {
     }),
     { cash_sales: 0, bank_deposit: 0, hr_cash: 0, expenses: 0, balance: 0 }
   )
-  const hrBalanceTotal = totals.hr_cash - totals.expenses
+  const hrBalanceTotal = previousBalance + totals.hr_cash - totals.expenses
 
   const fmtShortDate = (dateStr) => {
     const d = new Date(dateStr + 'T00:00:00')
@@ -373,7 +382,7 @@ function MonthlyTable({ reports, fmt }) {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {(() => {
-              let cumulativeHrBalance = 0
+              let cumulativeHrBalance = previousBalance
               return reports.map((day) => {
               const bal = parseFloat(day.balance || 0)
               const expTotal = parseFloat(day.cash_expenses_total || 0)
