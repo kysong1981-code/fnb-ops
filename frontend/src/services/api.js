@@ -378,6 +378,9 @@ export const storeAPI = {
       params,
     }),
 
+  // Create Store
+  createStore: (data) => api.post('/users/stores/create/', data),
+
   // Suppliers
   getSuppliers: (params) => api.get('/closing/suppliers/', { params }),
   createSupplier: (data, params) => api.post('/closing/suppliers/', data, { params }),

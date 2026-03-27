@@ -39,6 +39,34 @@ class StoreListView(generics.ListAPIView):
         return Organization.objects.filter(id=profile.organization_id)
 
 
+class StoreCreateView(APIView):
+    """CEO만 새 매장 생성"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        profile = request.user.profile
+        if profile.role not in ('CEO', 'HQ', 'ADMIN'):
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        name = request.data.get('name', '').strip()
+        if not name:
+            return Response({'error': 'Store name is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if Organization.objects.filter(name__iexact=name).exists():
+            return Response({'error': f'Store "{name}" already exists'}, status=status.HTTP_400_BAD_REQUEST)
+
+        hq_org = Organization.objects.filter(level='HQ').first()
+        org = Organization.objects.create(
+            name=name,
+            level='STORE',
+            parent=hq_org,
+            region=request.data.get('region', ''),
+            address=request.data.get('address', ''),
+            phone=request.data.get('phone', ''),
+        )
+        return Response(OrganizationSerializer(org).data, status=status.HTTP_201_CREATED)
+
+
 class AssignStoresView(APIView):
     """CEO/HQ: 매니저에게 스토어 배정 + 역할 변경"""
     permission_classes = [IsAuthenticated]

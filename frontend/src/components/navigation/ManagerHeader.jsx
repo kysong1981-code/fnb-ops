@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useStore } from '../../context/StoreContext'
+import { storeAPI } from '../../services/api'
 import { BellIcon, SunIcon, UserIcon, LogoutIcon, HomeIcon } from '../icons'
 
 const ROLE_OPTIONS = [
@@ -18,6 +19,10 @@ export default function ManagerHeader() {
   const [avatarOpen, setAvatarOpen] = useState(false)
   const [storeOpen, setStoreOpen] = useState(false)
   const [roleOpen, setRoleOpen] = useState(false)
+  const [addStoreOpen, setAddStoreOpen] = useState(false)
+  const [newStoreName, setNewStoreName] = useState('')
+  const [addStoreError, setAddStoreError] = useState('')
+  const [addStoreLoading, setAddStoreLoading] = useState(false)
   const avatarRef = useRef(null)
   const storeRef = useRef(null)
   const roleRef = useRef(null)
@@ -60,10 +65,28 @@ export default function ManagerHeader() {
     navigate('/dashboard')
   }
 
+  const handleAddStore = async () => {
+    if (!newStoreName.trim()) return
+    setAddStoreLoading(true)
+    setAddStoreError('')
+    try {
+      await storeAPI.createStore({ name: newStoreName.trim() })
+      setAddStoreOpen(false)
+      setNewStoreName('')
+      window.location.reload()
+    } catch (err) {
+      setAddStoreError(err.response?.data?.error || 'Failed to create store')
+    } finally {
+      setAddStoreLoading(false)
+    }
+  }
+
+  const isCEO = user?.role === 'CEO' || user?.role === 'HQ' || user?.role === 'ADMIN'
   const currentRole = user?.role || ''
   const currentRoleOption = ROLE_OPTIONS.find(r => r.value === currentRole)
 
   return (
+    <>
     <header className="bg-white border-b border-gray-100 px-6 py-4 shrink-0">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -188,6 +211,15 @@ export default function ManagerHeader() {
                     <UserIcon size={16} />
                     My Page
                   </button>
+                  {isCEO && (
+                    <button
+                      onClick={() => { setAddStoreOpen(true); setAvatarOpen(false) }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition"
+                    >
+                      <HomeIcon size={16} />
+                      Add Store
+                    </button>
+                  )}
                 </div>
 
                 <div className="border-t border-gray-100 pt-1">
@@ -205,5 +237,40 @@ export default function ManagerHeader() {
         </div>
       </div>
     </header>
+
+    {/* Add Store Modal */}
+    {addStoreOpen && (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100]" onClick={() => setAddStoreOpen(false)}>
+        <div className="bg-white rounded-2xl shadow-xl w-96 p-6" onClick={e => e.stopPropagation()}>
+          <h3 className="text-lg font-bold text-gray-800 mb-4">Add New Store</h3>
+          <input
+            type="text"
+            value={newStoreName}
+            onChange={e => { setNewStoreName(e.target.value); setAddStoreError('') }}
+            placeholder="Store name"
+            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            autoFocus
+            onKeyDown={e => e.key === 'Enter' && handleAddStore()}
+          />
+          {addStoreError && <p className="text-red-500 text-xs mt-2">{addStoreError}</p>}
+          <div className="flex gap-3 mt-5">
+            <button
+              onClick={() => { setAddStoreOpen(false); setNewStoreName(''); setAddStoreError('') }}
+              className="flex-1 px-4 py-2.5 text-sm text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAddStore}
+              disabled={!newStoreName.trim() || addStoreLoading}
+              className="flex-1 px-4 py-2.5 text-sm text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
+            >
+              {addStoreLoading ? 'Creating...' : 'Create'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
