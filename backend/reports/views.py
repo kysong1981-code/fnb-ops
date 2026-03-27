@@ -1641,8 +1641,8 @@ class SkyReportViewSet(viewsets.ModelViewSet):
         gst_base = instance.total_sales_inc_gst - instance.hq_cash - instance.total_cogs_xero - (op_exp_excl * d('1.15')) - instance.sub_gst
         instance.payable_gst = (gst_base * d('3') / d('23')).quantize(d('0.01')) if gst_base > 0 else d('0')
 
-        # Operating Profit = EXCL GST Sales - COGS - Operating Expenses - Wages
-        instance.operating_profit = (excl_gst - instance.cogs - op_exp_excl - instance.wages).quantize(d('0.01'))
+        # Operating Profit = EXCL GST Sales - COGS - Operating Expenses - Total Labour
+        instance.operating_profit = (excl_gst - instance.cogs - op_exp_excl - total_labour).quantize(d('0.01'))
 
         # Store sales_per_hour as total labour cost for display
         instance.sales_per_hour = total_labour.quantize(d('0.01'))
