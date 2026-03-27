@@ -1714,7 +1714,7 @@ class SkyReportViewSet(viewsets.ModelViewSet):
         ).prefetch_related('other_sales', 'supplier_costs')
 
         total_sales = Decimal('0')
-        cash_sales = Decimal('0')
+        hr_cash = Decimal('0')
         total_cogs = Decimal('0')
         num_days = 0
 
@@ -1724,8 +1724,8 @@ class SkyReportViewSet(viewsets.ModelViewSet):
             day_total = c.pos_cash + c.pos_card + other_total
             total_sales += day_total
 
-            # HQ Cash = pos_cash (현금 매출, GST 계산용)
-            cash_sales += c.pos_cash
+            # HQ Cash = HR Cash (actual_cash - bank_deposit), GST 없는 현금
+            hr_cash += c.actual_cash - c.bank_deposit
 
             # COGS = sum of supplier costs
             total_cogs += sum(s.amount for s in c.supplier_costs.all())
@@ -1733,7 +1733,7 @@ class SkyReportViewSet(viewsets.ModelViewSet):
 
         return Response({
             'total_sales_garage': float(total_sales),
-            'hq_cash_garage': float(cash_sales),
+            'hq_cash_garage': float(hr_cash),
             'total_cogs_xero': float(total_cogs),
             'number_of_days': num_days,
         })
