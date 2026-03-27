@@ -6,7 +6,7 @@ from rest_framework.parsers import MultiPartParser
 from django.db.models import Sum, Avg, Count, F, DecimalField
 from django.http import HttpResponse
 from django.utils import timezone
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date
 from decimal import Decimal
 from collections import defaultdict
 import io
@@ -1645,6 +1645,43 @@ class SkyReportViewSet(viewsets.ModelViewSet):
             'first_half_totals': compute_totals(first_half),
             'second_half_totals': compute_totals(second_half),
             'annual_totals': compute_totals(data),
+        })
+
+    @action(detail=False, methods=['get'], url_path='auto-fill')
+    def auto_fill(self, request):
+        """Return auto-calculated values from DailyClosing for a given year/month."""
+        import calendar
+        year = int(request.query_params.get('year', timezone.now().year))
+        month = int(request.query_params.get('month', timezone.now().month))
+        org = request.user.profile.organization
+
+        days_in_month = calendar.monthrange(year, month)[1]
+        start = date(year, month, 1)
+        end = date(year, month, days_in_month)
+
+        closings = DailyClosing.objects.filter(
+            organization=org,
+            closing_date__range=[start, end],
+        ).prefetch_related('other_sales')
+
+        total_sales = Decimal('0')
+        hr_cash = Decimal('0')
+        num_days = 0
+
+        for c in closings:
+            # Total Sales = pos_cash + pos_card + other_sales
+            other_total = sum(o.amount for o in c.other_sales.all())
+            day_total = c.pos_cash + c.pos_card + other_total
+            total_sales += day_total
+
+            # HR Cash = actual_cash - bank_deposit
+            hr_cash += c.actual_cash - c.bank_deposit
+            num_days += 1
+
+        return Response({
+            'total_sales_garage': float(total_sales),
+            'hq_cash_garage': float(hr_cash),
+            'number_of_days': num_days,
         })
 
     @action(detail=False, methods=['get'])

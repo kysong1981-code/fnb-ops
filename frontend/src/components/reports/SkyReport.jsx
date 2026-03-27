@@ -97,7 +97,7 @@ export default function SkyReport() {
 
   const currentReport = reports.find(r => r.month === selectedMonth)
 
-  const startEditing = () => {
+  const startEditing = async () => {
     setError('')
     setSuccess('')
     if (currentReport) {
@@ -114,6 +114,20 @@ export default function SkyReport() {
       setForm({ ...EMPTY_FORM })
     }
     setEditing(true)
+
+    // Auto-fill Total Sales and HQ Cash from DailyClosing data
+    try {
+      const res = await skyReportAPI.autoFill(year, selectedMonth)
+      const auto = res.data
+      setForm(prev => ({
+        ...prev,
+        total_sales_garage: auto.total_sales_garage ? String(auto.total_sales_garage) : prev.total_sales_garage,
+        hq_cash_garage: auto.hq_cash_garage ? String(auto.hq_cash_garage) : prev.hq_cash_garage,
+        number_of_days: auto.number_of_days ? String(auto.number_of_days) : prev.number_of_days,
+      }))
+    } catch {
+      // Silently fail — auto-fill is optional
+    }
   }
 
   const cancelEditing = () => {
