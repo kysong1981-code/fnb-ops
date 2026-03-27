@@ -133,9 +133,12 @@ class SkyReport(models.Model):
 
     @property
     def excl_gst_sales(self):
-        """Total sales excluding GST (GST = 15% in NZ)"""
+        """Total sales excluding GST: (Total - Cash)/1.15 + Cash"""
         from decimal import Decimal
-        return (self.total_sales_inc_gst / Decimal('1.15')).quantize(Decimal('0.01'))
+        if self.total_sales_inc_gst == 0:
+            return Decimal('0')
+        card_excl = (self.total_sales_inc_gst - self.hq_cash) / Decimal('1.15')
+        return (card_excl + self.hq_cash).quantize(Decimal('0.01'))
 
     @property
     def cogs_ratio(self):

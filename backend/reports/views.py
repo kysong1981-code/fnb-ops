@@ -1602,13 +1602,62 @@ class SkyReportViewSet(viewsets.ModelViewSet):
             qs = qs.filter(year=year)
         return qs
 
+    def _auto_calculate(self, instance):
+        """Auto-calculate P&L fields from input fields."""
+        import calendar
+
+        d = Decimal
+        # Total Sales & HQ Cash from garage inputs
+        instance.total_sales_inc_gst = instance.total_sales_garage
+        instance.hq_cash = instance.hq_cash_garage
+
+        # COGS inc GST = cogs_xero (excl GST) * 1.15
+        instance.cogs = (instance.total_cogs_xero * d('1.15')).quantize(d('0.01'))
+
+        # Operating Expenses = (Total Expense - Labour - Sub) * 1.15
+        op_exp_excl = instance.total_expense_xero - instance.labour_xero - instance.sub_contractor_xero
+        instance.operating_expenses = (op_exp_excl * d('1.15')).quantize(d('0.01'))
+
+        # Wages = (labour / (payruns * 14)) * calendar_days
+        days_in_month = calendar.monthrange(instance.year, instance.month)[1]
+        payrun_days = instance.number_of_payruns * 14 if instance.number_of_payruns > 0 else 1
+        if instance.labour_xero > 0:
+            daily_rate = instance.labour_xero / d(str(payrun_days))
+            instance.wages = (daily_rate * d(str(days_in_month))).quantize(d('0.01'))
+        else:
+            instance.wages = d('0')
+
+        # Sub GST = sub_contractor * 1.15 * 3/23
+        sub_inc_gst = instance.sub_contractor_xero * d('1.15')
+        instance.sub_gst = (sub_inc_gst * d('3') / d('23')).quantize(d('0.01'))
+
+        # Total labour cost = wages + sub_inc_gst - sub_gst
+        total_labour = instance.wages + sub_inc_gst - instance.sub_gst
+
+        # Payable GST = (sales - cash - cogs - op_exp - sub_gst) * 3/23
+        gst_base = instance.total_sales_inc_gst - instance.hq_cash - instance.cogs - instance.operating_expenses - instance.sub_gst
+        instance.payable_gst = (gst_base * d('3') / d('23')).quantize(d('0.01')) if gst_base > 0 else d('0')
+
+        # Operating Profit (excl GST) = excl_sales - cogs_excl - op_exp_excl - wages
+        excl_sales = instance.excl_gst_sales
+        instance.operating_profit = (excl_sales - instance.total_cogs_xero - op_exp_excl - instance.wages).quantize(d('0.01'))
+
+        # Store sales_per_hour as total labour cost for display
+        instance.sales_per_hour = total_labour.quantize(d('0.01'))
+        instance.opening_sales_per_hour = instance.labour_xero
+        instance.tab_allowance_sales = sub_inc_gst.quantize(d('0.01'))
+
+        instance.save()
+
     def perform_create(self, serializer):
         org = self.request.user.profile.organization
         profile = self.request.user.profile
-        serializer.save(organization=org, created_by=profile)
+        instance = serializer.save(organization=org, created_by=profile)
+        self._auto_calculate(instance)
 
     def perform_update(self, serializer):
-        serializer.save()
+        instance = serializer.save()
+        self._auto_calculate(instance)
 
     @action(detail=False, methods=['get'])
     def summary(self, request):
@@ -1662,10 +1711,11 @@ class SkyReportViewSet(viewsets.ModelViewSet):
         closings = DailyClosing.objects.filter(
             organization=org,
             closing_date__range=[start, end],
-        ).prefetch_related('other_sales')
+        ).prefetch_related('other_sales', 'supplier_costs')
 
         total_sales = Decimal('0')
         hr_cash = Decimal('0')
+        total_cogs = Decimal('0')
         num_days = 0
 
         for c in closings:
@@ -1676,11 +1726,15 @@ class SkyReportViewSet(viewsets.ModelViewSet):
 
             # HR Cash = actual_cash - bank_deposit
             hr_cash += c.actual_cash - c.bank_deposit
+
+            # COGS = sum of supplier costs
+            total_cogs += sum(s.amount for s in c.supplier_costs.all())
             num_days += 1
 
         return Response({
             'total_sales_garage': float(total_sales),
             'hq_cash_garage': float(hr_cash),
+            'total_cogs_xero': float(total_cogs),
             'number_of_days': num_days,
         })
 

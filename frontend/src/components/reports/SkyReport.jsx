@@ -123,6 +123,7 @@ export default function SkyReport() {
         ...prev,
         total_sales_garage: auto.total_sales_garage ? String(auto.total_sales_garage) : prev.total_sales_garage,
         hq_cash_garage: auto.hq_cash_garage ? String(auto.hq_cash_garage) : prev.hq_cash_garage,
+        total_cogs_xero: auto.total_cogs_xero ? String(auto.total_cogs_xero) : prev.total_cogs_xero,
         number_of_days: auto.number_of_days ? String(auto.number_of_days) : prev.number_of_days,
       }))
     } catch {
@@ -408,35 +409,39 @@ function ReportDetail({ report }) {
         <div className="space-y-1">
           <DetailRow label="총매출 (GST 포함)" labelEn="Total Sales inc.GST" value={`$${fmt(r.total_sales_inc_gst)}`} highlight />
           <DetailRow label="현금" labelEn="HQ CASH" value={`$${fmt(r.hq_cash)}`} />
-          <DetailRow label="포스 매출" labelEn="Pos Sales" value={`$${fmt(r.pos_sales)}`} sub={`$${fmt(r.excl_gst_sales)}`} subLabel="EXCL. GST" />
-          <DetailRow label="그외 매출" labelEn="Other Sales" value={`$${fmt(r.other_sales)}`} />
+          <DetailRow label="매출 (GST 제외)" labelEn="EXCL. GST" value={`$${fmt(r.excl_gst_sales)}`} />
           <div className="border-t border-gray-100 my-2" />
           <DetailRow label="매출원가" labelEn="COGS" value={`$${fmt(r.cogs)}`} ratio={salesRatio('cogs')} />
           <DetailRow label="운영비용" labelEn="Operating Expenses" value={`$${fmt(r.operating_expenses)}`} ratio={salesRatio('operating_expenses')} />
-          <DetailRow label="인건비" labelEn="Wages & Salaries" value={`$${fmt(r.wages)}`} ratio={salesRatio('wages')} />
-          <div className="border-t border-gray-100 my-2" />
-          <DetailRow label="시간당 매출" labelEn="Sales per Hour" value={`$${fmt(r.sales_per_hour)}`} />
-          <DetailRow label="오프닝 시간당 매출" labelEn="Opening Sales/Hr" value={`$${fmt(r.opening_sales_per_hour)}`} />
-          <DetailRow label="탭 수당 매출" labelEn="Tab Allowance" value={`$${fmt(r.tab_allowance_sales)}`} />
+          <DetailRow label="인건비 (Labour)" labelEn="Wages" value={`$${fmt(r.wages)}`} ratio={salesRatio('wages')} />
+          {parseFloat(r.tab_allowance_sales) > 0 && (
+            <DetailRow label="Sub-contractor" labelEn="(GST 포함)" value={`$${fmt(r.tab_allowance_sales)}`} />
+          )}
+          <DetailRow label="총 인건비" labelEn="Total Labour" value={`$${fmt(r.sales_per_hour)}`} />
           <div className="border-t border-gray-100 my-2" />
           <DetailRow label="납부할 GST" labelEn="Payable GST" value={`$${fmt(r.payable_gst)}`} />
-          <DetailRow label="" labelEn="Sub GST" value={`$${fmt(r.sub_gst)}`} />
+          {parseFloat(r.sub_gst) > 0 && (
+            <DetailRow label="" labelEn="Sub GST" value={`$${fmt(r.sub_gst)}`} />
+          )}
           <DetailRow label="영업이익 (세전)" labelEn="Operating Profit" value={`$${fmt(r.operating_profit)}`} highlight />
         </div>
       </Card>
 
-      {/* External Data */}
+      {/* Input Data */}
       <Card className="p-5">
-        <h3 className="text-sm font-bold text-gray-900 mb-4">External Data (Xero / Garage)</h3>
+        <h3 className="text-sm font-bold text-gray-900 mb-4">Input Data</h3>
         <div className="space-y-1">
-          <DetailRow label="" labelEn="Total Sales (Garage)" value={`$${fmt(r.total_sales_garage)}`} />
-          <DetailRow label="" labelEn="HQ CASH (Garage)" value={`$${fmt(r.hq_cash_garage)}`} />
-          <DetailRow label="" labelEn="Total COGS (Xero)" value={`$${fmt(r.total_cogs_xero)}`} />
-          <DetailRow label="" labelEn="Total Expense (Xero)" value={`$${fmt(r.total_expense_xero)}`} />
-          <DetailRow label="" labelEn="Labour (Xero)" value={`$${fmt(r.labour_xero)}`} />
-          <DetailRow label="" labelEn="Sub-contractor (Xero)" value={`$${fmt(r.sub_contractor_xero)}`} />
-          <DetailRow label="" labelEn="Number of Days" value={r.number_of_days || '-'} />
-          <DetailRow label="" labelEn="Number of Payruns" value={r.number_of_payruns || '-'} />
+          <DetailRow label="자동" labelEn="Total Sales" value={`$${fmt(r.total_sales_garage)}`} />
+          <DetailRow label="자동" labelEn="HQ CASH" value={`$${fmt(r.hq_cash_garage)}`} />
+          <DetailRow label="자동" labelEn="COGS" value={`$${fmt(r.total_cogs_xero)}`} />
+          <div className="border-t border-gray-100 my-2" />
+          <DetailRow label="입력" labelEn="Total Expense" value={`$${fmt(r.total_expense_xero)}`} />
+          <DetailRow label="입력" labelEn="Labour" value={`$${fmt(r.labour_xero)}`} />
+          {parseFloat(r.sub_contractor_xero) > 0 && (
+            <DetailRow label="입력" labelEn="Sub-contractor" value={`$${fmt(r.sub_contractor_xero)}`} />
+          )}
+          <DetailRow label="" labelEn="Trading Days" value={r.number_of_days || '-'} />
+          <DetailRow label="" labelEn="Payruns" value={r.number_of_payruns || '-'} />
         </div>
       </Card>
 
@@ -473,58 +478,54 @@ function ReportDetail({ report }) {
 function ReportForm({ form, updateField, handleSave, cancelEditing, saving, editingReport }) {
   return (
     <>
+      {/* Auto-filled from DailyClosing */}
       <Card className="p-5">
-        <h3 className="text-sm font-bold text-gray-900 mb-1">Financial Summary</h3>
-        <p className="text-xs text-gray-400 mb-4">Main financial data for the month</p>
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <NumField label="Total Sales (GST incl.)" value={form.total_sales_inc_gst} onChange={v => updateField('total_sales_inc_gst', v)} prefix="$" />
-            <NumField label="HQ CASH" value={form.hq_cash} onChange={v => updateField('hq_cash', v)} prefix="$" />
-            <NumField label="Pos Sales" value={form.pos_sales} onChange={v => updateField('pos_sales', v)} prefix="$" />
+        <h3 className="text-sm font-bold text-gray-900 mb-1">Auto Data (DailyClosing)</h3>
+        <p className="text-xs text-gray-400 mb-4">CSV 업로드 데이터에서 자동 계산</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div>
+            <label className={labelCls}>Total Sales (자동)</label>
+            <div className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm text-right text-blue-700 font-medium">
+              ${parseFloat(form.total_sales_garage || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2 })}
+            </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <NumField label="Other Sales" value={form.other_sales} onChange={v => updateField('other_sales', v)} prefix="$" />
-            <NumField label="COGS" value={form.cogs} onChange={v => updateField('cogs', v)} prefix="$" />
-            <NumField label="Operating Expenses" value={form.operating_expenses} onChange={v => updateField('operating_expenses', v)} prefix="$" />
+          <div>
+            <label className={labelCls}>HQ CASH (자동)</label>
+            <div className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm text-right text-blue-700 font-medium">
+              ${parseFloat(form.hq_cash_garage || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2 })}
+            </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <NumField label="Wages & Salaries" value={form.wages} onChange={v => updateField('wages', v)} prefix="$" />
-            <NumField label="Sales per Hour" value={form.sales_per_hour} onChange={v => updateField('sales_per_hour', v)} prefix="$" />
-            <NumField label="Opening Sales/Hr" value={form.opening_sales_per_hour} onChange={v => updateField('opening_sales_per_hour', v)} prefix="$" />
+          <div>
+            <label className={labelCls}>COGS (자동)</label>
+            <div className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm text-right text-blue-700 font-medium">
+              ${parseFloat(form.total_cogs_xero || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2 })}
+            </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <NumField label="Tab Allowance Sales" value={form.tab_allowance_sales} onChange={v => updateField('tab_allowance_sales', v)} prefix="$" />
-            <NumField label="Payable GST" value={form.payable_gst} onChange={v => updateField('payable_gst', v)} prefix="$" />
-            <NumField label="Sub GST" value={form.sub_gst} onChange={v => updateField('sub_gst', v)} prefix="$" />
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <NumField label="Operating Profit (Pre-tax)" value={form.operating_profit} onChange={v => updateField('operating_profit', v)} prefix="$" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+          <div>
+            <label className={labelCls}>Trading Days (자동)</label>
+            <div className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm text-right text-blue-700 font-medium">
+              {form.number_of_days || 0}
+            </div>
           </div>
         </div>
       </Card>
 
+      {/* Manager Input */}
       <Card className="p-5">
-        <h3 className="text-sm font-bold text-gray-900 mb-1">External Data</h3>
-        <p className="text-xs text-gray-400 mb-4">Data from Xero / Garage</p>
+        <h3 className="text-sm font-bold text-gray-900 mb-1">Manager Input</h3>
+        <p className="text-xs text-gray-400 mb-4">매니저가 직접 입력하는 항목</p>
         <div className="space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <NumField label="Total Sales (Garage)" value={form.total_sales_garage} onChange={v => updateField('total_sales_garage', v)} prefix="$" />
-            <NumField label="HQ CASH (Garage)" value={form.hq_cash_garage} onChange={v => updateField('hq_cash_garage', v)} prefix="$" />
-            <NumField label="Total COGS (Xero)" value={form.total_cogs_xero} onChange={v => updateField('total_cogs_xero', v)} prefix="$" />
+            <NumField label="Total Expense (운영비 총액)" value={form.total_expense_xero} onChange={v => updateField('total_expense_xero', v)} prefix="$" />
+            <NumField label="Labour (인건비)" value={form.labour_xero} onChange={v => updateField('labour_xero', v)} prefix="$" />
+            <NumField label="Sub-contractor (있으면)" value={form.sub_contractor_xero} onChange={v => updateField('sub_contractor_xero', v)} prefix="$" />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <NumField label="Total Expense (Xero)" value={form.total_expense_xero} onChange={v => updateField('total_expense_xero', v)} prefix="$" />
-            <NumField label="Labour (Xero)" value={form.labour_xero} onChange={v => updateField('labour_xero', v)} prefix="$" />
-            <NumField label="Sub-contractor (Xero)" value={form.sub_contractor_xero} onChange={v => updateField('sub_contractor_xero', v)} prefix="$" />
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div>
-              <label className={labelCls}>Number of Days</label>
-              <input type="number" value={form.number_of_days} onChange={e => updateField('number_of_days', e.target.value)} className={inputCls} />
-            </div>
             <div>
               <label className={labelCls}>Number of Payruns</label>
-              <input type="number" value={form.number_of_payruns} onChange={e => updateField('number_of_payruns', e.target.value)} className={inputCls} />
+              <input type="number" value={form.number_of_payruns} onChange={e => updateField('number_of_payruns', e.target.value)} className={inputCls} min="1" max="4" />
             </div>
           </div>
         </div>
