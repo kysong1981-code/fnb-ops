@@ -18,6 +18,7 @@ from rest_framework.parsers import MultiPartParser
 from users.views import get_target_org
 from closing.models import (
     DailyClosing, ClosingOtherSale, ClosingSupplierCost,
+    ClosingCashExpense, ClosingHRCash,
     Supplier, SalesCategory,
 )
 
@@ -162,9 +163,11 @@ class ImportDataView(APIView):
             content = file.read().decode('utf-8-sig')
             reader = csv.reader(io.StringIO(content))
             rows = list(reader)
-            # Detect simple format: Date,Daily Total
+            # Detect format from headers
             if rows and len(rows[0]) == 2 and rows[0][0].strip().lower() == 'date':
                 self._process_simple_csv(rows, org, stats)
+            elif rows and any('Income -' in h or 'COGs -' in h or 'Cash Tracking' in h for h in rows[0]):
+                self._process_gomenu_csv(rows, org, stats, request.user)
             else:
                 self._process_csv_from_rows(rows, org, stats)
         elif filename.endswith(('.xlsx', '.xls')):
@@ -209,6 +212,195 @@ class ImportDataView(APIView):
                     stats['closings_updated'] += 1
             except (ValueError, Exception) as e:
                 stats['errors'].append(f'Row {row[0]}: {str(e)}')
+        stats['months_processed'] = len(months_seen)
+
+    def _process_gomenu_csv(self, rows, org, stats, user):
+        """
+        Process GoMenu POS export CSV format.
+        Headers like: Date, Income - Store | Cash, Income - Store | Card, ...,
+                      COGs - Store | Supplier, ..., Cash Tracking | Cash, ...
+        """
+        headers = rows[0]
+        months_seen = set()
+
+        # Parse column mappings from headers
+        col_map = []  # list of (index, section, field_name)
+        for i, h in enumerate(headers):
+            h = h.strip()
+            if h.lower() == 'date':
+                col_map.append((i, 'date', None))
+            elif '|' in h:
+                parts = h.split('|')
+                field_name = parts[-1].strip()
+                prefix = parts[0].strip().lower()
+
+                if 'income' in prefix:
+                    fl = field_name.lower()
+                    if fl == 'total':
+                        col_map.append((i, 'skip', None))
+                    elif fl == 'cash':
+                        col_map.append((i, 'income_cash', None))
+                    elif fl == 'card':
+                        col_map.append((i, 'income_card', None))
+                    elif fl == 'surcharge':
+                        col_map.append((i, 'income_surcharge', None))
+                    else:
+                        col_map.append((i, 'other_sale', field_name))
+                elif 'cogs' in prefix:
+                    fl = field_name.lower()
+                    if fl == 'total':
+                        col_map.append((i, 'skip', None))
+                    else:
+                        col_map.append((i, 'cogs', field_name))
+                elif 'expense' in prefix:
+                    col_map.append((i, 'skip', None))
+                elif 'cash tracking' in prefix:
+                    fl = field_name.lower()
+                    if fl == 'cash':
+                        col_map.append((i, 'ct_cash', None))
+                    elif fl == 'banking':
+                        col_map.append((i, 'ct_banking', None))
+                    elif fl == 'deposit':
+                        col_map.append((i, 'ct_deposit', None))
+                    elif fl == 'cash movement':
+                        col_map.append((i, 'ct_movement', None))
+                    else:
+                        col_map.append((i, 'skip', None))
+                else:
+                    col_map.append((i, 'skip', None))
+            else:
+                col_map.append((i, 'skip', None))
+
+        for row in rows[1:]:
+            if not row or not row[0].strip():
+                continue
+            try:
+                d = date.fromisoformat(row[0].strip())
+            except (ValueError, IndexError):
+                continue
+
+            # Collect values for this row
+            income_cash = Decimal('0')
+            income_card = Decimal('0')
+            surcharge = Decimal('0')
+            other_sales = []
+            cogs_items = []
+            ct_cash = None
+            ct_banking = None
+            ct_deposit = None
+            ct_movement = None
+
+            for idx, section, field_name in col_map:
+                if section in ('date', 'skip'):
+                    continue
+                val = _safe_decimal(row[idx]) if idx < len(row) else None
+                if val is None:
+                    continue
+
+                if section == 'income_cash':
+                    income_cash = val
+                elif section == 'income_card':
+                    income_card = val
+                elif section == 'income_surcharge':
+                    surcharge = val
+                elif section == 'other_sale':
+                    other_sales.append((field_name, val))
+                elif section == 'cogs':
+                    cogs_items.append((field_name, val))
+                elif section == 'ct_cash':
+                    ct_cash = val
+                elif section == 'ct_banking':
+                    ct_banking = val
+                elif section == 'ct_deposit':
+                    ct_deposit = val
+                elif section == 'ct_movement':
+                    ct_movement = val
+
+            # Check if any data exists
+            has_data = (income_cash or income_card or surcharge or
+                        other_sales or cogs_items or
+                        ct_cash or ct_banking or ct_deposit or ct_movement)
+            if not has_data:
+                continue
+
+            # Create/update DailyClosing
+            closing, created = DailyClosing.objects.get_or_create(
+                organization=org,
+                closing_date=d,
+                defaults={'status': 'APPROVED'}
+            )
+            if created:
+                stats['closings_created'] += 1
+            else:
+                stats['closings_updated'] += 1
+                closing.other_sales.all().delete()
+                closing.supplier_costs.all().delete()
+                closing.cash_expenses.all().delete()
+                closing.hr_cash_entries.all().delete()
+
+            # Income → pos_cash, pos_card
+            closing.pos_cash = income_cash
+            closing.pos_card = income_card + surcharge
+            # Cash Tracking → actual_cash, bank_deposit
+            closing.actual_cash = ct_cash if ct_cash is not None else income_cash
+            closing.actual_card = income_card + surcharge
+            closing.bank_deposit = ct_banking if ct_banking is not None else Decimal('0')
+            closing.save()
+
+            # Other Sales (Uber, Bopple, DoorDash, etc.) - each as separate entry
+            for name, val in other_sales:
+                ClosingOtherSale.objects.create(closing=closing, name=name, amount=val)
+                stats['other_sales_created'] += 1
+                _, sc_created = SalesCategory.objects.get_or_create(
+                    organization=org, name=name,
+                    defaults={'is_active': True}
+                )
+                if sc_created and name not in stats['sales_categories_added']:
+                    stats['sales_categories_added'].append(name)
+
+            # COGs → SupplierCosts
+            for name, val in cogs_items:
+                name_clean = name.strip()
+                code = name_clean.upper().replace(' ', '_')[:50]
+                if name_clean.lower() == 'other':
+                    supplier, _ = Supplier.objects.get_or_create(
+                        organization=org, code='OTHER',
+                        defaults={'name': 'Other', 'category': 'COGS'}
+                    )
+                else:
+                    supplier, sup_created = Supplier.objects.get_or_create(
+                        organization=org, code=code,
+                        defaults={'name': name_clean, 'category': 'COGS'}
+                    )
+                    if sup_created and name_clean not in stats['suppliers_added']:
+                        stats['suppliers_added'].append(name_clean)
+                ClosingSupplierCost.objects.create(
+                    closing=closing, supplier=supplier, amount=val
+                )
+                stats['supplier_costs_created'] += 1
+
+            # Cash Tracking | Deposit → Expense
+            if ct_deposit is not None and ct_deposit != 0:
+                ClosingCashExpense.objects.create(
+                    daily_closing=closing,
+                    category='OTHER',
+                    reason='Deposit',
+                    amount=ct_deposit,
+                    created_by=user,
+                )
+
+            # Cash Tracking | Cash Movement → HR Cash
+            if ct_movement is not None and ct_movement != 0:
+                ClosingHRCash.objects.create(
+                    daily_closing=closing,
+                    amount=ct_movement,
+                    recipient_name='Import',
+                    notes='CSV Import - Cash Movement',
+                    created_by=user,
+                )
+
+            months_seen.add((d.year, d.month))
+
         stats['months_processed'] = len(months_seen)
 
     def _process_csv_from_rows(self, rows, org, stats):
