@@ -105,6 +105,8 @@ class Organization(models.Model):
 
     # Store settings
     hr_cash_enabled = models.BooleanField(default=True, help_text="HR 현금 입력 활성화 여부")
+    initial_cash_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Initial cash balance before first import")
+    initial_balance_date = models.DateField(null=True, blank=True, help_text="Date of initial cash balance (data starts after this date)")
 
     # Feature module toggles
     enabled_modules = models.JSONField(default=get_default_modules, help_text="활성화된 모듈 목록")

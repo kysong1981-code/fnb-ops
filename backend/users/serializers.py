@@ -16,6 +16,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
             'ird_number', 'logo',
             'opening_time', 'closing_time',
             'hr_cash_enabled',
+            'initial_cash_balance', 'initial_balance_date',
             'enabled_modules',
             'otherwise_working_weeks', 'otherwise_working_threshold',
             'created_at', 'updated_at'

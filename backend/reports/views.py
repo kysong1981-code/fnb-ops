@@ -471,7 +471,9 @@ class ReportViewSet(viewsets.ModelViewSet):
             missing_count = sum(1 for d in daily_reports if not d['has_data'])
 
             # 전달 HR Balance 계산 (조회 시작일 이전 모든 데이터)
-            previous_hr_balance = Decimal('0')
+            # Start with store's initial cash balance
+            previous_hr_balance = Decimal(str(org.initial_cash_balance or 0))
+
             prev_closings = DailyClosing.objects.filter(
                 organization=org,
                 closing_date__lt=start,

@@ -104,6 +104,8 @@ export default function StoreSettings() {
 
   // Business
   const [hrCashEnabled, setHrCashEnabled] = useState(true)
+  const [initialCashBalance, setInitialCashBalance] = useState('')
+  const [initialBalanceDate, setInitialBalanceDate] = useState('')
   const [owWeeks, setOwWeeks] = useState(8)
   const [owThreshold, setOwThreshold] = useState(7)
 
@@ -181,6 +183,8 @@ export default function StoreSettings() {
         setEnabledModules(d.enabled_modules)
       }
       setHrCashEnabled(d.hr_cash_enabled)
+      setInitialCashBalance(d.initial_cash_balance || '')
+      setInitialBalanceDate(d.initial_balance_date || '')
       setOwWeeks(d.otherwise_working_weeks)
       setOwThreshold(d.otherwise_working_threshold)
     } catch (e) {
@@ -334,6 +338,8 @@ export default function StoreSettings() {
     try {
       await storeAPI.updateSettings({
         hr_cash_enabled: hrCashEnabled,
+        initial_cash_balance: initialCashBalance || 0,
+        initial_balance_date: initialBalanceDate || null,
         otherwise_working_weeks: owWeeks,
         otherwise_working_threshold: owThreshold,
       }, storeParams)
@@ -1082,6 +1088,34 @@ export default function StoreSettings() {
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
                 <span className="ml-3 text-sm text-gray-700">{hrCashEnabled ? 'Enabled' : 'Disabled'}</span>
               </label>
+            </div>
+
+            {/* Initial Cash Balance */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Initial Cash Balance</h3>
+              <p className="text-xs text-gray-500 mb-3">Starting cash balance before first data import (carried forward to Cash Report)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Amount ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={initialCashBalance}
+                    onChange={(e) => setInitialCashBalance(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Balance Date</label>
+                  <input
+                    type="date"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={initialBalanceDate}
+                    onChange={(e) => setInitialBalanceDate(e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Otherwise Working Rule */}
