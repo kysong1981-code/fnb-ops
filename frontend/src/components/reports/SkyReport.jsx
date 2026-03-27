@@ -411,19 +411,11 @@ function ReportDetail({ report }) {
           <DetailRow label="매출 (GST 제외)" labelEn="EXCL GST" value={`$${fmt(r.excl_gst_sales)}`} />
           <DetailRow label="현금" labelEn="HQ CASH" value={`$${fmt(r.hq_cash)}`} />
           <div className="border-t border-gray-100 my-2" />
-          <DetailRow label="매출원가 (GST 제외)" labelEn="COGS" value={`$${fmt(r.cogs)}`} ratio={salesRatio('cogs')} />
-          <DetailRow label="" labelEn="COGS inc.GST" value={`$${fmt(r.total_cogs_xero)}`} />
+          <DetailRow label="매출원가" labelEn="COGS" value={`$${fmt(r.cogs)}`} ratio={salesRatio('cogs')} />
           <DetailRow label="운영비용" labelEn="Operating Expenses" value={`$${fmt(r.operating_expenses)}`} ratio={salesRatio('operating_expenses')} />
-          <DetailRow label="인건비 (Labour)" labelEn="Wages" value={`$${fmt(r.wages)}`} ratio={salesRatio('wages')} />
-          {parseFloat(r.tab_allowance_sales) > 0 && (
-            <DetailRow label="Sub-contractor" labelEn="(GST 포함)" value={`$${fmt(r.tab_allowance_sales)}`} />
-          )}
-          <DetailRow label="총 인건비" labelEn="Total Labour" value={`$${fmt(r.sales_per_hour)}`} />
+          <DetailRow label="인건비" labelEn="Wages" value={`$${fmt(r.sales_per_hour)}`} ratio={salesRatio('sales_per_hour')} />
           <div className="border-t border-gray-100 my-2" />
           <DetailRow label="납부할 GST" labelEn="Payable GST" value={`$${fmt(r.payable_gst)}`} />
-          {parseFloat(r.sub_gst) > 0 && (
-            <DetailRow label="" labelEn="Sub GST" value={`$${fmt(r.sub_gst)}`} />
-          )}
           <DetailRow label="영업이익 (세전)" labelEn="Operating Profit" value={`$${fmt(r.operating_profit)}`} highlight />
         </div>
       </Card>
