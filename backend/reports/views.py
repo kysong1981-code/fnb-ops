@@ -1652,7 +1652,8 @@ class SkyReportViewSet(viewsets.ModelViewSet):
         instance.save()
 
     def perform_create(self, serializer):
-        org = self.request.user.profile.organization
+        from users.filters import get_target_org
+        org = get_target_org(self.request)
         profile = self.request.user.profile
         instance = serializer.save(organization=org, created_by=profile)
         self._auto_calculate(instance)
@@ -1664,8 +1665,9 @@ class SkyReportViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def summary(self, request):
         """Yearly summary — returns all months for a given year, grouped into halves."""
+        from users.filters import get_target_org
         year = request.query_params.get('year', timezone.now().year)
-        org = request.user.profile.organization
+        org = get_target_org(request)
         reports = SkyReport.objects.filter(organization=org, year=year).order_by('month')
         serializer = self.get_serializer(reports, many=True)
 
@@ -1702,9 +1704,10 @@ class SkyReportViewSet(viewsets.ModelViewSet):
     def auto_fill(self, request):
         """Return auto-calculated values from DailyClosing for a given year/month."""
         import calendar
+        from users.filters import get_target_org
         year = int(request.query_params.get('year', timezone.now().year))
         month = int(request.query_params.get('month', timezone.now().month))
-        org = request.user.profile.organization
+        org = get_target_org(request)
 
         days_in_month = calendar.monthrange(year, month)[1]
         start = date(year, month, 1)
