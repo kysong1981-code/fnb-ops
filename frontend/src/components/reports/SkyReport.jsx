@@ -407,8 +407,8 @@ function ReportDetail({ report }) {
       <Card className="p-5">
         <h3 className="text-sm font-bold text-gray-900 mb-4">P&L Summary</h3>
         <div className="space-y-1">
-          <DetailRow label="매출 (GST 제외)" labelEn="Total Sales EXCL GST" value={`$${fmt(r.excl_gst_sales)}`} highlight />
-          <DetailRow label="총매출 (GST 포함)" labelEn="inc.GST" value={`$${fmt(r.total_sales_inc_gst)}`} />
+          <DetailRow label="총매출 (GST 포함)" labelEn="Total Sales inc.GST" value={`$${fmt(r.total_sales_inc_gst)}`} highlight />
+          <DetailRow label="매출 (GST 제외)" labelEn="EXCL GST" value={`$${fmt(r.excl_gst_sales)}`} />
           <DetailRow label="현금" labelEn="HQ CASH" value={`$${fmt(r.hq_cash)}`} />
           <div className="border-t border-gray-100 my-2" />
           <DetailRow label="매출원가" labelEn="COGS" value={`$${fmt(r.cogs)}`} ratio={salesRatio('cogs')} />
