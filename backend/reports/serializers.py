@@ -111,12 +111,22 @@ class SkyReportSerializer(serializers.ModelSerializer):
 
     def get_kpis(self, obj):
         """Calculate additional KPIs."""
+        from datetime import datetime as dt2, timedelta as td2, date as d2
         excl_gst = float(obj.excl_gst_sales) if obj.excl_gst_sales else 0
         tabs = float(obj.pos_sales) if obj.pos_sales else 0
         days = obj.number_of_days or 0
         profit = float(obj.operating_profit) if obj.operating_profit else 0
         total_work_hours = float(obj.other_sales) if obj.other_sales else 0  # repurposed
-        opening_hours_per_day = float(obj.tab_allowance_sales) if obj.tab_allowance_sales else 0  # repurposed
+
+        # Opening hours from Organization settings (opening_time/closing_time)
+        opening_hours_per_day = 0
+        org = obj.organization
+        if org and org.opening_time and org.closing_time:
+            open_dt = dt2.combine(d2.today(), org.opening_time)
+            close_dt = dt2.combine(d2.today(), org.closing_time)
+            if close_dt <= open_dt:
+                close_dt += td2(days=1)
+            opening_hours_per_day = (close_dt - open_dt).seconds / 3600
         total_opening_hours = days * opening_hours_per_day
 
         return {
