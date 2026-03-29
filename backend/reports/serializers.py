@@ -46,6 +46,8 @@ class SkyReportSerializer(serializers.ModelSerializer):
     cogs_ratio = serializers.DecimalField(max_digits=5, decimal_places=1, read_only=True)
     wage_ratio = serializers.DecimalField(max_digits=5, decimal_places=1, read_only=True)
     created_by_name = serializers.SerializerMethodField()
+    yoy = serializers.SerializerMethodField()
+    kpis = serializers.SerializerMethodField()
 
     class Meta:
         model = SkyReport
@@ -72,6 +74,8 @@ class SkyReportSerializer(serializers.ModelSerializer):
             'sales_notes', 'cogs_notes', 'wage_notes', 'next_month_notes',
             # Meta
             'created_by_name', 'created_at', 'updated_at',
+            # Extra computed
+            'yoy', 'kpis',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'created_by_name']
 
@@ -79,3 +83,44 @@ class SkyReportSerializer(serializers.ModelSerializer):
         if obj.created_by:
             return obj.created_by.user.get_full_name() or obj.created_by.user.username
         return None
+
+    def get_yoy(self, obj):
+        """Year-over-year comparison with same month last year."""
+        try:
+            prev = SkyReport.objects.get(
+                organization=obj.organization, year=obj.year - 1, month=obj.month
+            )
+        except SkyReport.DoesNotExist:
+            return None
+
+        def pct_change(curr, prev_val):
+            if not prev_val or prev_val == 0:
+                return None
+            return round(float((curr - prev_val) / abs(prev_val) * 100), 1)
+
+        return {
+            'sales': pct_change(obj.total_sales_inc_gst, prev.total_sales_inc_gst),
+            'cogs': pct_change(obj.cogs, prev.cogs),
+            'labour': pct_change(obj.sales_per_hour, prev.sales_per_hour),
+            'profit': pct_change(obj.operating_profit, prev.operating_profit),
+            'prev_sales': float(prev.total_sales_inc_gst),
+            'prev_cogs': float(prev.cogs),
+            'prev_labour': float(prev.sales_per_hour),
+            'prev_profit': float(prev.operating_profit),
+        }
+
+    def get_kpis(self, obj):
+        """Calculate additional KPIs."""
+        excl_gst = float(obj.excl_gst_sales) if obj.excl_gst_sales else 0
+        tabs = float(obj.pos_sales) if obj.pos_sales else 0
+        days = obj.number_of_days or 0
+        profit = float(obj.operating_profit) if obj.operating_profit else 0
+        total_labour = float(obj.sales_per_hour) if obj.sales_per_hour else 0
+
+        return {
+            'profit_ratio': round(profit / excl_gst * 100, 1) if excl_gst else 0,
+            'sales_per_tab': round(excl_gst / tabs, 2) if tabs else 0,
+            'sales_per_day': round(excl_gst / days, 2) if days else 0,
+            'labour_per_tab': round(total_labour / tabs, 2) if tabs else 0,
+            'profit_per_day': round(profit / days, 2) if days else 0,
+        }

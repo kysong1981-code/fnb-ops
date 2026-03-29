@@ -390,6 +390,38 @@ function MonthlyView({
   )
 }
 
+// ===== YOY BADGE =====
+function YoyBadge({ value, label }) {
+  if (value === null || value === undefined) return null
+  const isUp = value > 0
+  const color = isUp ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'
+  return (
+    <span className={`inline-flex items-center text-xs font-medium px-1.5 py-0.5 rounded ${color}`}>
+      {isUp ? '▲' : '▼'} {Math.abs(value)}%
+      {label && <span className="ml-1 text-gray-400">{label}</span>}
+    </span>
+  )
+}
+
+// ===== NZ MONTH CONTEXT =====
+function getMonthContext(month) {
+  const contexts = {
+    1: { season: '여름 성수기', desc: 'Summer peak season. School holidays continue. High tourist activity.', events: 'New Year\'s Day, Day after New Year\'s Day' },
+    2: { season: '여름 후반', desc: 'Late summer. Waitangi Day long weekend boost. Tourist flow still strong.', events: 'Waitangi Day (Feb 6)' },
+    3: { season: '가을 전환', desc: 'Autumn transition. Easter often falls here. Tourism starts to wind down.', events: 'Easter (varies), Otago Anniversary (Mar 23)' },
+    4: { season: '가을', desc: 'Autumn. ANZAC Day long weekend. Quieter period begins. School holidays.', events: 'ANZAC Day (Apr 25), School Holidays' },
+    5: { season: '비수기 시작', desc: 'Low season begins. Cooler weather, fewer tourists. Focus on locals.', events: '' },
+    6: { season: '비수기', desc: 'Winter low season. Ski season starts late June. Queen\'s Birthday weekend.', events: 'Queen\'s Birthday (1st Mon), Ski Season Opens' },
+    7: { season: '겨울 스키시즌', desc: 'Peak ski season! Queenstown/Wanaka tourist surge. School holidays.', events: 'Matariki, School Holidays, Ski Peak' },
+    8: { season: '겨울 스키시즌', desc: 'Ski season continues. Strong tourist activity in ski regions.', events: 'Ski Season' },
+    9: { season: '겨울 후반', desc: 'Late winter. Ski season winding down. Spring approaching.', events: 'Ski Season Ends, School Holidays' },
+    10: { season: '봄', desc: 'Spring. Labour Day long weekend. Business picks up gradually.', events: 'Labour Day (4th Mon)' },
+    11: { season: '봄/여름 전환', desc: 'Late spring. Weather warming. Pre-Christmas activity starts.', events: 'Canterbury Anniversary (varies)' },
+    12: { season: '여름 성수기', desc: 'Summer peak. Christmas/NY rush. Maximum tourist and local activity.', events: 'Christmas Day, Boxing Day, School Holidays' },
+  }
+  return contexts[month] || { season: '', desc: '', events: '' }
+}
+
 // ===== REPORT DETAIL (Read-only view) =====
 function ReportDetail({ report }) {
   const r = report
@@ -399,9 +431,79 @@ function ReportDetail({ report }) {
     const val = parseFloat(r[field]) || 0
     return (val / exclGst * 100).toFixed(1) + '%'
   }
+  const yoy = r.yoy
+  const kpis = r.kpis || {}
+  const ctx = getMonthContext(r.month)
 
   return (
     <>
+      {/* Month Context */}
+      <Card className="p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-blue-900">{r.month_display} {r.year} Summary</h3>
+            <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">{ctx.season}</span>
+          </div>
+          {kpis.profit_ratio !== undefined && (
+            <div className={`text-right ${kpis.profit_ratio >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+              <div className="text-2xl font-bold">{kpis.profit_ratio}%</div>
+              <div className="text-xs text-gray-500">영업이익률</div>
+            </div>
+          )}
+        </div>
+        <p className="text-xs text-gray-600 mt-2">{ctx.desc}</p>
+        {ctx.events && <p className="text-xs text-blue-600 mt-1">📅 {ctx.events}</p>}
+      </Card>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white rounded-xl border p-3 text-center">
+          <div className="text-lg font-bold text-gray-900">${fmt(kpis.sales_per_day)}</div>
+          <div className="text-xs text-gray-500">일 매출</div>
+        </div>
+        <div className="bg-white rounded-xl border p-3 text-center">
+          <div className="text-lg font-bold text-gray-900">${fmt(kpis.sales_per_tab)}</div>
+          <div className="text-xs text-gray-500">탭당 매출</div>
+        </div>
+        <div className="bg-white rounded-xl border p-3 text-center">
+          <div className="text-lg font-bold text-gray-900">${fmt(kpis.labour_per_tab)}</div>
+          <div className="text-xs text-gray-500">탭당 인건비</div>
+        </div>
+        <div className="bg-white rounded-xl border p-3 text-center">
+          <div className="text-lg font-bold text-gray-900">${fmt(kpis.profit_per_day)}</div>
+          <div className="text-xs text-gray-500">일 영업이익</div>
+        </div>
+      </div>
+
+      {/* YoY Comparison */}
+      {yoy && (
+        <Card className="p-5">
+          <h3 className="text-sm font-bold text-gray-900 mb-3">전년 대비 ({r.year - 1} → {r.year})</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="text-center">
+              <div className="text-xs text-gray-500 mb-1">매출</div>
+              <YoyBadge value={yoy.sales} />
+              <div className="text-xs text-gray-400 mt-1">${fmt(yoy.prev_sales)} → ${fmt(r.total_sales_inc_gst)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-gray-500 mb-1">COGS</div>
+              <YoyBadge value={yoy.cogs} />
+              <div className="text-xs text-gray-400 mt-1">${fmt(yoy.prev_cogs)} → ${fmt(r.cogs)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-gray-500 mb-1">인건비</div>
+              <YoyBadge value={yoy.labour} />
+              <div className="text-xs text-gray-400 mt-1">${fmt(yoy.prev_labour)} → ${fmt(r.sales_per_hour)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-gray-500 mb-1">영업이익</div>
+              <YoyBadge value={yoy.profit} />
+              <div className="text-xs text-gray-400 mt-1">${fmt(yoy.prev_profit)} → ${fmt(r.operating_profit)}</div>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* P&L Summary */}
       <Card className="p-5">
         <h3 className="text-sm font-bold text-gray-900 mb-4">P&L Summary</h3>
@@ -415,7 +517,7 @@ function ReportDetail({ report }) {
           <DetailRow label="총 인건비" labelEn="Total Labour" value={`$${fmt(r.sales_per_hour)}`} ratio={salesRatio('sales_per_hour')} />
           <div className="border-t border-gray-100 my-2" />
           <DetailRow label="납부할 GST" labelEn="Payable GST" value={`$${fmt(r.payable_gst)}`} />
-          <DetailRow label="영업이익 (세전)" labelEn="Operating Profit" value={`$${fmt(r.operating_profit)}`} highlight />
+          <DetailRow label="영업이익 (세전)" labelEn="Operating Profit" value={`$${fmt(r.operating_profit)}`} ratio={`${kpis.profit_ratio || 0}%`} highlight />
         </div>
       </Card>
 
@@ -443,11 +545,23 @@ function ReportDetail({ report }) {
         <h3 className="text-sm font-bold text-gray-900 mb-4">Goals & Review</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <MiniKpi label="Sales Goal" value={`$${fmt(r.sales_goal)}`} />
-          <MiniKpi label="COGS Goal" value={`$${fmt(r.cogs_goal)}`} />
-          <MiniKpi label="Wage Goal" value={`$${fmt(r.wage_goal)}`} />
+          <MiniKpi label="COGS Goal" value={parseFloat(r.cogs_goal) > 0 ? `${r.cogs_goal}%` : '-'} />
+          <MiniKpi label="Wage Goal" value={parseFloat(r.wage_goal) > 0 ? `${r.wage_goal}%` : '-'} />
           <MiniKpi label="Review Rating" value={r.review_rating > 0 ? r.review_rating : '-'} />
           <MiniKpi label="Review Goal" value={r.review_goal > 0 ? r.review_goal : '-'} />
-          <MiniKpi label="Hygiene Grade" value={r.hygiene_grade || '-'} />
+          <div className="bg-gray-50 rounded-xl p-3 text-center">
+            <div className="text-xs text-gray-500 mb-1">Hygiene</div>
+            {(() => {
+              const g = r.hygiene_grade || ''
+              const months = g === '18' ? 18 : g === '12' ? 12 : g === '6' ? 6 : 0
+              const color = months >= 18 ? 'text-green-600 bg-green-100' : months >= 12 ? 'text-blue-600 bg-blue-100' : months >= 6 ? 'text-yellow-600 bg-yellow-100' : 'text-gray-600 bg-gray-100'
+              return months > 0 ? (
+                <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${color}`}>{months}개월</span>
+              ) : (
+                <span className="text-sm font-bold text-gray-400">{g || '-'}</span>
+              )
+            })()}
+          </div>
         </div>
       </Card>
 
@@ -523,20 +637,20 @@ function ReportForm({ form, updateField, handleSave, cancelEditing, saving, edit
 
       <Card className="p-5">
         <h3 className="text-sm font-bold text-gray-900 mb-1">Goals & Review</h3>
-        <p className="text-xs text-gray-400 mb-4">Targets for the following month</p>
+        <p className="text-xs text-gray-400 mb-4">다음달 목표 및 리뷰</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <NumField label="Sales Goal" value={form.sales_goal} onChange={v => updateField('sales_goal', v)} prefix="$" />
-          <NumField label="COGS Goal" value={form.cogs_goal} onChange={v => updateField('cogs_goal', v)} prefix="$" />
-          <NumField label="Wage Goal" value={form.wage_goal} onChange={v => updateField('wage_goal', v)} prefix="$" />
+          <NumField label="Sales Goal ($)" value={form.sales_goal} onChange={v => updateField('sales_goal', v)} prefix="$" />
+          <NumField label="COGS Goal (%)" value={form.cogs_goal} onChange={v => updateField('cogs_goal', v)} suffix="%" />
+          <NumField label="Wage Goal (%)" value={form.wage_goal} onChange={v => updateField('wage_goal', v)} suffix="%" />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
-          <NumField label="Review Rating" value={form.review_rating} onChange={v => updateField('review_rating', v)} />
+          <NumField label="이번달 리뷰 개수" value={form.review_rating} onChange={v => updateField('review_rating', v)} />
           <NumField label="Review Goal (Next)" value={form.review_goal} onChange={v => updateField('review_goal', v)} />
           <div>
-            <label className={labelCls}>Hygiene Grade</label>
+            <label className={labelCls}>Hygiene (검사 주기)</label>
             <select value={form.hygiene_grade} onChange={e => updateField('hygiene_grade', e.target.value)}
               className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-              {['A', 'B', 'C', 'D', 'E'].map(g => <option key={g} value={g}>{g}</option>)}
+              {[['18', '18개월 (우수)'], ['12', '12개월 (양호)'], ['6', '6개월 (주의)']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
         </div>
@@ -647,14 +761,15 @@ function CustomView({ year, summaryData, reports }) {
 }
 
 // ===== SUB COMPONENTS =====
-function NumField({ label, value, onChange, prefix = '' }) {
+function NumField({ label, value, onChange, prefix = '', suffix = '' }) {
   return (
     <div>
       <label className={labelCls}>{label}</label>
       <div className="relative">
         {prefix && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">{prefix}</span>}
         <input type="number" step="0.01" value={value} onChange={e => onChange(e.target.value)}
-          className={`${inputCls} ${prefix ? 'pl-7' : ''}`} placeholder="0.00" />
+          className={`${inputCls} ${prefix ? 'pl-7' : ''} ${suffix ? 'pr-7' : ''}`} placeholder="0.00" />
+        {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">{suffix}</span>}
       </div>
     </div>
   )
