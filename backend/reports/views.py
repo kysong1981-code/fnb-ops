@@ -1720,7 +1720,6 @@ class SkyReportViewSet(viewsets.ModelViewSet):
 
         total_sales = Decimal('0')
         hr_cash = Decimal('0')
-        total_cogs = Decimal('0')
         num_days = 0
 
         for c in closings:
@@ -1731,15 +1730,11 @@ class SkyReportViewSet(viewsets.ModelViewSet):
 
             # HQ Cash = HR Cash (actual_cash - bank_deposit), GST 없는 현금
             hr_cash += c.actual_cash - c.bank_deposit
-
-            # COGS = sum of supplier costs
-            total_cogs += sum(s.amount for s in c.supplier_costs.all())
             num_days += 1
 
         return Response({
             'total_sales_garage': float(total_sales),
             'hq_cash_garage': float(hr_cash),
-            'total_cogs_xero': float(total_cogs),
             'number_of_days': num_days,
         })
 

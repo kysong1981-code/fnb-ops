@@ -78,8 +78,8 @@ class SkyReport(models.Model):
     # Main Financial Data
     total_sales_inc_gst = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     hq_cash = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    pos_sales = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    other_sales = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    pos_sales = models.DecimalField(max_digits=12, decimal_places=2, default=0)  # repurposed as number_of_tabs
+    other_sales = models.DecimalField(max_digits=12, decimal_places=2, default=0)  # unused
     cogs = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     operating_expenses = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     wages = models.DecimalField(max_digits=12, decimal_places=2, default=0)
