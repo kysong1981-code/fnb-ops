@@ -124,6 +124,7 @@ export default function SkyReport() {
         total_sales_garage: auto.total_sales_garage ? String(auto.total_sales_garage) : prev.total_sales_garage,
         hq_cash_garage: auto.hq_cash_garage ? String(auto.hq_cash_garage) : prev.hq_cash_garage,
         number_of_days: auto.number_of_days ? String(auto.number_of_days) : prev.number_of_days,
+        tab_allowance_sales: auto.opening_hours_per_day ? String(auto.opening_hours_per_day) : prev.tab_allowance_sales,
       }))
     } catch {
       // Silently fail — auto-fill is optional
@@ -466,12 +467,12 @@ function ReportDetail({ report }) {
           <div className="text-xs text-gray-500">탭당 매출</div>
         </div>
         <div className="bg-white rounded-xl border p-3 text-center">
-          <div className="text-lg font-bold text-gray-900">${fmt(kpis.labour_per_tab)}</div>
-          <div className="text-xs text-gray-500">탭당 인건비</div>
+          <div className="text-lg font-bold text-gray-900">${fmt(kpis.sales_per_labour_hour)}</div>
+          <div className="text-xs text-gray-500">근무시간당 매출</div>
         </div>
         <div className="bg-white rounded-xl border p-3 text-center">
-          <div className="text-lg font-bold text-gray-900">${fmt(kpis.profit_per_day)}</div>
-          <div className="text-xs text-gray-500">일 영업이익</div>
+          <div className="text-lg font-bold text-gray-900">${fmt(kpis.sales_per_opening_hour)}</div>
+          <div className="text-xs text-gray-500">영업시간당 매출</div>
         </div>
       </div>
 
@@ -536,7 +537,9 @@ function ReportDetail({ report }) {
           )}
           <DetailRow label="" labelEn="Trading Days" value={r.number_of_days || '-'} />
           <DetailRow label="" labelEn="Payruns" value={r.number_of_payruns || '-'} />
-          <DetailRow label="" labelEn="Tabs" value={r.pos_sales > 0 ? r.pos_sales : '-'} />
+          <DetailRow label="" labelEn="Tabs (탭수)" value={r.pos_sales > 0 ? r.pos_sales : '-'} />
+          <DetailRow label="" labelEn="Total Work Hours (총 근무시간)" value={parseFloat(r.other_sales) > 0 ? r.other_sales + 'h' : '-'} />
+          <DetailRow label="" labelEn="Opening Hours/Day (일 영업시간)" value={parseFloat(r.tab_allowance_sales) > 0 ? r.tab_allowance_sales + 'h' : '-'} />
         </div>
       </Card>
 
@@ -630,6 +633,18 @@ function ReportForm({ form, updateField, handleSave, cancelEditing, saving, edit
             <div>
               <label className={labelCls}>Number of Tabs (탭수)</label>
               <input type="number" value={form.pos_sales} onChange={e => updateField('pos_sales', e.target.value)} className={inputCls} min="0" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div>
+              <label className={labelCls}>총 근무시간 (Total Work Hours)</label>
+              <input type="number" step="0.5" value={form.other_sales} onChange={e => updateField('other_sales', e.target.value)} className={inputCls} min="0" placeholder="예: 480" />
+            </div>
+            <div>
+              <label className={labelCls}>일 영업시간 (Opening Hours/Day)</label>
+              <div className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm text-right text-blue-700 font-medium">
+                {parseFloat(form.tab_allowance_sales || 0)}h (가게설정)
+              </div>
             </div>
           </div>
         </div>

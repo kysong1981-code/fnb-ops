@@ -115,12 +115,14 @@ class SkyReportSerializer(serializers.ModelSerializer):
         tabs = float(obj.pos_sales) if obj.pos_sales else 0
         days = obj.number_of_days or 0
         profit = float(obj.operating_profit) if obj.operating_profit else 0
-        total_labour = float(obj.sales_per_hour) if obj.sales_per_hour else 0
+        total_work_hours = float(obj.other_sales) if obj.other_sales else 0  # repurposed
+        opening_hours_per_day = float(obj.tab_allowance_sales) if obj.tab_allowance_sales else 0  # repurposed
+        total_opening_hours = days * opening_hours_per_day
 
         return {
             'profit_ratio': round(profit / excl_gst * 100, 1) if excl_gst else 0,
             'sales_per_tab': round(excl_gst / tabs, 2) if tabs else 0,
             'sales_per_day': round(excl_gst / days, 2) if days else 0,
-            'labour_per_tab': round(total_labour / tabs, 2) if tabs else 0,
-            'profit_per_day': round(profit / days, 2) if days else 0,
+            'sales_per_labour_hour': round(excl_gst / total_work_hours, 2) if total_work_hours else 0,
+            'sales_per_opening_hour': round(excl_gst / total_opening_hours, 2) if total_opening_hours else 0,
         }

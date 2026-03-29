@@ -1644,10 +1644,12 @@ class SkyReportViewSet(viewsets.ModelViewSet):
         # Operating Profit = EXCL GST Sales - COGS - Operating Expenses - Total Labour
         instance.operating_profit = (excl_gst - instance.cogs - op_exp_excl - total_labour).quantize(d('0.01'))
 
-        # Store sales_per_hour as total labour cost for display
+        # Store total labour cost for display (sales_per_hour field repurposed)
         instance.sales_per_hour = total_labour.quantize(d('0.01'))
+        # opening_sales_per_hour stores labour_xero for reference
         instance.opening_sales_per_hour = instance.labour_xero
-        instance.tab_allowance_sales = sub_inc_gst.quantize(d('0.01'))
+        # other_sales = total_work_hours (manager input, don't overwrite)
+        # tab_allowance_sales = opening_hours_per_day (manager input, don't overwrite)
 
         instance.save()
 
@@ -1732,10 +1734,22 @@ class SkyReportViewSet(viewsets.ModelViewSet):
             hr_cash += c.actual_cash - c.bank_deposit
             num_days += 1
 
+        # Get opening hours from store settings
+        opening_hours = 0
+        store = org.stores.first() if hasattr(org, 'stores') else None
+        if store and store.opening_time and store.closing_time:
+            from datetime import datetime, timedelta
+            open_dt = datetime.combine(date.today(), store.opening_time)
+            close_dt = datetime.combine(date.today(), store.closing_time)
+            if close_dt < open_dt:
+                close_dt += timedelta(days=1)
+            opening_hours = (close_dt - open_dt).seconds / 3600
+
         return Response({
             'total_sales_garage': float(total_sales),
             'hq_cash_garage': float(hr_cash),
             'number_of_days': num_days,
+            'opening_hours_per_day': opening_hours,
         })
 
     @action(detail=False, methods=['get'])
