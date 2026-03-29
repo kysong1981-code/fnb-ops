@@ -533,7 +533,7 @@ export default function ProfitShare() {
                     <label className={labelCls}>Incentive %</label>
                     <div className="relative">
                       <input
-                        type="number" step="0.1"
+                        type="number" step="1" min="0" max="100"
                         value={partner.incentive_pct ? (parseFloat(partner.incentive_pct) * 100).toFixed(1) : ''}
                         onChange={(e) => handlePartnerChange(index, 'incentive_pct', e.target.value ? (parseFloat(e.target.value) / 100).toFixed(4) : '')}
                         className={disabled ? readOnlyCls : inputCls}
@@ -547,7 +547,7 @@ export default function ProfitShare() {
                     <label className={labelCls}>Equity %</label>
                     <div className="relative">
                       <input
-                        type="number" step="0.1"
+                        type="number" step="1" min="0" max="100"
                         value={partner.equity_pct ? (parseFloat(partner.equity_pct) * 100).toFixed(1) : ''}
                         onChange={(e) => handlePartnerChange(index, 'equity_pct', e.target.value ? (parseFloat(e.target.value) / 100).toFixed(4) : '')}
                         className={disabled ? readOnlyCls : inputCls}
