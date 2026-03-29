@@ -447,9 +447,20 @@ export default function ProfitShare() {
               <div>
                 <label className={labelCls}>% of Net Profit</label>
                 <input
-                  type="number" step="0.01"
-                  value={summary.incentive_pct ? (parseFloat(summary.incentive_pct) * 100).toFixed(1) : ''}
-                  onChange={(e) => handleSummaryChange('incentive_pct', e.target.value ? (parseFloat(e.target.value) / 100).toFixed(4) : '')}
+                  type="text" inputMode="decimal"
+                  value={summary._incentive_pct_display ?? (summary.incentive_pct ? (parseFloat(summary.incentive_pct) * 100) : '')}
+                  onChange={(e) => {
+                    const raw = e.target.value
+                    setSummary(prev => ({ ...prev, _incentive_pct_display: raw }))
+                    const num = parseFloat(raw)
+                    if (!isNaN(num)) handleSummaryChange('incentive_pct', (num / 100).toFixed(4))
+                  }}
+                  onBlur={(e) => {
+                    const num = parseFloat(e.target.value)
+                    if (!isNaN(num)) {
+                      setSummary(prev => ({ ...prev, _incentive_pct_display: undefined, incentive_pct: (num / 100).toFixed(4) }))
+                    }
+                  }}
                   className={disabled ? readOnlyCls : inputCls}
                   disabled={disabled}
                   placeholder="10"
@@ -533,9 +544,21 @@ export default function ProfitShare() {
                     <label className={labelCls}>Incentive %</label>
                     <div className="relative">
                       <input
-                        type="number" step="1" min="0" max="100"
-                        value={partner.incentive_pct ? (parseFloat(partner.incentive_pct) * 100).toFixed(1) : ''}
-                        onChange={(e) => handlePartnerChange(index, 'incentive_pct', e.target.value ? (parseFloat(e.target.value) / 100).toFixed(4) : '')}
+                        type="text" inputMode="decimal"
+                        value={partner._incentive_pct_display ?? (partner.incentive_pct ? (parseFloat(partner.incentive_pct) * 100) : '')}
+                        onChange={(e) => {
+                          const raw = e.target.value
+                          handlePartnerChange(index, '_incentive_pct_display', raw)
+                          const num = parseFloat(raw)
+                          if (!isNaN(num)) handlePartnerChange(index, 'incentive_pct', (num / 100).toFixed(4))
+                        }}
+                        onBlur={(e) => {
+                          const num = parseFloat(e.target.value)
+                          if (!isNaN(num)) {
+                            handlePartnerChange(index, '_incentive_pct_display', undefined)
+                            handlePartnerChange(index, 'incentive_pct', (num / 100).toFixed(4))
+                          }
+                        }}
                         className={disabled ? readOnlyCls : inputCls}
                         disabled={disabled}
                         placeholder="0"
@@ -547,9 +570,21 @@ export default function ProfitShare() {
                     <label className={labelCls}>Equity %</label>
                     <div className="relative">
                       <input
-                        type="number" step="1" min="0" max="100"
-                        value={partner.equity_pct ? (parseFloat(partner.equity_pct) * 100).toFixed(1) : ''}
-                        onChange={(e) => handlePartnerChange(index, 'equity_pct', e.target.value ? (parseFloat(e.target.value) / 100).toFixed(4) : '')}
+                        type="text" inputMode="decimal"
+                        value={partner._equity_pct_display ?? (partner.equity_pct ? (parseFloat(partner.equity_pct) * 100) : '')}
+                        onChange={(e) => {
+                          const raw = e.target.value
+                          handlePartnerChange(index, '_equity_pct_display', raw)
+                          const num = parseFloat(raw)
+                          if (!isNaN(num)) handlePartnerChange(index, 'equity_pct', (num / 100).toFixed(4))
+                        }}
+                        onBlur={(e) => {
+                          const num = parseFloat(e.target.value)
+                          if (!isNaN(num)) {
+                            handlePartnerChange(index, '_equity_pct_display', undefined)
+                            handlePartnerChange(index, 'equity_pct', (num / 100).toFixed(4))
+                          }
+                        }}
                         className={disabled ? readOnlyCls : inputCls}
                         disabled={disabled}
                         placeholder="0"
