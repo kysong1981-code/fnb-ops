@@ -1752,15 +1752,14 @@ class SkyReportViewSet(viewsets.ModelViewSet):
             hr_cash += c.actual_cash - c.bank_deposit
             num_days += 1
 
-        # Get opening hours from store settings
+        # Get opening hours from organization settings
         opening_hours = 0
-        store = org.stores.first() if hasattr(org, 'stores') else None
-        if store and store.opening_time and store.closing_time:
-            from datetime import datetime, timedelta
-            open_dt = datetime.combine(date.today(), store.opening_time)
-            close_dt = datetime.combine(date.today(), store.closing_time)
-            if close_dt < open_dt:
-                close_dt += timedelta(days=1)
+        if org.opening_time and org.closing_time:
+            from datetime import datetime as dt2, timedelta as td2
+            open_dt = dt2.combine(date.today(), org.opening_time)
+            close_dt = dt2.combine(date.today(), org.closing_time)
+            if close_dt <= open_dt:
+                close_dt += td2(days=1)  # e.g. 11:00 open, 21:00 close (next day handling)
             opening_hours = (close_dt - open_dt).seconds / 3600
 
         return Response({
