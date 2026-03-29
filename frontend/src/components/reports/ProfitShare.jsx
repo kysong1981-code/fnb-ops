@@ -155,6 +155,41 @@ export default function ProfitShare() {
     setPartners(prev => prev.filter((_, i) => i !== index))
   }
 
+  const copyFromPrevious = async () => {
+    if (!selectedStore?.id) return
+    // Previous period: H1->previous H2, H2->same year H1
+    const prevPeriod = periodType === 'H1' ? 'H2' : 'H1'
+    const prevYear = periodType === 'H1' ? year - 1 : year
+    try {
+      const res = await profitShareAPI.list({
+        store_id: selectedStore.id,
+        year: prevYear,
+        period_type: prevPeriod,
+      })
+      const data = res.data?.results || res.data
+      if (Array.isArray(data) && data.length > 0) {
+        const prev = data[0]
+        setPartners((prev.partners || []).map((p, i) => ({
+          name: p.name || '',
+          partner_type: p.partner_type || 'EQUITY',
+          incentive_pct: p.incentive_pct || '',
+          equity_pct: p.equity_pct || '',
+          fixed_amount: p.fixed_amount || '',
+          notes: '',
+          order: i,
+        })))
+        setSuccess(`Copied ${prev.partners?.length || 0} partners from ${prevYear} ${prevPeriod}`)
+        setTimeout(() => setSuccess(''), 3000)
+      } else {
+        setError(`No previous period data found (${prevYear} ${prevPeriod})`)
+        setTimeout(() => setError(''), 3000)
+      }
+    } catch (err) {
+      setError('Failed to load previous period')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
   // Auto-calculate computed fields locally for preview
   const totalRevenue = (parseFloat(summary.account_revenue) || 0) + (parseFloat(summary.account_25) || 0)
   const totalBank = (parseFloat(summary.bank_account) || 0) + (parseFloat(summary.bank_cash) || 0)
@@ -489,12 +524,22 @@ export default function ProfitShare() {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">Partners</h2>
           {!disabled && (
-            <button
-              onClick={addPartner}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-all"
-            >
-              + Add Partner
-            </button>
+            <div className="flex gap-2">
+              {partners.length === 0 && (
+                <button
+                  onClick={copyFromPrevious}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-200 transition-all"
+                >
+                  Copy Previous
+                </button>
+              )}
+              <button
+                onClick={addPartner}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-all"
+              >
+                + Add Partner
+              </button>
+            </div>
           )}
         </div>
 
