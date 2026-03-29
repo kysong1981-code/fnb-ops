@@ -539,7 +539,7 @@ function ReportDetail({ report }) {
           <DetailRow label="" labelEn="Payruns" value={r.number_of_payruns || '-'} />
           <DetailRow label="" labelEn="Tabs" value={r.pos_sales > 0 ? r.pos_sales : '-'} />
           <DetailRow label="" labelEn="Total Work Hours" value={parseFloat(r.other_sales) > 0 ? r.other_sales + 'h' : '-'} />
-          <DetailRow label="" labelEn="Opening Hours/Day" value={parseFloat(r.tab_allowance_sales) > 0 ? r.tab_allowance_sales + 'h' : '-'} />
+          <DetailRow label="" labelEn="Opening Hours/Day" value={parseFloat(r.opening_hours_per_day) > 0 ? r.opening_hours_per_day + 'h' : '-'} />
         </div>
       </Card>
 

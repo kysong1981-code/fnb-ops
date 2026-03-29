@@ -48,6 +48,7 @@ class SkyReportSerializer(serializers.ModelSerializer):
     created_by_name = serializers.SerializerMethodField()
     yoy = serializers.SerializerMethodField()
     kpis = serializers.SerializerMethodField()
+    opening_hours_per_day = serializers.SerializerMethodField()
 
     class Meta:
         model = SkyReport
@@ -75,7 +76,7 @@ class SkyReportSerializer(serializers.ModelSerializer):
             # Meta
             'created_by_name', 'created_at', 'updated_at',
             # Extra computed
-            'yoy', 'kpis',
+            'yoy', 'kpis', 'opening_hours_per_day',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'created_by_name']
 
@@ -136,3 +137,15 @@ class SkyReportSerializer(serializers.ModelSerializer):
             'sales_per_labour_hour': round(excl_gst / total_work_hours, 2) if total_work_hours else 0,
             'sales_per_opening_hour': round(excl_gst / total_opening_hours, 2) if total_opening_hours else 0,
         }
+
+    def get_opening_hours_per_day(self, obj):
+        """Get opening hours/day from Organization settings."""
+        from datetime import datetime as dt2, timedelta as td2, date as d2
+        org = obj.organization
+        if org and org.opening_time and org.closing_time:
+            open_dt = dt2.combine(d2.today(), org.opening_time)
+            close_dt = dt2.combine(d2.today(), org.closing_time)
+            if close_dt <= open_dt:
+                close_dt += td2(days=1)
+            return (close_dt - open_dt).seconds / 3600
+        return 0
