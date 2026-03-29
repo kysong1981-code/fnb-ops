@@ -304,11 +304,7 @@ export default function SkyReport() {
           monthLabel={monthLabel}
         />
       ) : (
-        <CustomView
-          year={year}
-          summaryData={summaryData}
-          reports={reports}
-        />
+        <CustomView year={year} />
       )}
     </div>
   )
@@ -712,65 +708,280 @@ function ReportForm({ form, updateField, handleSave, cancelEditing, saving, edit
   )
 }
 
-// ===== CUSTOM VIEW (Year Overview) =====
-function CustomView({ year, summaryData, reports }) {
-  if (!summaryData) return null
+// ===== CUSTOM VIEW (Range Selection + Comparison + AI) =====
+function CustomView({ year }) {
+  const now = new Date()
+  const [fromYear, setFromYear] = useState(year)
+  const [fromMonth, setFromMonth] = useState(1)
+  const [toYear, setToYear] = useState(year)
+  const [toMonth, setToMonth] = useState(now.getMonth() + 1)
+  const [rangeData, setRangeData] = useState(null)
+  const [rangeLoading, setRangeLoading] = useState(false)
+  const [aiResult, setAiResult] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
 
-  const allReports = [...(summaryData.first_half || []), ...(summaryData.second_half || [])]
+  const loadRange = async () => {
+    setRangeLoading(true)
+    setAiResult(null)
+    try {
+      const res = await skyReportAPI.rangeSummary(fromYear, fromMonth, toYear, toMonth)
+      setRangeData(res.data)
+    } catch { setRangeData(null) }
+    finally { setRangeLoading(false) }
+  }
+
+  useEffect(() => { loadRange() }, [fromYear, fromMonth, toYear, toMonth])
+
+  const runAiAnalysis = async () => {
+    setAiLoading(true)
+    try {
+      const res = await skyReportAPI.aiAnalysis(fromYear, fromMonth, toYear, toMonth)
+      setAiResult(res.data)
+    } catch { setAiResult({ error: 'AI analysis failed. Please try again.' }) }
+    finally { setAiLoading(false) }
+  }
+
+  const t = rangeData?.totals || {}
+  const comp = rangeData?.comparison || {}
+  const yoy1 = comp.yoy_1
+  const yoy2 = comp.yoy_2
+
+  const MonthPicker = ({ label, selYear, selMonth, onYearChange, onMonthChange }) => (
+    <div>
+      <p className="text-xs font-semibold text-gray-500 mb-2">{label}</p>
+      <div className="flex items-center gap-2 mb-2">
+        <button onClick={() => onYearChange(selYear - 1)} className="p-1 hover:bg-gray-100 rounded text-gray-500 text-sm">←</button>
+        <span className="text-sm font-bold text-gray-900 w-12 text-center">{selYear}</span>
+        <button onClick={() => onYearChange(selYear + 1)} className="p-1 hover:bg-gray-100 rounded text-gray-500 text-sm">→</button>
+      </div>
+      <div className="grid grid-cols-4 gap-1">
+        {MONTHS.map(m => (
+          <button key={m.value} onClick={() => onMonthChange(m.value)}
+            className={`px-2 py-1.5 rounded text-xs font-semibold transition ${
+              selMonth === m.value ? 'bg-blue-600 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 
   return (
     <>
-      {/* Annual KPIs */}
-      {summaryData.annual_totals && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiBox label="Total Sales" value={`$${fmt(summaryData.annual_totals.total_sales)}`} />
-          <KpiBox label="Total COGS" value={`$${fmt(summaryData.annual_totals.total_cogs)}`} sub={`${summaryData.annual_totals.cogs_ratio}%`} />
-          <KpiBox label="Total Wages" value={`$${fmt(summaryData.annual_totals.total_wages)}`} sub={`${summaryData.annual_totals.wage_ratio}%`} />
-          <KpiBox label="Reports Filed" value={`${allReports.length} / 12`} />
+      {/* Range Picker */}
+      <Card className="p-5">
+        <h3 className="text-sm font-bold text-gray-900 mb-4">Select Period</h3>
+        <div className="grid grid-cols-2 gap-6">
+          <MonthPicker label="FROM" selYear={fromYear} selMonth={fromMonth}
+            onYearChange={setFromYear} onMonthChange={setFromMonth} />
+          <MonthPicker label="TO" selYear={toYear} selMonth={toMonth}
+            onYearChange={setToYear} onMonthChange={setToMonth} />
         </div>
-      )}
-
-      {/* Full Year Comparison Table */}
-      <Card className="overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100">
-          <h3 className="text-sm font-bold text-gray-900">{year} Year Overview</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="px-4 py-3 text-left text-gray-500 font-semibold">Metric</th>
-                {MONTHS.map(m => (
-                  <th key={m.value} className="px-2 py-3 text-right text-gray-500 font-semibold">{m.label}</th>
-                ))}
-                <th className="px-3 py-3 text-right text-gray-900 font-bold">TOTAL</th>
-              </tr>
-            </thead>
-            <tbody>
-              <CompRow label="SALES" field="total_sales_inc_gst" reports={allReports} isCurrency />
-              <CompRow label="COGS" field="cogs" reports={allReports} isCurrency showRatio />
-              <CompRow label="WAGE" field="wages" reports={allReports} isCurrency showRatio />
-              <CompRow label="OP.PROFIT" field="operating_profit" reports={allReports} isCurrency />
-              <tr className="border-t border-gray-100">
-                <td className="px-4 py-2 font-semibold text-gray-700">HYGIENE</td>
-                {MONTHS.map(m => {
-                  const r = allReports.find(rep => rep.month === m.value)
-                  return <td key={m.value} className="px-2 py-2 text-right text-gray-600">{r?.hygiene_grade || '-'}</td>
-                })}
-                <td className="px-3 py-2 text-right text-gray-600">-</td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 font-semibold text-gray-700">REVIEW</td>
-                {MONTHS.map(m => {
-                  const r = allReports.find(rep => rep.month === m.value)
-                  return <td key={m.value} className="px-2 py-2 text-right text-gray-600">{r?.review_rating > 0 ? r.review_rating : '-'}</td>
-                })}
-                <td className="px-3 py-2 text-right text-gray-600">-</td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="mt-3 text-center text-xs text-gray-400">
+          {rangeData?.months_count || 0} months of data
         </div>
       </Card>
+
+      {rangeLoading ? (
+        <div className="flex justify-center py-8">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : rangeData && t.total_sales ? (
+        <>
+          {/* Aggregate KPIs */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <KpiBox label="Total Sales" value={`$${fmt(t.total_sales)}`}
+              sub={yoy1 ? `YoY ${yoy1.total_sales > 0 ? '▲' : '▼'}${Math.abs(yoy1.total_sales)}%` : null} />
+            <KpiBox label="COGS" value={`$${fmt(t.cogs)}`} sub={`${t.cogs_ratio}%`} />
+            <KpiBox label="Labour" value={`$${fmt(t.labour)}`} sub={`${t.labour_ratio}%`} />
+            <KpiBox label="OP. Profit" value={`$${fmt(t.profit)}`} sub={`${t.profit_ratio}% margin`} />
+          </div>
+
+          {/* KPI Details */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <KpiBox label="Sales/Day" value={`$${fmt(t.sales_per_day)}`} />
+            <KpiBox label="Sales/Tab" value={t.sales_per_tab ? `$${fmt(t.sales_per_tab)}` : '-'} />
+            <KpiBox label="Sales/Labour Hr" value={t.sales_per_labour_hr ? `$${fmt(t.sales_per_labour_hr)}` : '-'} />
+            <KpiBox label="Sales/Opening Hr" value={t.sales_per_opening_hr ? `$${fmt(t.sales_per_opening_hr)}` : '-'} />
+          </div>
+
+          {/* Year-over-Year Comparison Table */}
+          {(comp.prev_1 || comp.prev_2) && (
+            <Card className="overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100">
+                <h3 className="text-sm font-bold text-gray-900">Year-over-Year Comparison</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="px-4 py-3 text-left text-gray-500 font-semibold">Metric</th>
+                      {comp.prev_2 && <th className="px-3 py-3 text-right text-gray-500 font-semibold">{fromYear - 2}</th>}
+                      {comp.prev_1 && <th className="px-3 py-3 text-right text-gray-500 font-semibold">{fromYear - 1}</th>}
+                      <th className="px-3 py-3 text-right text-blue-700 font-bold">{fromYear}</th>
+                      {yoy1 && <th className="px-3 py-3 text-right text-gray-500 font-semibold">YoY</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { label: 'Sales', key: 'total_sales', yoyKey: 'total_sales' },
+                      { label: 'COGS', key: 'cogs', yoyKey: 'cogs' },
+                      { label: 'Labour', key: 'labour', yoyKey: 'labour' },
+                      { label: 'Profit', key: 'profit', yoyKey: 'profit' },
+                    ].map(row => (
+                      <tr key={row.key} className="border-b border-gray-50">
+                        <td className="px-4 py-2.5 font-semibold text-gray-700">{row.label}</td>
+                        {comp.prev_2 && <td className="px-3 py-2.5 text-right text-gray-500">${fmt(comp.prev_2.totals?.[row.key])}</td>}
+                        {comp.prev_1 && <td className="px-3 py-2.5 text-right text-gray-600">${fmt(comp.prev_1.totals?.[row.key])}</td>}
+                        <td className="px-3 py-2.5 text-right font-bold text-gray-900">${fmt(t[row.key])}</td>
+                        {yoy1 && (
+                          <td className="px-3 py-2.5 text-right">
+                            <YoyBadge value={yoy1[row.yoyKey]} />
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                    {/* Ratio rows */}
+                    {[
+                      { label: 'COGS %', curr: t.cogs_ratio, p1: comp.prev_1?.totals?.cogs_ratio, p2: comp.prev_2?.totals?.cogs_ratio },
+                      { label: 'Labour %', curr: t.labour_ratio, p1: comp.prev_1?.totals?.labour_ratio, p2: comp.prev_2?.totals?.labour_ratio },
+                      { label: 'Profit %', curr: t.profit_ratio, p1: comp.prev_1?.totals?.profit_ratio, p2: comp.prev_2?.totals?.profit_ratio },
+                    ].map(row => (
+                      <tr key={row.label} className="border-b border-gray-50 bg-gray-50/50">
+                        <td className="px-4 py-2 text-gray-500 text-xs">{row.label}</td>
+                        {comp.prev_2 && <td className="px-3 py-2 text-right text-gray-400">{row.p2 || '-'}%</td>}
+                        {comp.prev_1 && <td className="px-3 py-2 text-right text-gray-500">{row.p1 || '-'}%</td>}
+                        <td className="px-3 py-2 text-right font-semibold text-gray-800">{row.curr || '-'}%</td>
+                        {yoy1 && <td className="px-3 py-2"></td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+
+          {/* Monthly Breakdown Table */}
+          <Card className="overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-100">
+              <h3 className="text-sm font-bold text-gray-900">Monthly Breakdown</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="px-4 py-3 text-left text-gray-500 font-semibold">Month</th>
+                    <th className="px-3 py-3 text-right text-gray-500 font-semibold">Sales</th>
+                    <th className="px-3 py-3 text-right text-gray-500 font-semibold">COGS</th>
+                    <th className="px-3 py-3 text-right text-gray-500 font-semibold">Labour</th>
+                    <th className="px-3 py-3 text-right text-gray-500 font-semibold">Profit</th>
+                    <th className="px-3 py-3 text-right text-gray-500 font-semibold">Margin</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(rangeData?.reports || []).map(r => {
+                    const mLabel = MONTHS.find(m => m.value === r.month)?.label || r.month
+                    const excl = parseFloat(r.excl_gst_sales) || 0
+                    const prof = parseFloat(r.operating_profit) || 0
+                    const margin = excl ? (prof / excl * 100).toFixed(1) : '0'
+                    return (
+                      <tr key={`${r.year}-${r.month}`} className="border-b border-gray-50">
+                        <td className="px-4 py-2.5 font-semibold text-gray-700">{mLabel} {r.year}</td>
+                        <td className="px-3 py-2.5 text-right text-gray-600">${fmt(r.total_sales_inc_gst)}</td>
+                        <td className="px-3 py-2.5 text-right text-gray-600">${fmt(r.cogs)}</td>
+                        <td className="px-3 py-2.5 text-right text-gray-600">${fmt(r.sales_per_hour)}</td>
+                        <td className="px-3 py-2.5 text-right font-semibold text-gray-900">${fmt(r.operating_profit)}</td>
+                        <td className="px-3 py-2.5 text-right text-gray-500">{margin}%</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          {/* AI Analysis */}
+          <Card className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-gray-900">🤖 AI Analysis</h3>
+              <button onClick={runAiAnalysis} disabled={aiLoading}
+                className="px-4 py-2 text-xs font-semibold bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 transition">
+                {aiLoading ? 'Analyzing...' : aiResult ? 'Re-analyze' : 'Analyze with AI'}
+              </button>
+            </div>
+
+            {aiLoading && (
+              <div className="flex items-center justify-center py-8 gap-3">
+                <div className="w-5 h-5 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm text-gray-500">Analyzing P&L data...</span>
+              </div>
+            )}
+
+            {aiResult && !aiResult.error && (
+              <div className="space-y-4">
+                {/* Executive Summary */}
+                <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-purple-700 mb-1">Executive Summary</p>
+                  <p className="text-sm text-gray-800">{aiResult.executive_summary}</p>
+                </div>
+
+                {/* Highlights */}
+                {aiResult.highlights?.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-gray-500">Key Findings</p>
+                    {aiResult.highlights.map((h, i) => (
+                      <div key={i} className={`p-3 rounded-xl text-sm ${
+                        h.type === 'positive' ? 'bg-green-50 text-green-800 border border-green-200' :
+                        h.type === 'negative' ? 'bg-red-50 text-red-800 border border-red-200' :
+                        'bg-gray-50 text-gray-800 border border-gray-200'
+                      }`}>
+                        {h.type === 'positive' ? '✅ ' : h.type === 'negative' ? '⚠️ ' : 'ℹ️ '}{h.text}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Recommendations */}
+                {aiResult.recommendations?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-2">Recommendations</p>
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
+                      {aiResult.recommendations.map((r, i) => (
+                        <p key={i} className="text-sm text-blue-900">
+                          <span className="font-bold text-blue-600">{i + 1}.</span> {r}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Trend Note */}
+                {aiResult.trend_note && (
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs font-semibold text-gray-500 mb-1">Trend Analysis</p>
+                    <p className="text-sm text-gray-700">{aiResult.trend_note}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {aiResult?.error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{aiResult.error}</div>
+            )}
+
+            {!aiLoading && !aiResult && (
+              <p className="text-sm text-gray-400 text-center py-4">
+                Click "Analyze with AI" to get insights on your P&L performance
+              </p>
+            )}
+          </Card>
+        </>
+      ) : (
+        <Card className="p-8 text-center">
+          <p className="text-gray-400 text-sm">No data for selected period</p>
+        </Card>
+      )}
     </>
   )
 }

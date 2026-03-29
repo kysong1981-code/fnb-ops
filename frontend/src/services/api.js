@@ -704,6 +704,15 @@ export const skyReportAPI = {
   delete: (id) => api.delete(`/reports/sky-reports/${id}/`),
   summary: (year) => api.get('/reports/sky-reports/summary/', { params: { year } }),
   autoFill: (year, month) => api.get('/reports/sky-reports/auto-fill/', { params: { year, month } }),
+  rangeSummary: (fromYear, fromMonth, toYear, toMonth) =>
+    api.get('/reports/sky-reports/range-summary/', {
+      params: { from_year: fromYear, from_month: fromMonth, to_year: toYear, to_month: toMonth }
+    }),
+  aiAnalysis: (fromYear, fromMonth, toYear, toMonth) =>
+    api.get('/reports/sky-reports/ai-analysis/', {
+      params: { from_year: fromYear, from_month: fromMonth, to_year: toYear, to_month: toMonth },
+      timeout: 30000,
+    }),
   downloadTemplate: () => api.get('/reports/sky-reports/template/', { responseType: 'blob' }),
   upload: (file) => {
     const formData = new FormData()

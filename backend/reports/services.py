@@ -124,3 +124,144 @@ def generate_sales_insights(sales_data, store_name, start_date, end_date):
     except Exception as e:
         logger.error(f"AI insights generation failed: {e}")
         return None
+
+
+SKY_REPORT_ANALYSIS_PROMPT = """You are an expert F&B (Food & Beverage) business analyst specializing in P&L analysis for New Zealand restaurants.
+
+Analyze the following financial data for "{store_name}" for the period {period}.
+
+CURRENT PERIOD DATA:
+- Total Sales (inc GST): ${total_sales:,.2f}
+- Excl GST Sales: ${excl_gst:,.2f}
+- COGS: ${cogs:,.2f} ({cogs_ratio:.1f}%)
+- Operating Expenses: ${op_exp:,.2f}
+- Total Labour: ${labour:,.2f} ({labour_ratio:.1f}%)
+- Operating Profit: ${profit:,.2f} ({profit_ratio:.1f}% margin)
+- Trading Days: {days}
+
+KPIs:
+- Sales/Day: ${sales_per_day:,.2f}
+- Sales/Tab: {sales_per_tab}
+- Sales/Labour Hour: {sales_per_labour_hr}
+- Sales/Opening Hour: {sales_per_opening_hr}
+
+{comparison_text}
+
+MONTHLY BREAKDOWN:
+{monthly_breakdown}
+
+Respond ONLY with valid JSON:
+{{
+  "executive_summary": "2-3 sentence performance overview",
+  "highlights": [
+    {{"text": "positive finding", "type": "positive"}},
+    {{"text": "concern or issue", "type": "negative"}}
+  ],
+  "recommendations": [
+    "actionable suggestion 1",
+    "actionable suggestion 2",
+    "actionable suggestion 3"
+  ],
+  "trend_note": "1-2 sentence trend analysis"
+}}
+
+Rules:
+- Provide 2-4 highlights (mix of positive/negative)
+- Provide 2-4 specific, actionable recommendations for an F&B business owner
+- Consider NZ seasonal factors and market conditions
+- All text must be in English
+- Be concise but insightful
+- Focus on profitability improvement opportunities
+"""
+
+
+def generate_sky_report_analysis(range_data, store_name):
+    """
+    Generate AI-powered P&L analysis from Sky Report range data.
+    Returns dict with executive_summary, highlights, recommendations, trend_note or None.
+    """
+    api_key = settings.ANTHROPIC_API_KEY
+    if not api_key:
+        logger.warning("ANTHROPIC_API_KEY not configured, skipping AI analysis")
+        return None
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+
+        totals = range_data.get('totals', {})
+        period = f"{range_data['from_month']}/{range_data['from_year']} - {range_data['to_month']}/{range_data['to_year']}"
+
+        # Build comparison text
+        comparison_text = ""
+        comp = range_data.get('comparison', {})
+        if comp.get('prev_1'):
+            p1 = comp['prev_1']['totals']
+            yoy1 = comp.get('yoy_1', {})
+            comparison_text += f"\nVS LAST YEAR (same period):\n"
+            comparison_text += f"- Sales: ${p1.get('total_sales', 0):,.2f} (YoY: {yoy1.get('sales', 0):+.1f}%)\n"
+            comparison_text += f"- COGS: ${p1.get('cogs', 0):,.2f} (YoY: {yoy1.get('cogs', 0):+.1f}%)\n"
+            comparison_text += f"- Profit: ${p1.get('profit', 0):,.2f} (YoY: {yoy1.get('profit', 0):+.1f}%)\n"
+
+        if comp.get('prev_2'):
+            p2 = comp['prev_2']['totals']
+            yoy2 = comp.get('yoy_2', {})
+            comparison_text += f"\nVS 2 YEARS AGO (same period):\n"
+            comparison_text += f"- Sales: ${p2.get('total_sales', 0):,.2f} (YoY: {yoy2.get('sales', 0):+.1f}%)\n"
+            comparison_text += f"- Profit: ${p2.get('profit', 0):,.2f} (YoY: {yoy2.get('profit', 0):+.1f}%)\n"
+
+        if not comparison_text:
+            comparison_text = "No previous year data available for comparison."
+
+        # Monthly breakdown
+        monthly_lines = []
+        for r in range_data.get('reports', []):
+            monthly_lines.append(
+                f"  {r.get('month_display', r.get('month'))}: Sales=${r.get('total_sales_inc_gst', 0)}, "
+                f"COGS=${r.get('cogs', 0)}, Profit=${r.get('operating_profit', 0)}"
+            )
+        monthly_breakdown = '\n'.join(monthly_lines) if monthly_lines else 'No monthly data'
+
+        excl_gst = totals.get('excl_gst', 0)
+        total_sales = totals.get('total_sales', 0)
+        cogs = totals.get('cogs', 0)
+        labour = totals.get('labour', 0)
+        profit = totals.get('profit', 0)
+
+        prompt = SKY_REPORT_ANALYSIS_PROMPT.format(
+            store_name=store_name,
+            period=period,
+            total_sales=total_sales,
+            excl_gst=excl_gst,
+            cogs=cogs,
+            cogs_ratio=(cogs / excl_gst * 100) if excl_gst else 0,
+            op_exp=totals.get('op_exp', 0),
+            labour=labour,
+            labour_ratio=(labour / excl_gst * 100) if excl_gst else 0,
+            profit=profit,
+            profit_ratio=(profit / excl_gst * 100) if excl_gst else 0,
+            days=totals.get('days', 0),
+            sales_per_day=f"{excl_gst / totals['days']:,.2f}" if totals.get('days') else 'N/A',
+            sales_per_tab=totals.get('sales_per_tab', 'N/A'),
+            sales_per_labour_hr=totals.get('sales_per_labour_hr', 'N/A'),
+            sales_per_opening_hr=totals.get('sales_per_opening_hr', 'N/A'),
+            comparison_text=comparison_text,
+            monthly_breakdown=monthly_breakdown,
+        )
+
+        response = client.messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=2048,
+            messages=[{'role': 'user', 'content': prompt}],
+        )
+
+        text = response.content[0].text.strip()
+        if text.startswith('```'):
+            text = text.split('\n', 1)[1].rsplit('```', 1)[0].strip()
+
+        result = json.loads(text)
+        return result
+
+    except Exception as e:
+        logger.error(f"Sky Report AI analysis failed: {e}")
+        return None

@@ -1769,6 +1769,178 @@ class SkyReportViewSet(viewsets.ModelViewSet):
             'opening_hours_per_day': opening_hours,
         })
 
+    def _aggregate_range(self, org, from_year, from_month, to_year, to_month):
+        """Aggregate SkyReport data for a given year/month range."""
+        from datetime import datetime as dt2, timedelta as td2
+        from django.db.models import Q
+
+        if from_year == to_year:
+            q = Q(year=from_year, month__gte=from_month, month__lte=to_month)
+        else:
+            q = (
+                Q(year=from_year, month__gte=from_month) |
+                Q(year=to_year, month__lte=to_month) |
+                Q(year__gt=from_year, year__lt=to_year)
+            )
+
+        reports = SkyReport.objects.filter(organization=org).filter(q).order_by('year', 'month')
+        serializer = self.get_serializer(reports, many=True)
+        data = serializer.data
+
+        if not data:
+            return {'reports': [], 'totals': {}}
+
+        total_sales = sum(float(r.get('total_sales_inc_gst', 0) or 0) for r in data)
+        excl_gst = sum(float(r.get('excl_gst_sales', 0) or 0) for r in data)
+        cogs = sum(float(r.get('cogs', 0) or 0) for r in data)
+        op_exp = sum(float(r.get('operating_expenses', 0) or 0) for r in data)
+        wages = sum(float(r.get('wages', 0) or 0) for r in data)
+        labour = sum(float(r.get('sales_per_hour', 0) or 0) for r in data)  # total_labour field
+        profit = sum(float(r.get('operating_profit', 0) or 0) for r in data)
+        days = sum(int(r.get('number_of_days', 0) or 0) for r in data)
+        hq_cash = sum(float(r.get('hq_cash', 0) or 0) for r in data)
+
+        # Opening hours from org settings
+        opening_hours_per_day = 0
+        if org.opening_time and org.closing_time:
+            open_dt = dt2.combine(date.today(), org.opening_time)
+            close_dt = dt2.combine(date.today(), org.closing_time)
+            if close_dt <= open_dt:
+                close_dt += td2(days=1)
+            opening_hours_per_day = (close_dt - open_dt).seconds / 3600
+
+        total_opening_hours = days * opening_hours_per_day
+        total_work_hours = sum(float(r.get('other_sales', 0) or 0) for r in data)
+        total_tabs = sum(float(r.get('pos_sales', 0) or 0) for r in data)
+
+        return {
+            'reports': data,
+            'totals': {
+                'total_sales': total_sales,
+                'excl_gst': excl_gst,
+                'cogs': cogs,
+                'cogs_ratio': round(cogs / excl_gst * 100, 1) if excl_gst else 0,
+                'op_exp': op_exp,
+                'wages': wages,
+                'labour': labour,
+                'labour_ratio': round(labour / excl_gst * 100, 1) if excl_gst else 0,
+                'profit': profit,
+                'profit_ratio': round(profit / excl_gst * 100, 1) if excl_gst else 0,
+                'days': days,
+                'hq_cash': hq_cash,
+                'sales_per_day': round(excl_gst / days, 2) if days else 0,
+                'sales_per_tab': round(excl_gst / total_tabs, 2) if total_tabs else 0,
+                'sales_per_labour_hr': round(excl_gst / total_work_hours, 2) if total_work_hours else 0,
+                'sales_per_opening_hr': round(excl_gst / total_opening_hours, 2) if total_opening_hours else 0,
+            },
+        }
+
+    @action(detail=False, methods=['get'], url_path='range-summary')
+    def range_summary(self, request):
+        """Aggregate Sky Reports for a date range with multi-year comparison."""
+        from users.filters import get_target_org
+        org = get_target_org(request)
+
+        from_year = int(request.query_params.get('from_year', timezone.now().year))
+        from_month = int(request.query_params.get('from_month', 1))
+        to_year = int(request.query_params.get('to_year', from_year))
+        to_month = int(request.query_params.get('to_month', 12))
+
+        # Current period
+        current = self._aggregate_range(org, from_year, from_month, to_year, to_month)
+
+        # Previous year (same months, 1 year back)
+        prev_1 = self._aggregate_range(org, from_year - 1, from_month, to_year - 1, to_month)
+        prev_2 = self._aggregate_range(org, from_year - 2, from_month, to_year - 2, to_month)
+
+        def calc_yoy(curr_totals, prev_totals):
+            if not prev_totals or not curr_totals:
+                return None
+            result = {}
+            for key in ['total_sales', 'cogs', 'labour', 'profit', 'excl_gst']:
+                cv = curr_totals.get(key, 0) or 0
+                pv = prev_totals.get(key, 0) or 0
+                result[key] = round((cv - pv) / pv * 100, 1) if pv else 0
+            return result
+
+        ct = current.get('totals', {})
+        p1t = prev_1.get('totals', {}) if prev_1.get('reports') else None
+        p2t = prev_2.get('totals', {}) if prev_2.get('reports') else None
+
+        comparison = {}
+        if p1t:
+            comparison['prev_1'] = {'totals': p1t, 'reports': prev_1['reports']}
+            comparison['yoy_1'] = calc_yoy(ct, p1t)
+        if p2t:
+            comparison['prev_2'] = {'totals': p2t, 'reports': prev_2['reports']}
+            comparison['yoy_2'] = calc_yoy(p1t, p2t) if p1t else calc_yoy(ct, p2t)
+
+        return Response({
+            'from_year': from_year,
+            'from_month': from_month,
+            'to_year': to_year,
+            'to_month': to_month,
+            'months_count': len(current.get('reports', [])),
+            'reports': current.get('reports', []),
+            'totals': ct,
+            'comparison': comparison,
+        })
+
+    @action(detail=False, methods=['get'], url_path='ai-analysis')
+    def ai_analysis(self, request):
+        """Generate AI-powered P&L analysis for a date range."""
+        from users.filters import get_target_org
+        from .services import generate_sky_report_analysis
+
+        org = get_target_org(request)
+        from_year = int(request.query_params.get('from_year', timezone.now().year))
+        from_month = int(request.query_params.get('from_month', 1))
+        to_year = int(request.query_params.get('to_year', from_year))
+        to_month = int(request.query_params.get('to_month', 12))
+
+        # Build range data with comparison
+        current = self._aggregate_range(org, from_year, from_month, to_year, to_month)
+        prev_1 = self._aggregate_range(org, from_year - 1, from_month, to_year - 1, to_month)
+        prev_2 = self._aggregate_range(org, from_year - 2, from_month, to_year - 2, to_month)
+
+        ct = current.get('totals', {})
+        p1t = prev_1.get('totals', {}) if prev_1.get('reports') else None
+        p2t = prev_2.get('totals', {}) if prev_2.get('reports') else None
+
+        def calc_yoy(curr_totals, prev_totals):
+            if not prev_totals or not curr_totals:
+                return None
+            result = {}
+            for key in ['total_sales', 'cogs', 'labour', 'profit']:
+                cv = curr_totals.get(key, 0) or 0
+                pv = prev_totals.get(key, 0) or 0
+                result[key.replace('total_', '')] = round((cv - pv) / pv * 100, 1) if pv else 0
+            return result
+
+        comparison = {}
+        if p1t:
+            comparison['prev_1'] = {'totals': p1t}
+            comparison['yoy_1'] = calc_yoy(ct, p1t)
+        if p2t:
+            comparison['prev_2'] = {'totals': p2t}
+            comparison['yoy_2'] = calc_yoy(p1t, p2t) if p1t else None
+
+        range_data = {
+            'from_year': from_year,
+            'from_month': from_month,
+            'to_year': to_year,
+            'to_month': to_month,
+            'reports': current.get('reports', []),
+            'totals': ct,
+            'comparison': comparison,
+        }
+
+        result = generate_sky_report_analysis(range_data, org.name)
+        if result is None:
+            return Response({'error': 'AI analysis unavailable'}, status=503)
+
+        return Response(result)
+
     @action(detail=False, methods=['get'])
     def template(self, request):
         """Download an Excel template for bulk Sky Report data entry."""
