@@ -460,19 +460,19 @@ function ReportDetail({ report }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white rounded-xl border p-3 text-center">
           <div className="text-lg font-bold text-gray-900">${fmt(kpis.sales_per_day)}</div>
-          <div className="text-xs text-gray-500">일 매출</div>
+          <div className="text-xs text-gray-500">Daily Sales</div>
         </div>
         <div className="bg-white rounded-xl border p-3 text-center">
           <div className="text-lg font-bold text-gray-900">${fmt(kpis.sales_per_tab)}</div>
-          <div className="text-xs text-gray-500">탭당 매출</div>
+          <div className="text-xs text-gray-500">Sales / Tab</div>
         </div>
         <div className="bg-white rounded-xl border p-3 text-center">
           <div className="text-lg font-bold text-gray-900">${fmt(kpis.sales_per_labour_hour)}</div>
-          <div className="text-xs text-gray-500">근무시간당 매출</div>
+          <div className="text-xs text-gray-500">Sales / Labour Hr</div>
         </div>
         <div className="bg-white rounded-xl border p-3 text-center">
           <div className="text-lg font-bold text-gray-900">${fmt(kpis.sales_per_opening_hour)}</div>
-          <div className="text-xs text-gray-500">영업시간당 매출</div>
+          <div className="text-xs text-gray-500">Sales / Opening Hr</div>
         </div>
       </div>
 
