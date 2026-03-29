@@ -18,6 +18,13 @@ const menuSections = [
     ]
   },
   {
+    title: null,
+    roles: ['CEO', 'HQ'],
+    items: [
+      { label: 'Store Evaluation', path: '/evaluation', icon: ChartIcon },
+    ]
+  },
+  {
     title: 'My Work',
     roles: ['EMPLOYEE'],
     items: [

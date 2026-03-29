@@ -62,6 +62,7 @@ import StoreAssignment from './components/admin/StoreAssignment'
 import ManagerRoute from './components/auth/ManagerRoute'
 import ImportPage from './components/import/ImportPage'
 import CQReport from './components/reports/CQReport'
+import StoreEvaluation from './components/reports/StoreEvaluation'
 
 // Helper component to wrap protected routes with Layout
 function ProtectedWithLayout({ children }) {
@@ -160,6 +161,16 @@ function App() {
             element={
               <ProtectedWithLayout>
                 <ImportPage />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Store Evaluation (CEO/HQ only) */}
+          <Route
+            path="/evaluation"
+            element={
+              <ProtectedWithLayout>
+                <StoreEvaluation />
               </ProtectedWithLayout>
             }
           />

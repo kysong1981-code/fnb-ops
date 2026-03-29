@@ -11,8 +11,8 @@ from decimal import Decimal
 from collections import defaultdict
 import io
 
-from .models import Report, GeneratedReport, SkyReport
-from .serializers import ReportSerializer, GeneratedReportSerializer, SkyReportSerializer
+from .models import Report, GeneratedReport, SkyReport, StoreEvaluation
+from .serializers import ReportSerializer, GeneratedReportSerializer, SkyReportSerializer, StoreEvaluationSerializer
 from closing.models import DailyClosing, ClosingHRCash, ClosingCashExpense, ClosingSupplierCost, SupplierMonthlyStatement, ClosingOtherSale, Holiday
 from sales.models import Sales
 from hr.models import Timesheet
@@ -2158,4 +2158,221 @@ class SkyReportViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class StoreEvaluationViewSet(viewsets.ModelViewSet):
+    """
+    Store Evaluation — semi-annual manager performance evaluation
+    - list: all evaluations for the organization (filter by ?year=)
+    - create/update: CEO/HQ only
+    - auto_fill: pull achievements from SkyReport data
+    - toggle_lock: lock/unlock evaluation (CEO/HQ only)
+    """
+    queryset = StoreEvaluation.objects.all()
+    serializer_class = StoreEvaluationSerializer
+    permission_classes = [IsAuthenticated, IsManager]
+    filter_backends = [OrganizationFilterBackend]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        year = self.request.query_params.get('year')
+        period = self.request.query_params.get('period_type')
+        if year:
+            qs = qs.filter(year=year)
+        if period:
+            qs = qs.filter(period_type=period)
+        return qs.select_related('organization', 'created_by__user')
+
+    def _check_ceo_hq(self, request):
+        """Check if user is CEO or HQ."""
+        return request.user.profile.role in ['CEO', 'HQ']
+
+    def _calculate_scores(self, instance):
+        """Calculate all evaluation scores based on targets vs achievements."""
+        d = Decimal
+
+        # --- Guarantee amount ---
+        if instance.guarantee_pct and instance.net_profit:
+            instance.guarantee_amount = (instance.net_profit * instance.guarantee_pct / d('100')).quantize(d('0.01'))
+        else:
+            instance.guarantee_amount = d('0')
+
+        # --- Incentive pool ---
+        if instance.incentive_amount > 0:
+            instance.incentive_pool = instance.incentive_amount
+        elif instance.incentive_pct > 0 and instance.net_profit > 0:
+            instance.incentive_pool = (instance.net_profit * instance.incentive_pct / d('100')).quantize(d('0.01'))
+        else:
+            instance.incentive_pool = d('0')
+
+        # --- Sales score (max 25) ---
+        if instance.sales_target and instance.sales_target > 0:
+            ratio = float(instance.sales_achievement / instance.sales_target * 100)
+            if ratio >= 110:
+                instance.sales_score = 25
+            elif ratio >= 100:
+                instance.sales_score = 15
+            elif ratio >= 90:
+                instance.sales_score = 10
+            else:
+                instance.sales_score = 0
+        else:
+            instance.sales_score = 0
+
+        # --- COGS score (max 20) ---
+        # diff in percentage points (achievement - target); positive = worse
+        if instance.cogs_target > 0:
+            diff = float(instance.cogs_achievement - instance.cogs_target) * 100  # convert ratio to %p
+            if diff <= 0:
+                instance.cogs_score = 20
+            elif diff <= 1:
+                instance.cogs_score = 18
+            elif diff <= 2:
+                instance.cogs_score = 14
+            else:
+                instance.cogs_score = 7
+        else:
+            instance.cogs_score = 0
+
+        # --- Wage score (max 25) ---
+        if instance.wage_target > 0:
+            diff = float(instance.wage_achievement - instance.wage_target) * 100  # convert ratio to %p
+            if diff <= 0:
+                instance.wage_score = 25
+            elif diff <= 1:
+                instance.wage_score = 15
+            elif diff <= 2:
+                instance.wage_score = 10
+            else:
+                instance.wage_score = 0
+        else:
+            instance.wage_score = 0
+
+        # --- Service score (max 10) ---
+        rating = float(instance.service_rating)
+        if rating >= 4.8:
+            instance.service_score = 10
+        elif rating >= 4.5:
+            instance.service_score = 7
+        elif rating >= 4.2:
+            instance.service_score = 5
+        else:
+            instance.service_score = 0
+
+        # --- Hygiene score (max 10) ---
+        if instance.hygiene_months >= 18:
+            instance.hygiene_score = 10
+        elif instance.hygiene_months >= 12:
+            instance.hygiene_score = 5
+        else:
+            instance.hygiene_score = 0
+
+        # --- Leadership score points (max 10) ---
+        ls = instance.leadership_score
+        if ls >= 5:
+            instance.leadership_score_points = 10
+        elif ls >= 4:
+            instance.leadership_score_points = 5
+        elif ls >= 3:
+            instance.leadership_score_points = 2
+        else:
+            instance.leadership_score_points = 0
+
+        # --- Total ---
+        instance.total_score = (
+            instance.sales_score + instance.cogs_score + instance.wage_score +
+            instance.service_score + instance.hygiene_score + instance.leadership_score_points
+        )
+        instance.payout_ratio = d(str(instance.total_score)) / d('100')
+
+        instance.save()
+
+    def perform_create(self, serializer):
+        from users.filters import get_target_org
+        if not self._check_ceo_hq(self.request):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Only CEO/HQ can create evaluations.')
+        org = get_target_org(self.request)
+        profile = self.request.user.profile
+        instance = serializer.save(organization=org, created_by=profile)
+        self._calculate_scores(instance)
+
+    def perform_update(self, serializer):
+        if not self._check_ceo_hq(self.request):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Only CEO/HQ can edit evaluations.')
+        instance = serializer.instance
+        if instance.is_locked:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('This evaluation is locked and cannot be modified.')
+        instance = serializer.save()
+        self._calculate_scores(instance)
+
+    def perform_destroy(self, instance):
+        if not self._check_ceo_hq(self.request):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Only CEO/HQ can delete evaluations.')
+        if instance.is_locked:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('This evaluation is locked and cannot be deleted.')
+        instance.delete()
+
+    @action(detail=True, methods=['post'])
+    def auto_fill(self, request, pk=None):
+        """Auto-fill achievements from SkyReport data for the evaluation period."""
+        instance = self.get_object()
+        if instance.is_locked:
+            return Response({'error': 'Evaluation is locked.'}, status=status.HTTP_403_FORBIDDEN)
+        if not self._check_ceo_hq(request):
+            return Response({'error': 'Only CEO/HQ can auto-fill.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Determine month range
+        if instance.period_type == 'H1':
+            months = range(1, 7)
+        else:
+            months = range(7, 13)
+
+        sky_reports = SkyReport.objects.filter(
+            organization=instance.organization,
+            year=instance.year,
+            month__in=months,
+        )
+
+        if not sky_reports.exists():
+            return Response({'error': 'No SkyReport data found for this period.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Aggregate sales (total_sales_inc_gst), COGS ratio, Wage ratio
+        total_sales = sky_reports.aggregate(total=Sum('total_sales_inc_gst'))['total'] or Decimal('0')
+        total_cogs = sky_reports.aggregate(total=Sum('cogs'))['total'] or Decimal('0')
+        total_wages = sky_reports.aggregate(total=Sum('wages'))['total'] or Decimal('0')
+
+        instance.sales_achievement = total_sales
+        if total_sales > 0:
+            instance.cogs_achievement = (total_cogs / total_sales).quantize(Decimal('0.0001'))
+            instance.wage_achievement = (total_wages / total_sales).quantize(Decimal('0.0001'))
+        else:
+            instance.cogs_achievement = Decimal('0')
+            instance.wage_achievement = Decimal('0')
+
+        # Auto-fill service rating from latest SkyReport's review_rating
+        latest_report = sky_reports.order_by('-month').first()
+        if latest_report and latest_report.review_rating > 0:
+            instance.service_rating = latest_report.review_rating
+
+        instance.save()
+        self._calculate_scores(instance)
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def toggle_lock(self, request, pk=None):
+        """Toggle lock status of an evaluation. CEO/HQ only."""
+        if not self._check_ceo_hq(request):
+            return Response({'error': 'Only CEO/HQ can lock/unlock evaluations.'}, status=status.HTTP_403_FORBIDDEN)
+        instance = self.get_object()
+        instance.is_locked = not instance.is_locked
+        instance.save()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 

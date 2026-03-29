@@ -696,6 +696,17 @@ export const adminAPI = {
   updateUserRole: (userId, role, storeIds) => api.post('/users/assign-stores/', { user_id: userId, role, store_ids: storeIds || [] }),
 }
 
+// Store Evaluation API
+export const evaluationAPI = {
+  list: (params) => api.get('/reports/store-evaluations/', { params }),
+  get: (id) => api.get(`/reports/store-evaluations/${id}/`),
+  create: (data) => api.post('/reports/store-evaluations/', data),
+  update: (id, data) => api.put(`/reports/store-evaluations/${id}/`, data),
+  delete: (id) => api.delete(`/reports/store-evaluations/${id}/`),
+  autoFill: (year, period, storeId) => api.get('/reports/store-evaluations/auto-fill/', { params: { year, period_type: period, store_id: storeId } }),
+  toggleLock: (id) => api.post(`/reports/store-evaluations/${id}/toggle-lock/`),
+}
+
 export const skyReportAPI = {
   list: (params) => api.get('/reports/sky-reports/', { params }),
   get: (id) => api.get(`/reports/sky-reports/${id}/`),

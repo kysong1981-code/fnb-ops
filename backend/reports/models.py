@@ -153,3 +153,76 @@ class SkyReport(models.Model):
             return 0
         from decimal import Decimal
         return (self.wages / self.total_sales_inc_gst * 100).quantize(Decimal('0.1'))
+
+
+class StoreEvaluation(models.Model):
+    """Store Evaluation — semi-annual manager performance evaluation"""
+
+    PERIOD_CHOICES = (
+        ('H1', 'H1 (Jan-Jun)'),
+        ('H2', 'H2 (Jul-Dec)'),
+    )
+
+    MANAGER_TYPE_CHOICES = (
+        ('NON_EQUITY', 'Non-Equity Manager'),
+        ('EQUITY', 'Equity Manager'),
+    )
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='store_evaluations')
+    period_type = models.CharField(max_length=2, choices=PERIOD_CHOICES)
+    year = models.IntegerField()
+    manager_type = models.CharField(max_length=10, choices=MANAGER_TYPE_CHOICES, default='NON_EQUITY')
+
+    # Basic inputs (manual)
+    net_profit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    account_profit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cash_profit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    guarantee_pct = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    guarantee_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    incentive_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    incentive_pct = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    incentive_pool = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    equity_share = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    staff_count = models.IntegerField(default=0)
+    staff_incentive_pct = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+
+    # Evaluation targets (manual)
+    sales_target = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cogs_target = models.DecimalField(max_digits=5, decimal_places=4, default=0)
+    wage_target = models.DecimalField(max_digits=5, decimal_places=4, default=0)
+
+    # Evaluation achievements (can be auto-filled from SkyReport or manual)
+    sales_achievement = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cogs_achievement = models.DecimalField(max_digits=5, decimal_places=4, default=0)
+    wage_achievement = models.DecimalField(max_digits=5, decimal_places=4, default=0)
+    service_rating = models.DecimalField(max_digits=3, decimal_places=1, default=0)
+    hygiene_months = models.IntegerField(default=0)
+    leadership_score = models.IntegerField(default=0)
+
+    # Auto-calculated scores
+    sales_score = models.IntegerField(default=0)
+    cogs_score = models.IntegerField(default=0)
+    wage_score = models.IntegerField(default=0)
+    service_score = models.IntegerField(default=0)
+    hygiene_score = models.IntegerField(default=0)
+    leadership_score_points = models.IntegerField(default=0)
+    total_score = models.IntegerField(default=0)
+    payout_ratio = models.DecimalField(max_digits=5, decimal_places=4, default=0)
+
+    # Lock
+    is_locked = models.BooleanField(default=False)
+
+    # Meta
+    created_by = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, related_name='store_evaluations')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-year', '-period_type']
+        unique_together = ['organization', 'year', 'period_type']
+        indexes = [
+            models.Index(fields=['organization', 'year', 'period_type']),
+        ]
+
+    def __str__(self):
+        return f"Evaluation - {self.organization} {self.year} {self.get_period_type_display()}"

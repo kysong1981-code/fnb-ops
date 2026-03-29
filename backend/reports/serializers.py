@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Report, GeneratedReport, SkyReport
+from .models import Report, GeneratedReport, SkyReport, StoreEvaluation
 
 
 class ReportSerializer(serializers.ModelSerializer):
@@ -149,3 +149,54 @@ class SkyReportSerializer(serializers.ModelSerializer):
                 close_dt += td2(days=1)
             return (close_dt - open_dt).seconds / 3600
         return 0
+
+
+class StoreEvaluationSerializer(serializers.ModelSerializer):
+    """Store Evaluation serializer"""
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    period_display = serializers.CharField(source='get_period_type_display', read_only=True)
+    manager_type_display = serializers.CharField(source='get_manager_type_display', read_only=True)
+
+    class Meta:
+        model = StoreEvaluation
+        fields = [
+            'id', 'organization', 'organization_name',
+            'period_type', 'period_display', 'year',
+            'manager_type', 'manager_type_display',
+            # Basic inputs
+            'net_profit', 'account_profit', 'cash_profit',
+            'guarantee_pct', 'guarantee_amount',
+            'incentive_amount', 'incentive_pct', 'incentive_pool',
+            'equity_share', 'staff_count', 'staff_incentive_pct',
+            # Targets
+            'sales_target', 'cogs_target', 'wage_target',
+            # Achievements
+            'sales_achievement', 'cogs_achievement', 'wage_achievement',
+            'service_rating', 'hygiene_months', 'leadership_score',
+            # Auto-calculated scores
+            'sales_score', 'cogs_score', 'wage_score',
+            'service_score', 'hygiene_score', 'leadership_score_points',
+            'total_score', 'payout_ratio',
+            # Lock
+            'is_locked',
+            # Meta
+            'created_by', 'created_by_name',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'organization', 'organization_name',
+            'created_by', 'created_by_name',
+            'created_at', 'updated_at',
+            'period_display', 'manager_type_display',
+            # Auto-calculated
+            'sales_score', 'cogs_score', 'wage_score',
+            'service_score', 'hygiene_score', 'leadership_score_points',
+            'total_score', 'payout_ratio',
+            'guarantee_amount', 'incentive_pool',
+        ]
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return obj.created_by.user.get_full_name() or obj.created_by.user.username
+        return None
