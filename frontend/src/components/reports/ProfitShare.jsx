@@ -235,17 +235,21 @@ export default function ProfitShare() {
       } else {
         res = await profitShareAPI.create(payload)
       }
-      // Auto-calculate after save
       const ps = res.data
+      // Auto-calculate after save (non-blocking)
       if (ps.id) {
-        await profitShareAPI.autoCalculate(ps.id)
+        try {
+          await profitShareAPI.autoCalculate(ps.id)
+        } catch (calcErr) {
+          console.warn('Auto-calculate skipped:', calcErr)
+        }
       }
       setSuccess('Saved successfully')
       setTimeout(() => setSuccess(''), 3000)
       loadProfitShare()
     } catch (err) {
-      console.error('Save error:', err)
-      setError(err.response?.data?.detail || err.response?.data?.error || 'Failed to save')
+      console.error('Save error:', err?.response?.status, err?.response?.data)
+      setError(err.response?.data?.detail || err.response?.data?.error || JSON.stringify(err.response?.data) || 'Failed to save')
     } finally {
       setSaving(false)
     }
