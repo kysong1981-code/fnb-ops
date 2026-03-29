@@ -1110,6 +1110,31 @@ class TeamViewSet(viewsets.ViewSet):
         }
         return Response(data)
 
+    def destroy(self, request, pk=None):
+        """Delete a team member (CEO/HQ only). Deactivates user and removes profile."""
+        profile = request.user.profile
+        if profile.role not in ['CEO', 'HQ']:
+            return Response({'error': 'Only CEO/HQ can delete staff'}, status=status.HTTP_403_FORBIDDEN)
+
+        org = self._get_org(request)
+        try:
+            member = UserProfile.objects.select_related('user').get(id=pk, organization=org)
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Don't allow deleting yourself
+        if member.user == request.user:
+            return Response({'error': 'Cannot delete yourself'}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            user = member.user
+            user.is_active = False
+            user.save()
+            member.employment_status = 'TERMINATED'
+            member.save()
+
+        return Response({'message': f'{user.get_full_name()} has been removed'}, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=['post'], url_path='update-salary')
     def update_salary(self, request, pk=None):
         """시급 변경"""

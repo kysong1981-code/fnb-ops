@@ -228,6 +228,7 @@ export const hrAPI = {
   getTeamMember: (id) => api.get(`/hr/team/${id}/`),
   updateSalary: (id, data) => api.post(`/hr/team/${id}/update-salary/`, data),
   updatePermissions: (id, data) => api.post(`/hr/team/${id}/update-permissions/`, data),
+  deleteTeamMember: (id) => api.delete(`/hr/team/${id}/`),
   getTeamDocuments: (id) => api.get(`/hr/team/${id}/documents/`),
   uploadTeamDocument: (id, formData) =>
     api.post(`/hr/team/${id}/upload-document/`, formData, {

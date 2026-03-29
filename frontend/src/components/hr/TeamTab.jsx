@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { hrAPI } from '../../services/api'
+import { useAuth } from '../../context/AuthContext'
 import Card from '../ui/Card'
 import { XIcon, DocumentIcon } from '../icons'
 
@@ -33,6 +34,8 @@ const fmt = (v) => v != null ? `$${parseFloat(v).toFixed(2)}` : '-'
 
 export default function TeamTab() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const isCeoHq = user?.role === 'CEO' || user?.role === 'HQ'
   const [team, setTeam] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('ACTIVE')
@@ -142,6 +145,18 @@ export default function TeamTab() {
       loadTeam()
     } catch {}
     finally { setSaving(false) }
+  }
+
+  const handleDeleteMember = async (profileId, name) => {
+    if (!confirm(`Remove "${name}" from the team? This will deactivate their account.`)) return
+    try {
+      await hrAPI.deleteTeamMember(profileId)
+      setSelected(null)
+      setDetail(null)
+      loadTeam()
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to remove staff')
+    }
   }
 
   const handleSaveNote = async () => {
@@ -284,6 +299,14 @@ export default function TeamTab() {
                           >
                             + Meeting Note
                           </button>
+                          {isCeoHq && (
+                            <button
+                              onClick={() => handleDeleteMember(m.profile_id, m.name)}
+                              className="px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium text-sm"
+                            >
+                              Remove
+                            </button>
+                          )}
                         </div>
                         {/* Basic Info */}
                         <div className="grid grid-cols-2 gap-3 text-sm">

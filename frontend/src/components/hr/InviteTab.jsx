@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { hrAPI, storeAPI } from '../../services/api'
 import { useStore } from '../../context/StoreContext'
+import { useAuth } from '../../context/AuthContext'
 import Card from '../ui/Card'
 import SectionLabel from '../ui/SectionLabel'
 import { TrashIcon, ClipboardIcon } from '../icons'
@@ -16,8 +17,11 @@ const WORK_TYPES = [
 const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 
 export default function InviteTab() {
-  const { selectedStore } = useStore()
-  const storeParams = selectedStore ? { store_id: selectedStore.id } : {}
+  const { selectedStore, stores } = useStore()
+  const { user } = useAuth()
+  const isCeoHq = user?.role === 'CEO' || user?.role === 'HQ'
+  const [inviteStoreId, setInviteStoreId] = useState(selectedStore?.id || '')
+  const storeParams = isCeoHq && inviteStoreId ? { store_id: inviteStoreId } : selectedStore ? { store_id: selectedStore.id } : {}
   const [invites, setInvites] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -72,6 +76,10 @@ export default function InviteTab() {
     e.preventDefault()
     if (!form.first_name || !form.email || !form.hourly_rate) {
       setError('Name, email, and hourly rate are required')
+      return
+    }
+    if (isCeoHq && stores.length > 1 && !inviteStoreId) {
+      setError('Please select a store')
       return
     }
     setSaving(true)
@@ -185,6 +193,17 @@ export default function InviteTab() {
       <Card className="p-5">
         <SectionLabel>New Invitation</SectionLabel>
         <form onSubmit={handleSubmit} className="space-y-3">
+          {/* Store Selector (CEO/HQ only) */}
+          {isCeoHq && stores.length > 1 && (
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Assign to Store *</label>
+              <select value={inviteStoreId} onChange={(e) => setInviteStoreId(e.target.value)} className={inputCls}>
+                <option value="">— Select Store —</option>
+                {stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-gray-500 mb-1 block">First Name *</label>
@@ -256,7 +275,7 @@ export default function InviteTab() {
 
           <button
             type="submit"
-            disabled={saving || !form.first_name || !form.email || !form.hourly_rate}
+            disabled={saving || !form.first_name || !form.email || !form.hourly_rate || (isCeoHq && stores.length > 1 && !inviteStoreId)}
             className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
           >
             {saving ? 'Sending...' : 'Send Invitation'}
