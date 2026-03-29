@@ -504,15 +504,19 @@ export default function ProfitShare() {
               {/* Partner header */}
               <div className="flex items-center gap-3 mb-4">
                 <div className="flex-1">
+                  <label className={labelCls}>Partner Name</label>
                   <input
                     type="text"
                     value={partner.name}
                     onChange={(e) => handlePartnerChange(index, 'name', e.target.value)}
-                    className={`text-base font-semibold bg-transparent border-b border-gray-200 focus:border-blue-500 focus:outline-none pb-1 w-full ${disabled ? 'text-gray-500' : 'text-gray-900'}`}
+                    className={disabled ? readOnlyCls : inputCls}
+                    style={{ textAlign: 'left' }}
                     disabled={disabled}
-                    placeholder="Partner name"
+                    placeholder="Enter partner name"
                   />
                 </div>
+                <div>
+                  <label className={labelCls}>Type</label>
                 <select
                   value={partner.partner_type}
                   onChange={(e) => handlePartnerChange(index, 'partner_type', e.target.value)}
@@ -523,6 +527,7 @@ export default function ProfitShare() {
                   <option value="NON_EQUITY">Non-Equity</option>
                   <option value="OWNER">Owner</option>
                 </select>
+                </div>
                 {!disabled && (
                   <button
                     onClick={() => removePartner(index)}
