@@ -2329,14 +2329,41 @@ class SalesAnalysisViewSet(viewsets.GenericViewSet):
         start, end = self._parse_dates(request)
         profile = request.user.profile
 
-        # Get holidays in range
-        holidays = list(Holiday.objects.filter(
+        # Region-to-anniversary mapping
+        REGION_ANNIVERSARY_MAP = {
+            'AUCKLAND': 'Auckland Anniversary',
+            'WELLINGTON': 'Wellington Anniversary',
+            'NELSON': 'Nelson Anniversary',
+            'OTAGO': 'Otago Anniversary',
+            'SOUTHLAND': 'Southland Anniversary',
+            'TARANAKI': 'Taranaki Anniversary',
+            'HAWKES_BAY': "Hawke's Bay Anniversary",
+            'MARLBOROUGH': 'Marlborough Anniversary',
+            'CANTERBURY': 'Canterbury Anniversary',
+            'WEST_COAST': 'Westland Anniversary',
+            'CHATHAM_ISLANDS': 'Chatham Islands Anniversary',
+        }
+
+        org = profile.organization
+        store_region = org.region if org else None
+        store_anniversary = REGION_ANNIVERSARY_MAP.get(store_region, '') if store_region else ''
+
+        # Get holidays in range, filter NZ_REGIONAL to only show store's region
+        all_holidays = Holiday.objects.filter(
             start_date__lte=end,
             end_date__gte=start,
-        ).values('id', 'name', 'name_ko', 'category', 'start_date', 'end_date', 'year', 'impact'))
+        ).values('id', 'name', 'name_ko', 'category', 'start_date', 'end_date', 'year', 'impact')
+
+        holidays = []
+        for h in all_holidays:
+            if h['category'] == 'NZ_REGIONAL':
+                # Only include if it matches the store's region
+                if store_anniversary and h['name'] == store_anniversary:
+                    holidays.append(h)
+            else:
+                holidays.append(h)
 
         # Add regional anniversary days dynamically based on store's region
-        org = profile.organization
         region = org.region if org else None
         if region:
             existing_names = {h['name'].lower() for h in holidays}
