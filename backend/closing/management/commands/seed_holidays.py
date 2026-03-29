@@ -94,11 +94,72 @@ HOLIDAYS = [
     ('Year-End Season', '연말 시즌', 'OTHER', '2026-12-25', '2026-12-31', 'HIGH'),
     ('New Year Season', '연초 시즌', 'OTHER', '2027-01-01', '2027-01-07', 'HIGH'),
 
-    # ═══════════ Canterbury Anniversary (Regional) ═══════════
-    ('Canterbury Anniversary', '캔터베리 기념일', 'NZ_PUBLIC', '2024-11-15', '2024-11-15', 'MEDIUM'),
-    ('Canterbury Anniversary', '캔터베리 기념일', 'NZ_PUBLIC', '2025-11-14', '2025-11-14', 'MEDIUM'),
-    ('Canterbury Anniversary', '캔터베리 기념일', 'NZ_PUBLIC', '2026-11-13', '2026-11-13', 'MEDIUM'),
-    ('Canterbury Anniversary', '캔터베리 기념일', 'NZ_PUBLIC', '2027-11-12', '2027-11-12', 'MEDIUM'),
+    # ═══════════ NZ Regional Anniversary Days ═══════════
+    # Auckland Anniversary (closest Mon to Jan 29)
+    ('Auckland Anniversary', '오클랜드 기념일', 'NZ_REGIONAL', '2024-01-29', '2024-01-29', 'MEDIUM'),
+    ('Auckland Anniversary', '오클랜드 기념일', 'NZ_REGIONAL', '2025-01-27', '2025-01-27', 'MEDIUM'),
+    ('Auckland Anniversary', '오클랜드 기념일', 'NZ_REGIONAL', '2026-01-26', '2026-01-26', 'MEDIUM'),
+    ('Auckland Anniversary', '오클랜드 기념일', 'NZ_REGIONAL', '2027-02-01', '2027-02-01', 'MEDIUM'),
+
+    # Wellington Anniversary (closest Mon to Jan 22)
+    ('Wellington Anniversary', '웰링턴 기념일', 'NZ_REGIONAL', '2024-01-22', '2024-01-22', 'MEDIUM'),
+    ('Wellington Anniversary', '웰링턴 기념일', 'NZ_REGIONAL', '2025-01-20', '2025-01-20', 'MEDIUM'),
+    ('Wellington Anniversary', '웰링턴 기념일', 'NZ_REGIONAL', '2026-01-19', '2026-01-19', 'MEDIUM'),
+    ('Wellington Anniversary', '웰링턴 기념일', 'NZ_REGIONAL', '2027-01-25', '2027-01-25', 'MEDIUM'),
+
+    # Nelson Anniversary (Feb 1 or closest Mon)
+    ('Nelson Anniversary', '넬슨 기념일', 'NZ_REGIONAL', '2024-02-05', '2024-02-05', 'MEDIUM'),
+    ('Nelson Anniversary', '넬슨 기념일', 'NZ_REGIONAL', '2025-02-03', '2025-02-03', 'MEDIUM'),
+    ('Nelson Anniversary', '넬슨 기념일', 'NZ_REGIONAL', '2026-02-02', '2026-02-02', 'MEDIUM'),
+    ('Nelson Anniversary', '넬슨 기념일', 'NZ_REGIONAL', '2027-02-01', '2027-02-01', 'MEDIUM'),
+
+    # Otago Anniversary (closest Mon to Mar 23)
+    ('Otago Anniversary', '오타고 기념일', 'NZ_REGIONAL', '2024-03-25', '2024-03-25', 'MEDIUM'),
+    ('Otago Anniversary', '오타고 기념일', 'NZ_REGIONAL', '2025-03-24', '2025-03-24', 'MEDIUM'),
+    ('Otago Anniversary', '오타고 기념일', 'NZ_REGIONAL', '2026-03-23', '2026-03-23', 'MEDIUM'),
+    ('Otago Anniversary', '오타고 기념일', 'NZ_REGIONAL', '2027-03-22', '2027-03-22', 'MEDIUM'),
+
+    # Southland Anniversary (usually observed Easter Tuesday)
+    ('Southland Anniversary', '사우스랜드 기념일', 'NZ_REGIONAL', '2024-04-02', '2024-04-02', 'MEDIUM'),
+    ('Southland Anniversary', '사우스랜드 기념일', 'NZ_REGIONAL', '2025-04-22', '2025-04-22', 'MEDIUM'),
+    ('Southland Anniversary', '사우스랜드 기념일', 'NZ_REGIONAL', '2026-04-07', '2026-04-07', 'MEDIUM'),
+    ('Southland Anniversary', '사우스랜드 기념일', 'NZ_REGIONAL', '2027-03-30', '2027-03-30', 'MEDIUM'),
+
+    # Taranaki Anniversary (2nd Mon of Mar)
+    ('Taranaki Anniversary', '타라나키 기념일', 'NZ_REGIONAL', '2024-03-11', '2024-03-11', 'MEDIUM'),
+    ('Taranaki Anniversary', '타라나키 기념일', 'NZ_REGIONAL', '2025-03-10', '2025-03-10', 'MEDIUM'),
+    ('Taranaki Anniversary', '타라나키 기념일', 'NZ_REGIONAL', '2026-03-09', '2026-03-09', 'MEDIUM'),
+    ('Taranaki Anniversary', '타라나키 기념일', 'NZ_REGIONAL', '2027-03-08', '2027-03-08', 'MEDIUM'),
+
+    # Hawke's Bay Anniversary (Fri before Labour Day weekend)
+    ('Hawke\'s Bay Anniversary', '혹스베이 기념일', 'NZ_REGIONAL', '2024-10-25', '2024-10-25', 'MEDIUM'),
+    ('Hawke\'s Bay Anniversary', '혹스베이 기념일', 'NZ_REGIONAL', '2025-10-24', '2025-10-24', 'MEDIUM'),
+    ('Hawke\'s Bay Anniversary', '혹스베이 기념일', 'NZ_REGIONAL', '2026-10-23', '2026-10-23', 'MEDIUM'),
+    ('Hawke\'s Bay Anniversary', '혹스베이 기념일', 'NZ_REGIONAL', '2027-10-22', '2027-10-22', 'MEDIUM'),
+
+    # Marlborough Anniversary (closest Mon to Nov 1)
+    ('Marlborough Anniversary', '말버러 기념일', 'NZ_REGIONAL', '2024-11-04', '2024-11-04', 'MEDIUM'),
+    ('Marlborough Anniversary', '말버러 기념일', 'NZ_REGIONAL', '2025-11-03', '2025-11-03', 'MEDIUM'),
+    ('Marlborough Anniversary', '말버러 기념일', 'NZ_REGIONAL', '2026-11-02', '2026-11-02', 'MEDIUM'),
+    ('Marlborough Anniversary', '말버러 기념일', 'NZ_REGIONAL', '2027-11-01', '2027-11-01', 'MEDIUM'),
+
+    # Canterbury Anniversary (2nd Fri before 1st Sat in Dec)
+    ('Canterbury Anniversary', '캔터베리 기념일', 'NZ_REGIONAL', '2024-11-15', '2024-11-15', 'MEDIUM'),
+    ('Canterbury Anniversary', '캔터베리 기념일', 'NZ_REGIONAL', '2025-11-14', '2025-11-14', 'MEDIUM'),
+    ('Canterbury Anniversary', '캔터베리 기념일', 'NZ_REGIONAL', '2026-11-13', '2026-11-13', 'MEDIUM'),
+    ('Canterbury Anniversary', '캔터베리 기념일', 'NZ_REGIONAL', '2027-11-12', '2027-11-12', 'MEDIUM'),
+
+    # Westland Anniversary (Dec 1 or closest Mon)
+    ('Westland Anniversary', '웨스트랜드 기념일', 'NZ_REGIONAL', '2024-12-02', '2024-12-02', 'MEDIUM'),
+    ('Westland Anniversary', '웨스트랜드 기념일', 'NZ_REGIONAL', '2025-12-01', '2025-12-01', 'MEDIUM'),
+    ('Westland Anniversary', '웨스트랜드 기념일', 'NZ_REGIONAL', '2026-11-30', '2026-11-30', 'MEDIUM'),
+    ('Westland Anniversary', '웨스트랜드 기념일', 'NZ_REGIONAL', '2027-12-06', '2027-12-06', 'MEDIUM'),
+
+    # Chatham Islands Anniversary (closest Mon to Nov 30)
+    ('Chatham Islands Anniversary', '채텀 아일랜드 기념일', 'NZ_REGIONAL', '2024-12-02', '2024-12-02', 'LOW'),
+    ('Chatham Islands Anniversary', '채텀 아일랜드 기념일', 'NZ_REGIONAL', '2025-12-01', '2025-12-01', 'LOW'),
+    ('Chatham Islands Anniversary', '채텀 아일랜드 기념일', 'NZ_REGIONAL', '2026-11-30', '2026-11-30', 'LOW'),
+    ('Chatham Islands Anniversary', '채텀 아일랜드 기념일', 'NZ_REGIONAL', '2027-11-29', '2027-11-29', 'LOW'),
 ]
 
 

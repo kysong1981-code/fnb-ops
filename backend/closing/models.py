@@ -521,6 +521,7 @@ class CQTransaction(models.Model):
 # Holiday Category Choices
 HOLIDAY_CATEGORY_CHOICES = (
     ('NZ_PUBLIC', 'NZ Public Holiday'),
+    ('NZ_REGIONAL', 'NZ Regional Anniversary'),
     ('NZ_SCHOOL', 'NZ School Holiday'),
     ('CN_MAJOR', 'Chinese Major Holiday'),
     ('CN_FESTIVAL', 'Chinese Festival'),
