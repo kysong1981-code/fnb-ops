@@ -166,27 +166,28 @@ export default function ProfitShare() {
     setError('')
     setSuccess('')
 
+    const n = (v) => parseFloat(v) || 0
     const payload = {
       year,
       period_type: periodType,
-      account_revenue: summary.account_revenue || 0,
-      account_25: summary.account_25 || 0,
-      tax: summary.tax || 0,
-      bank_account: summary.bank_account || 0,
-      bank_cash: summary.bank_cash || 0,
-      net_profit_account: summary.net_profit_account || 0,
-      net_profit_cash: summary.net_profit_cash || 0,
-      incentive_account: summary.incentive_account || 0,
-      incentive_cash: summary.incentive_cash || 0,
-      incentive_pct: summary.incentive_pct || 0,
+      account_revenue: n(summary.account_revenue),
+      account_25: n(summary.account_25),
+      tax: n(summary.tax),
+      bank_account: n(summary.bank_account),
+      bank_cash: n(summary.bank_cash),
+      net_profit_account: n(summary.net_profit_account),
+      net_profit_cash: n(summary.net_profit_cash),
+      incentive_account: n(summary.incentive_account),
+      incentive_cash: n(summary.incentive_cash),
+      incentive_pct: n(summary.incentive_pct),
       notes: summary.notes || '',
       partners: partners.map((p, i) => ({
         ...(p.id ? { id: p.id } : {}),
-        name: p.name,
+        name: p.name || 'Partner',
         partner_type: p.partner_type,
-        incentive_pct: p.incentive_pct || 0,
-        equity_pct: p.equity_pct || 0,
-        fixed_amount: p.fixed_amount || 0,
+        incentive_pct: n(p.incentive_pct),
+        equity_pct: n(p.equity_pct),
+        fixed_amount: n(p.fixed_amount),
         notes: p.notes || '',
         order: i,
       })),
@@ -378,43 +379,6 @@ export default function ProfitShare() {
             </div>
           </div>
 
-          {/* Bank */}
-          <div className="mb-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Bank</h3>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className={labelCls}>Account</label>
-                <input
-                  type="number" step="0.01"
-                  value={summary.bank_account}
-                  onChange={(e) => handleSummaryChange('bank_account', e.target.value)}
-                  className={disabled ? readOnlyCls : inputCls}
-                  disabled={disabled}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label className={labelCls}>Cash</label>
-                <input
-                  type="number" step="0.01"
-                  value={summary.bank_cash}
-                  onChange={(e) => handleSummaryChange('bank_cash', e.target.value)}
-                  className={disabled ? readOnlyCls : inputCls}
-                  disabled={disabled}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label className={labelCls}>Total</label>
-                <input
-                  type="text"
-                  value={fmt(totalBank)}
-                  className={readOnlyCls}
-                  disabled
-                />
-              </div>
-            </div>
-          </div>
 
           {/* Net Profit */}
           <div className="mb-4">
@@ -633,7 +597,7 @@ export default function ProfitShare() {
                         <td className="py-1 text-right text-gray-400">{fmtDec((parseFloat(partner._incentive_account) || 0) + (parseFloat(partner._incentive_cash) || 0) || '')}</td>
                       </tr>
                       <tr>
-                        <td className="py-1 text-gray-500">Bank</td>
+                        <td className="py-1 text-gray-500">Equity</td>
                         <td className="py-1 text-right">{fmtDec(partner._bank_account)}</td>
                         <td className="py-1 text-right">{fmtDec(partner._bank_cash)}</td>
                         <td className="py-1 text-right text-gray-400">{fmtDec((parseFloat(partner._bank_account) || 0) + (parseFloat(partner._bank_cash) || 0) || '')}</td>
