@@ -22,6 +22,7 @@ const menuSections = [
     roles: ['CEO', 'HQ'],
     items: [
       { label: 'Store Evaluation', path: '/evaluation', icon: ChartIcon },
+      { label: 'Profit Share', path: '/profit-share', icon: MoneyIcon },
     ]
   },
   {

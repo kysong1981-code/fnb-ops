@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Report, GeneratedReport, SkyReport, StoreEvaluation
+from .models import Report, GeneratedReport, SkyReport, StoreEvaluation, ProfitShare, PartnerShare
 
 
 class ReportSerializer(serializers.ModelSerializer):
@@ -200,3 +200,128 @@ class StoreEvaluationSerializer(serializers.ModelSerializer):
         if obj.created_by:
             return obj.created_by.user.get_full_name() or obj.created_by.user.username
         return None
+
+
+class PartnerShareSerializer(serializers.ModelSerializer):
+    """Individual partner share serializer"""
+    partner_type_display = serializers.CharField(source='get_partner_type_display', read_only=True)
+
+    class Meta:
+        model = PartnerShare
+        fields = [
+            'id', 'name', 'partner_type', 'partner_type_display',
+            'incentive_pct', 'equity_pct',
+            'incentive_account', 'incentive_cash',
+            'bank_account', 'bank_cash',
+            'total_account', 'total_cash', 'total',
+            'fixed_amount', 'notes', 'order',
+        ]
+        read_only_fields = [
+            'id', 'partner_type_display',
+            'incentive_account', 'incentive_cash',
+            'bank_account', 'bank_cash',
+            'total_account', 'total_cash', 'total',
+        ]
+
+
+class ProfitShareSerializer(serializers.ModelSerializer):
+    """Profit share serializer with nested partners"""
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    period_display = serializers.CharField(source='get_period_type_display', read_only=True)
+    partners = PartnerShareSerializer(many=True, required=False)
+
+    class Meta:
+        model = ProfitShare
+        fields = [
+            'id', 'organization', 'organization_name',
+            'year', 'period_type', 'period_display',
+            # Revenue
+            'account_revenue', 'account_25', 'total_revenue',
+            # Tax
+            'tax',
+            # Bank
+            'bank_account', 'bank_cash', 'total_bank',
+            # Net Profit
+            'net_profit_account', 'net_profit_cash',
+            # Incentive
+            'incentive_account', 'incentive_cash', 'incentive_total', 'incentive_pct',
+            # Lock & Notes
+            'is_locked', 'notes',
+            # Partners
+            'partners',
+            # Meta
+            'created_by', 'created_by_name',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'organization', 'organization_name',
+            'created_by', 'created_by_name',
+            'created_at', 'updated_at',
+            'period_display',
+            'total_revenue', 'total_bank', 'incentive_total',
+        ]
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return obj.created_by.user.get_full_name() or obj.created_by.user.username
+        return None
+
+    def create(self, validated_data):
+        partners_data = validated_data.pop('partners', [])
+        instance = ProfitShare.objects.create(**validated_data)
+        instance.calculate_totals()
+        instance.save()
+        for partner_data in partners_data:
+            partner = PartnerShare.objects.create(profit_share=instance, **partner_data)
+            partner.calculate_amounts()
+            partner.save()
+        # Recalculate owner after all partners created
+        for partner in instance.partners.filter(partner_type='OWNER'):
+            partner.calculate_amounts()
+            partner.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        partners_data = validated_data.pop('partners', None)
+
+        # Update ProfitShare fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.calculate_totals()
+        instance.save()
+
+        if partners_data is not None:
+            # Replace all partners
+            existing_ids = set(instance.partners.values_list('id', flat=True))
+            incoming_ids = set()
+
+            for partner_data in partners_data:
+                pid = partner_data.get('id')
+                if pid and pid in existing_ids:
+                    # Update existing
+                    partner = PartnerShare.objects.get(id=pid, profit_share=instance)
+                    for attr, value in partner_data.items():
+                        if attr != 'id':
+                            setattr(partner, attr, value)
+                    partner.calculate_amounts()
+                    partner.save()
+                    incoming_ids.add(pid)
+                else:
+                    # Create new
+                    partner_data.pop('id', None)
+                    partner = PartnerShare.objects.create(profit_share=instance, **partner_data)
+                    partner.calculate_amounts()
+                    partner.save()
+                    incoming_ids.add(partner.id)
+
+            # Delete removed partners
+            to_delete = existing_ids - incoming_ids
+            instance.partners.filter(id__in=to_delete).delete()
+
+            # Recalculate owner after all partners updated
+            for partner in instance.partners.filter(partner_type='OWNER'):
+                partner.calculate_amounts()
+                partner.save()
+
+        return instance

@@ -63,6 +63,7 @@ import ManagerRoute from './components/auth/ManagerRoute'
 import ImportPage from './components/import/ImportPage'
 import CQReport from './components/reports/CQReport'
 import StoreEvaluation from './components/reports/StoreEvaluation'
+import ProfitShare from './components/reports/ProfitShare'
 
 // Helper component to wrap protected routes with Layout
 function ProtectedWithLayout({ children }) {
@@ -171,6 +172,16 @@ function App() {
             element={
               <ProtectedWithLayout>
                 <StoreEvaluation />
+              </ProtectedWithLayout>
+            }
+          />
+
+          {/* Profit Share (CEO/HQ only) */}
+          <Route
+            path="/profit-share"
+            element={
+              <ProtectedWithLayout>
+                <ProfitShare />
               </ProtectedWithLayout>
             }
           />

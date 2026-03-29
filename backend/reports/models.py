@@ -226,3 +226,151 @@ class StoreEvaluation(models.Model):
 
     def __str__(self):
         return f"Evaluation - {self.organization} {self.year} {self.get_period_type_display()}"
+
+
+class ProfitShare(models.Model):
+    """Store-level profit share summary per semi-annual period"""
+
+    PERIOD_CHOICES = (
+        ('H1', 'H1 (Apr-Sep)'),
+        ('H2', 'H2 (Oct-Mar)'),
+    )
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='profit_shares')
+    year = models.IntegerField()
+    period_type = models.CharField(max_length=2, choices=PERIOD_CHOICES)
+
+    # Revenue
+    account_revenue = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    account_25 = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_revenue = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Tax
+    tax = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Bank
+    bank_account = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    bank_cash = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_bank = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Net Profit
+    net_profit_account = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    net_profit_cash = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Incentive
+    incentive_account = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    incentive_cash = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    incentive_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    incentive_pct = models.DecimalField(max_digits=5, decimal_places=4, default=0)
+
+    # Lock & Notes
+    is_locked = models.BooleanField(default=False)
+    notes = models.TextField(blank=True, default='')
+
+    # Meta
+    created_by = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, related_name='profit_shares')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-year', '-period_type']
+        unique_together = ['organization', 'year', 'period_type']
+        indexes = [
+            models.Index(fields=['organization', 'year', 'period_type']),
+        ]
+
+    def __str__(self):
+        return f"ProfitShare - {self.organization} {self.year} {self.get_period_type_display()}"
+
+    def calculate_totals(self):
+        """Recalculate auto-computed totals."""
+        from decimal import Decimal
+        self.total_revenue = self.account_revenue + self.account_25
+        self.total_bank = self.bank_account + self.bank_cash
+        self.incentive_total = self.incentive_account + self.incentive_cash
+        # Auto-calc incentive from pct if incentive fields are 0 but pct is set
+        if self.incentive_pct > 0:
+            if self.incentive_account == 0 and self.net_profit_account > 0:
+                self.incentive_account = (self.net_profit_account * self.incentive_pct).quantize(Decimal('0.01'))
+            if self.incentive_cash == 0 and self.net_profit_cash > 0:
+                self.incentive_cash = (self.net_profit_cash * self.incentive_pct).quantize(Decimal('0.01'))
+            self.incentive_total = self.incentive_account + self.incentive_cash
+
+
+class PartnerShare(models.Model):
+    """Individual partner distribution within a ProfitShare"""
+
+    PARTNER_TYPE_CHOICES = (
+        ('EQUITY', 'Equity Partner'),
+        ('NON_EQUITY', 'Non-Equity Partner'),
+        ('OWNER', 'Owner'),
+    )
+
+    profit_share = models.ForeignKey(ProfitShare, on_delete=models.CASCADE, related_name='partners')
+    name = models.CharField(max_length=100)
+    partner_type = models.CharField(max_length=10, choices=PARTNER_TYPE_CHOICES, default='EQUITY')
+
+    # Percentages
+    incentive_pct = models.DecimalField(max_digits=5, decimal_places=4, default=0)
+    equity_pct = models.DecimalField(max_digits=5, decimal_places=4, default=0)
+
+    # Calculated amounts
+    incentive_account = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    incentive_cash = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    bank_account = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    bank_cash = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_account = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_cash = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Fixed amount (bypasses percentage calculation)
+    fixed_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Notes & order
+    notes = models.TextField(blank=True, default='')
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f"{self.name} ({self.get_partner_type_display()}) - {self.profit_share}"
+
+    def calculate_amounts(self):
+        """Recalculate amounts from parent ProfitShare percentages."""
+        from decimal import Decimal
+        parent = self.profit_share
+
+        if self.fixed_amount > 0:
+            # Fixed amount partner: split evenly between account and cash
+            self.incentive_account = Decimal('0')
+            self.incentive_cash = Decimal('0')
+            self.bank_account = Decimal('0')
+            self.bank_cash = Decimal('0')
+            self.total_account = (self.fixed_amount / 2).quantize(Decimal('0.01'))
+            self.total_cash = self.fixed_amount - self.total_account
+            self.total = self.fixed_amount
+        elif self.partner_type == 'OWNER':
+            # Owner gets remainder after all other partners
+            other_partners = parent.partners.exclude(id=self.id)
+            total_other_incentive_account = sum(p.incentive_account for p in other_partners)
+            total_other_incentive_cash = sum(p.incentive_cash for p in other_partners)
+            total_other_bank_account = sum(p.bank_account for p in other_partners)
+            total_other_bank_cash = sum(p.bank_cash for p in other_partners)
+
+            self.incentive_account = parent.incentive_account - total_other_incentive_account
+            self.incentive_cash = parent.incentive_cash - total_other_incentive_cash
+            self.bank_account = parent.net_profit_account - parent.incentive_account - total_other_bank_account
+            self.bank_cash = parent.net_profit_cash - parent.incentive_cash - total_other_bank_cash
+            self.total_account = self.incentive_account + self.bank_account
+            self.total_cash = self.incentive_cash + self.bank_cash
+            self.total = self.total_account + self.total_cash
+        else:
+            # Percentage-based partner
+            self.incentive_account = (parent.incentive_account * self.incentive_pct).quantize(Decimal('0.01'))
+            self.incentive_cash = (parent.incentive_cash * self.incentive_pct).quantize(Decimal('0.01'))
+            self.bank_account = (parent.net_profit_account * self.equity_pct).quantize(Decimal('0.01'))
+            self.bank_cash = (parent.net_profit_cash * self.equity_pct).quantize(Decimal('0.01'))
+            self.total_account = self.incentive_account + self.bank_account
+            self.total_cash = self.incentive_cash + self.bank_cash
+            self.total = self.total_account + self.total_cash

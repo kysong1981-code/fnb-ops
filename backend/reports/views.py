@@ -11,8 +11,8 @@ from decimal import Decimal
 from collections import defaultdict
 import io
 
-from .models import Report, GeneratedReport, SkyReport, StoreEvaluation
-from .serializers import ReportSerializer, GeneratedReportSerializer, SkyReportSerializer, StoreEvaluationSerializer
+from .models import Report, GeneratedReport, SkyReport, StoreEvaluation, ProfitShare, PartnerShare
+from .serializers import ReportSerializer, GeneratedReportSerializer, SkyReportSerializer, StoreEvaluationSerializer, ProfitShareSerializer
 from closing.models import DailyClosing, ClosingHRCash, ClosingCashExpense, ClosingSupplierCost, SupplierMonthlyStatement, ClosingOtherSale, Holiday
 from sales.models import Sales
 from hr.models import Timesheet
@@ -2317,59 +2317,50 @@ class StoreEvaluationViewSet(viewsets.ModelViewSet):
             raise PermissionDenied('This evaluation is locked and cannot be deleted.')
         instance.delete()
 
-    @action(detail=True, methods=['post'])
-    def auto_fill(self, request, pk=None):
+    @action(detail=False, methods=['get'], url_path='auto-fill')
+    def auto_fill(self, request):
         """Auto-fill achievements from SkyReport data for the evaluation period."""
-        instance = self.get_object()
-        if instance.is_locked:
-            return Response({'error': 'Evaluation is locked.'}, status=status.HTTP_403_FORBIDDEN)
-        if not self._check_ceo_hq(request):
-            return Response({'error': 'Only CEO/HQ can auto-fill.'}, status=status.HTTP_403_FORBIDDEN)
+        from users.filters import get_target_org
+        from django.db.models import Q
+
+        org = get_target_org(request)
+        year = int(request.query_params.get('year', timezone.now().year))
+        period_type = request.query_params.get('period_type', 'H1')
 
         # Determine month range: H1=Apr-Sep, H2=Oct-Mar (crosses year boundary)
-        from django.db.models import Q
-        if instance.period_type == 'H1':
-            # Apr-Sep same year
+        if period_type == 'H1':
             sky_reports = SkyReport.objects.filter(
-                organization=instance.organization,
-                year=instance.year,
-                month__in=range(4, 10),
+                organization=org, year=year, month__in=range(4, 10),
             )
         else:
-            # Oct of this year + Jan-Mar of next year
             sky_reports = SkyReport.objects.filter(
-                organization=instance.organization,
+                organization=org,
             ).filter(
-                Q(year=instance.year, month__in=[10, 11, 12]) |
-                Q(year=instance.year + 1, month__in=[1, 2, 3])
+                Q(year=year, month__in=[10, 11, 12]) |
+                Q(year=year + 1, month__in=[1, 2, 3])
             )
 
         if not sky_reports.exists():
             return Response({'error': 'No SkyReport data found for this period.'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Aggregate sales (total_sales_inc_gst), COGS ratio, Wage ratio
         total_sales = sky_reports.aggregate(total=Sum('total_sales_inc_gst'))['total'] or Decimal('0')
         total_cogs = sky_reports.aggregate(total=Sum('cogs'))['total'] or Decimal('0')
         total_wages = sky_reports.aggregate(total=Sum('wages'))['total'] or Decimal('0')
+        excl_gst = sky_reports.aggregate(total=Sum('excl_gst_sales'))['total'] or Decimal('0')
 
-        instance.sales_achievement = total_sales
-        if total_sales > 0:
-            instance.cogs_achievement = (total_cogs / total_sales).quantize(Decimal('0.0001'))
-            instance.wage_achievement = (total_wages / total_sales).quantize(Decimal('0.0001'))
-        else:
-            instance.cogs_achievement = Decimal('0')
-            instance.wage_achievement = Decimal('0')
+        cogs_pct = (total_cogs / excl_gst).quantize(Decimal('0.0001')) if excl_gst else Decimal('0')
+        wage_pct = (total_wages / excl_gst).quantize(Decimal('0.0001')) if excl_gst else Decimal('0')
 
-        # Auto-fill service rating from latest SkyReport's review_rating
-        latest_report = sky_reports.order_by('-month').first()
-        if latest_report and latest_report.review_rating > 0:
-            instance.service_rating = latest_report.review_rating
+        latest_report = sky_reports.order_by('-year', '-month').first()
+        service_rating = float(latest_report.review_rating) if latest_report and latest_report.review_rating > 0 else 0
 
-        instance.save()
-        self._calculate_scores(instance)
-
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data)
+        return Response({
+            'total_sales': float(total_sales),
+            'cogs_percent': float(cogs_pct),
+            'wage_percent': float(wage_pct),
+            'service_rating': service_rating,
+            'months_found': sky_reports.count(),
+        })
 
     @action(detail=True, methods=['post'])
     def toggle_lock(self, request, pk=None):
@@ -2382,3 +2373,98 @@ class StoreEvaluationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
+
+class ProfitShareViewSet(viewsets.ModelViewSet):
+    """
+    Partner Profit Share — semi-annual profit distribution per store
+    - list: all profit shares (filter by ?year=&period_type=)
+    - create/update: CEO/HQ only, with nested partners
+    - toggle_lock: lock/unlock (CEO/HQ only)
+    - auto_calculate: recalculate all partner amounts from percentages
+    """
+    queryset = ProfitShare.objects.all()
+    serializer_class = ProfitShareSerializer
+    permission_classes = [IsAuthenticated, IsManager]
+    filter_backends = [OrganizationFilterBackend]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        year = self.request.query_params.get('year')
+        period = self.request.query_params.get('period_type')
+        if year:
+            qs = qs.filter(year=year)
+        if period:
+            qs = qs.filter(period_type=period)
+        return qs.select_related('organization', 'created_by__user').prefetch_related('partners')
+
+    def _check_ceo_hq(self, request):
+        return request.user.profile.role in ['CEO', 'HQ']
+
+    def perform_create(self, serializer):
+        from users.filters import get_target_org
+        if not self._check_ceo_hq(self.request):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Only CEO/HQ can create profit shares.')
+        org = get_target_org(self.request)
+        profile = self.request.user.profile
+        serializer.save(organization=org, created_by=profile)
+
+    def perform_update(self, serializer):
+        if not self._check_ceo_hq(self.request):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Only CEO/HQ can edit profit shares.')
+        instance = serializer.instance
+        if instance.is_locked:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('This profit share is locked and cannot be modified.')
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if not self._check_ceo_hq(self.request):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Only CEO/HQ can delete profit shares.')
+        if instance.is_locked:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('This profit share is locked and cannot be deleted.')
+        instance.delete()
+
+    @action(detail=True, methods=['post'])
+    def auto_calculate(self, request, pk=None):
+        """Recalculate all partner amounts from percentages."""
+        instance = self.get_object()
+        if instance.is_locked:
+            return Response({'error': 'Profit share is locked.'}, status=status.HTTP_403_FORBIDDEN)
+        if not self._check_ceo_hq(request):
+            return Response({'error': 'Only CEO/HQ can recalculate.'}, status=status.HTTP_403_FORBIDDEN)
+
+        instance.calculate_totals()
+        instance.save()
+
+        # Calculate non-owner, non-fixed partners first
+        for partner in instance.partners.exclude(partner_type='OWNER').filter(fixed_amount=0):
+            partner.calculate_amounts()
+            partner.save()
+
+        # Calculate fixed-amount partners
+        for partner in instance.partners.filter(fixed_amount__gt=0):
+            partner.calculate_amounts()
+            partner.save()
+
+        # Calculate owner last (gets remainder)
+        for partner in instance.partners.filter(partner_type='OWNER'):
+            partner.calculate_amounts()
+            partner.save()
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def toggle_lock(self, request, pk=None):
+        """Toggle lock status. CEO/HQ only."""
+        if not self._check_ceo_hq(request):
+            return Response({'error': 'Only CEO/HQ can lock/unlock profit shares.'}, status=status.HTTP_403_FORBIDDEN)
+        instance = self.get_object()
+        instance.is_locked = not instance.is_locked
+        instance.save()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)

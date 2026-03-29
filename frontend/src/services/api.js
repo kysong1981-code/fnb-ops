@@ -707,6 +707,17 @@ export const evaluationAPI = {
   toggleLock: (id) => api.post(`/reports/store-evaluations/${id}/toggle-lock/`),
 }
 
+// Profit Share API
+export const profitShareAPI = {
+  list: (params) => api.get('/reports/profit-shares/', { params }),
+  get: (id) => api.get(`/reports/profit-shares/${id}/`),
+  create: (data) => api.post('/reports/profit-shares/', data),
+  update: (id, data) => api.put(`/reports/profit-shares/${id}/`, data),
+  delete: (id) => api.delete(`/reports/profit-shares/${id}/`),
+  toggleLock: (id) => api.post(`/reports/profit-shares/${id}/toggle-lock/`),
+  autoCalculate: (id) => api.post(`/reports/profit-shares/${id}/auto_calculate/`),
+}
+
 export const skyReportAPI = {
   list: (params) => api.get('/reports/sky-reports/', { params }),
   get: (id) => api.get(`/reports/sky-reports/${id}/`),
