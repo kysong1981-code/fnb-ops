@@ -525,7 +525,7 @@ function ReportDetail({ report }) {
           <DetailRow label="Auto" labelEn="Total Sales" value={`$${fmt(r.total_sales_garage)}`} />
           <DetailRow label="Auto" labelEn="HQ CASH" value={`$${fmt(r.hq_cash_garage)}`} />
           <div className="border-t border-gray-100 my-2" />
-          <DetailRow label="Input" labelEn="COGS (inc.GST)" value={`$${fmt(r.total_cogs_xero)}`} />
+          <DetailRow label="Input" labelEn="COGS (excl.GST)" value={`$${fmt(r.total_cogs_xero)}`} />
           <DetailRow label="Input" labelEn="Total Expense" value={`$${fmt(r.total_expense_xero)}`} />
           <DetailRow label="Input" labelEn="Labour" value={`$${fmt(r.labour_xero)}`} />
           {parseFloat(r.sub_contractor_xero) > 0 && (
@@ -616,7 +616,7 @@ function ReportForm({ form, updateField, handleSave, cancelEditing, saving, edit
         <p className="text-xs text-gray-400 mb-4">Manager manual input fields</p>
         <div className="space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <NumField label="COGS (inc.GST)" value={form.total_cogs_xero} onChange={v => updateField('total_cogs_xero', v)} prefix="$" />
+            <NumField label="COGS (excl.GST)" value={form.total_cogs_xero} onChange={v => updateField('total_cogs_xero', v)} prefix="$" />
             <NumField label="Total Expense" value={form.total_expense_xero} onChange={v => updateField('total_expense_xero', v)} prefix="$" />
             <NumField label="Labour" value={form.labour_xero} onChange={v => updateField('labour_xero', v)} prefix="$" />
           </div>
