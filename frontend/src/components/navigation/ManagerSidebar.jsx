@@ -42,7 +42,7 @@ const menuSections = [
       { label: 'Cash Management', path: '/cashup', icon: MoneyIcon, module: 'CASHUP' },
       { label: 'Reports', path: '/reports', icon: ChartIcon, module: 'REPORTS' },
       { label: 'Sales Analysis', path: '/sales', icon: ChartIcon, module: 'SALES' },
-      { label: 'HR Management', path: '/hr', icon: TeamIcon, module: 'HR' },
+      { label: 'HR Management', path: '/hr', icon: TeamIcon },
       { label: 'Assign Tasks', path: '/manager/assign-tasks', icon: CheckCircleIcon, module: 'TASKS' },
       { label: 'Safety Records', path: '/safety/inspection', icon: ShieldIcon, module: 'SAFETY' },
       { label: 'Data Import', path: '/import', icon: UploadIcon, module: 'REPORTS' },
