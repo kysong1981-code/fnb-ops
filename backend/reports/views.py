@@ -2326,17 +2326,23 @@ class StoreEvaluationViewSet(viewsets.ModelViewSet):
         if not self._check_ceo_hq(request):
             return Response({'error': 'Only CEO/HQ can auto-fill.'}, status=status.HTTP_403_FORBIDDEN)
 
-        # Determine month range
+        # Determine month range: H1=Apr-Sep, H2=Oct-Mar (crosses year boundary)
+        from django.db.models import Q
         if instance.period_type == 'H1':
-            months = range(1, 7)
+            # Apr-Sep same year
+            sky_reports = SkyReport.objects.filter(
+                organization=instance.organization,
+                year=instance.year,
+                month__in=range(4, 10),
+            )
         else:
-            months = range(7, 13)
-
-        sky_reports = SkyReport.objects.filter(
-            organization=instance.organization,
-            year=instance.year,
-            month__in=months,
-        )
+            # Oct of this year + Jan-Mar of next year
+            sky_reports = SkyReport.objects.filter(
+                organization=instance.organization,
+            ).filter(
+                Q(year=instance.year, month__in=[10, 11, 12]) |
+                Q(year=instance.year + 1, month__in=[1, 2, 3])
+            )
 
         if not sky_reports.exists():
             return Response({'error': 'No SkyReport data found for this period.'}, status=status.HTTP_404_NOT_FOUND)

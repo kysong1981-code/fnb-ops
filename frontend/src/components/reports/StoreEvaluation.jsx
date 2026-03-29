@@ -72,7 +72,9 @@ export default function StoreEvaluation() {
   const { user } = useAuth()
   const { stores, selectedStore } = useStore()
   const [year, setYear] = useState(new Date().getFullYear())
-  const [periodType, setPeriodType] = useState(new Date().getMonth() < 6 ? 'H1' : 'H2')
+  // H1=Apr-Sep, H2=Oct-Mar
+  const currentMonth = new Date().getMonth() + 1
+  const [periodType, setPeriodType] = useState(currentMonth >= 4 && currentMonth <= 9 ? 'H1' : 'H2')
   const [form, setForm] = useState({ ...EMPTY_FORM })
   const [evaluationId, setEvaluationId] = useState(null)
   const [isLocked, setIsLocked] = useState(false)
@@ -271,7 +273,7 @@ export default function StoreEvaluation() {
       <PageHeader
         title="Store Evaluation"
         icon={<ClipboardIcon size={24} />}
-        subtitle={`${periodType === 'H1' ? 'Jan - Jun' : 'Jul - Dec'} ${year}`}
+        subtitle={`${periodType === 'H1' ? 'Apr - Sep' : 'Oct - Mar'} ${year}`}
         action={
           isLocked && (
             <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-50 text-red-600 text-sm font-medium rounded-full">
@@ -314,7 +316,7 @@ export default function StoreEvaluation() {
                       : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  {p} ({p === 'H1' ? 'Jan-Jun' : 'Jul-Dec'})
+                  {p} ({p === 'H1' ? 'Apr-Sep' : 'Oct-Mar'})
                 </button>
               ))}
             </div>

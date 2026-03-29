@@ -159,8 +159,8 @@ class StoreEvaluation(models.Model):
     """Store Evaluation — semi-annual manager performance evaluation"""
 
     PERIOD_CHOICES = (
-        ('H1', 'H1 (Jan-Jun)'),
-        ('H2', 'H2 (Jul-Dec)'),
+        ('H1', 'H1 (Apr-Sep)'),
+        ('H2', 'H2 (Oct-Mar)'),
     )
 
     MANAGER_TYPE_CHOICES = (
