@@ -547,7 +547,7 @@ function ReportDetail({ report }) {
           <MiniKpi label="COGS Goal" value={parseFloat(r.cogs_goal) > 0 ? `${r.cogs_goal}%` : '-'} />
           <MiniKpi label="Wage Goal" value={parseFloat(r.wage_goal) > 0 ? `${r.wage_goal}%` : '-'} />
           <MiniKpi label="Review Rating" value={r.review_rating > 0 ? r.review_rating : '-'} />
-          <MiniKpi label="Review Goal" value={r.review_goal > 0 ? r.review_goal : '-'} />
+          <MiniKpi label="Total Reviews" value={r.review_goal > 0 ? r.review_goal : '-'} />
           <div className="bg-gray-50 rounded-xl p-3 text-center">
             <div className="text-xs text-gray-500 mb-1">Hygiene</div>
             {(() => {
@@ -656,7 +656,7 @@ function ReportForm({ form, updateField, handleSave, cancelEditing, saving, edit
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
           <NumField label="Reviews This Month" value={form.review_rating} onChange={v => updateField('review_rating', v)} />
-          <NumField label="Review Goal (Next)" value={form.review_goal} onChange={v => updateField('review_goal', v)} />
+          <NumField label="Total Reviews" value={form.review_goal} onChange={v => updateField('review_goal', v)} />
           <div>
             <label className={labelCls}>Hygiene Inspection Cycle</label>
             <select value={form.hygiene_grade} onChange={e => updateField('hygiene_grade', e.target.value)}
