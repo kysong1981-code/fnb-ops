@@ -369,8 +369,11 @@ class PartnerShare(models.Model):
             # Percentage-based partner
             self.incentive_account = (parent.incentive_account * self.incentive_pct).quantize(Decimal('0.01'))
             self.incentive_cash = (parent.incentive_cash * self.incentive_pct).quantize(Decimal('0.01'))
-            self.bank_account = (parent.net_profit_account * self.equity_pct).quantize(Decimal('0.01'))
-            self.bank_cash = (parent.net_profit_cash * self.equity_pct).quantize(Decimal('0.01'))
+            # Equity is based on net profit MINUS incentive
+            distributable_account = parent.net_profit_account - parent.incentive_account
+            distributable_cash = parent.net_profit_cash - parent.incentive_cash
+            self.bank_account = (distributable_account * self.equity_pct).quantize(Decimal('0.01'))
+            self.bank_cash = (distributable_cash * self.equity_pct).quantize(Decimal('0.01'))
             self.total_account = self.incentive_account + self.bank_account
             self.total_cash = self.incentive_cash + self.bank_cash
             self.total = self.total_account + self.total_cash
