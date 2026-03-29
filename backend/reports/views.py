@@ -1246,9 +1246,15 @@ class ReportViewSet(viewsets.ModelViewSet):
             start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
             end_date = datetime.strptime(end_str, '%Y-%m-%d').date()
 
-            # Last year same period (364 days = 52 weeks, same day of week)
-            ly_start = start_date - timedelta(days=364)
-            ly_end = end_date - timedelta(days=364)
+            # Last year same period (same month/day, 1 year back)
+            try:
+                ly_start = start_date.replace(year=start_date.year - 1)
+            except ValueError:  # Feb 29 → Feb 28
+                ly_start = start_date.replace(year=start_date.year - 1, day=28)
+            try:
+                ly_end = end_date.replace(year=end_date.year - 1)
+            except ValueError:
+                ly_end = end_date.replace(year=end_date.year - 1, day=28)
 
             # Sales aggregation by date (try Sales model first, fallback to DailyClosing POS data)
             sales_agg = {
@@ -1286,10 +1292,20 @@ class ReportViewSet(viewsets.ModelViewSet):
 
             # Fallback for last year too
             if not ly_sales_agg:
+                from closing.models import ClosingOtherSale as LyOtherSale
+                ly_other_sales_agg = {
+                    row['closing__closing_date']: float(row['total'] or 0)
+                    for row in LyOtherSale.objects.filter(
+                        closing__organization=org,
+                        closing__closing_date__range=[ly_start, ly_end]
+                    ).values('closing__closing_date').annotate(total=Sum('amount'))
+                }
                 for dc in DailyClosing.objects.filter(
                     organization=org, closing_date__range=[ly_start, ly_end]
                 ):
-                    total = float(dc.pos_card or 0) + float(dc.pos_cash or 0)
+                    pos_total = float(dc.pos_card or 0) + float(dc.pos_cash or 0)
+                    other_total = ly_other_sales_agg.get(dc.closing_date, 0)
+                    total = pos_total + other_total
                     if total > 0:
                         ly_sales_agg[dc.closing_date] = {'total': total, 'qty': 0}
 
@@ -1335,6 +1351,8 @@ class ReportViewSet(viewsets.ModelViewSet):
             day_idx = 0
             while current <= end_date:
                 ly_date = ly_start + timedelta(days=day_idx)
+                if ly_date > ly_end:
+                    ly_date = ly_end  # clamp to avoid overflow into next month
                 s = sales_agg.get(current, {'total': 0, 'qty': 0})
                 ly_s = ly_sales_agg.get(ly_date, {'total': 0, 'qty': 0})
 
