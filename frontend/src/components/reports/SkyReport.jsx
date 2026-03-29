@@ -407,18 +407,18 @@ function YoyBadge({ value, label }) {
 // ===== NZ MONTH CONTEXT =====
 function getMonthContext(month) {
   const contexts = {
-    1: { season: '여름 성수기', desc: 'Summer peak season. School holidays continue. High tourist activity.', events: 'New Year\'s Day, Day after New Year\'s Day' },
-    2: { season: '여름 후반', desc: 'Late summer. Waitangi Day long weekend boost. Tourist flow still strong.', events: 'Waitangi Day (Feb 6)' },
-    3: { season: '가을 전환', desc: 'Autumn transition. Easter often falls here. Tourism starts to wind down.', events: 'Easter (varies), Otago Anniversary (Mar 23)' },
-    4: { season: '가을', desc: 'Autumn. ANZAC Day long weekend. Quieter period begins. School holidays.', events: 'ANZAC Day (Apr 25), School Holidays' },
-    5: { season: '비수기 시작', desc: 'Low season begins. Cooler weather, fewer tourists. Focus on locals.', events: '' },
-    6: { season: '비수기', desc: 'Winter low season. Ski season starts late June. Queen\'s Birthday weekend.', events: 'Queen\'s Birthday (1st Mon), Ski Season Opens' },
-    7: { season: '겨울 스키시즌', desc: 'Peak ski season! Queenstown/Wanaka tourist surge. School holidays.', events: 'Matariki, School Holidays, Ski Peak' },
-    8: { season: '겨울 스키시즌', desc: 'Ski season continues. Strong tourist activity in ski regions.', events: 'Ski Season' },
-    9: { season: '겨울 후반', desc: 'Late winter. Ski season winding down. Spring approaching.', events: 'Ski Season Ends, School Holidays' },
-    10: { season: '봄', desc: 'Spring. Labour Day long weekend. Business picks up gradually.', events: 'Labour Day (4th Mon)' },
-    11: { season: '봄/여름 전환', desc: 'Late spring. Weather warming. Pre-Christmas activity starts.', events: 'Canterbury Anniversary (varies)' },
-    12: { season: '여름 성수기', desc: 'Summer peak. Christmas/NY rush. Maximum tourist and local activity.', events: 'Christmas Day, Boxing Day, School Holidays' },
+    1: { season: 'Summer Peak', desc: 'Summer peak season. School holidays continue. High tourist activity.', events: 'New Year\'s Day, Day after New Year\'s Day' },
+    2: { season: 'Late Summer', desc: 'Late summer. Waitangi Day long weekend boost. Tourist flow still strong.', events: 'Waitangi Day (Feb 6)' },
+    3: { season: 'Autumn Transition', desc: 'Autumn transition. Easter often falls here. Tourism starts to wind down.', events: 'Easter (varies), Otago Anniversary (Mar 23)' },
+    4: { season: 'Autumn', desc: 'Autumn. ANZAC Day long weekend. Quieter period begins. School holidays.', events: 'ANZAC Day (Apr 25), School Holidays' },
+    5: { season: 'Low Season', desc: 'Low season begins. Cooler weather, fewer tourists. Focus on locals.', events: '' },
+    6: { season: 'Off-Peak', desc: 'Winter low season. Ski season starts late June. Queen\'s Birthday weekend.', events: 'Queen\'s Birthday (1st Mon), Ski Season Opens' },
+    7: { season: 'Ski Season Peak', desc: 'Peak ski season! Queenstown/Wanaka tourist surge. School holidays.', events: 'Matariki, School Holidays, Ski Peak' },
+    8: { season: 'Ski Season', desc: 'Ski season continues. Strong tourist activity in ski regions.', events: 'Ski Season' },
+    9: { season: 'Late Winter', desc: 'Late winter. Ski season winding down. Spring approaching.', events: 'Ski Season Ends, School Holidays' },
+    10: { season: 'Spring', desc: 'Spring. Labour Day long weekend. Business picks up gradually.', events: 'Labour Day (4th Mon)' },
+    11: { season: 'Late Spring', desc: 'Late spring. Weather warming. Pre-Christmas activity starts.', events: 'Canterbury Anniversary (varies)' },
+    12: { season: 'Summer Peak', desc: 'Summer peak. Christmas/NY rush. Maximum tourist and local activity.', events: 'Christmas Day, Boxing Day, School Holidays' },
   }
   return contexts[month] || { season: '', desc: '', events: '' }
 }
@@ -448,7 +448,7 @@ function ReportDetail({ report }) {
           {kpis.profit_ratio !== undefined && (
             <div className={`text-right ${kpis.profit_ratio >= 0 ? 'text-green-700' : 'text-red-700'}`}>
               <div className="text-2xl font-bold">{kpis.profit_ratio}%</div>
-              <div className="text-xs text-gray-500">영업이익률</div>
+              <div className="text-xs text-gray-500">Profit Margin</div>
             </div>
           )}
         </div>
@@ -479,10 +479,10 @@ function ReportDetail({ report }) {
       {/* YoY Comparison */}
       {yoy && (
         <Card className="p-5">
-          <h3 className="text-sm font-bold text-gray-900 mb-3">전년 대비 ({r.year - 1} → {r.year})</h3>
+          <h3 className="text-sm font-bold text-gray-900 mb-3">YoY Comparison ({r.year - 1} → {r.year})</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="text-center">
-              <div className="text-xs text-gray-500 mb-1">매출</div>
+              <div className="text-xs text-gray-500 mb-1">Sales</div>
               <YoyBadge value={yoy.sales} />
               <div className="text-xs text-gray-400 mt-1">${fmt(yoy.prev_sales)} → ${fmt(r.total_sales_inc_gst)}</div>
             </div>
@@ -492,12 +492,12 @@ function ReportDetail({ report }) {
               <div className="text-xs text-gray-400 mt-1">${fmt(yoy.prev_cogs)} → ${fmt(r.cogs)}</div>
             </div>
             <div className="text-center">
-              <div className="text-xs text-gray-500 mb-1">인건비</div>
+              <div className="text-xs text-gray-500 mb-1">Labour</div>
               <YoyBadge value={yoy.labour} />
               <div className="text-xs text-gray-400 mt-1">${fmt(yoy.prev_labour)} → ${fmt(r.sales_per_hour)}</div>
             </div>
             <div className="text-center">
-              <div className="text-xs text-gray-500 mb-1">영업이익</div>
+              <div className="text-xs text-gray-500 mb-1">Profit</div>
               <YoyBadge value={yoy.profit} />
               <div className="text-xs text-gray-400 mt-1">${fmt(yoy.prev_profit)} → ${fmt(r.operating_profit)}</div>
             </div>
@@ -509,16 +509,16 @@ function ReportDetail({ report }) {
       <Card className="p-5">
         <h3 className="text-sm font-bold text-gray-900 mb-4">P&L Summary</h3>
         <div className="space-y-1">
-          <DetailRow label="총매출 (GST 포함)" labelEn="Total Sales inc.GST" value={`$${fmt(r.total_sales_inc_gst)}`} highlight />
-          <DetailRow label="매출 (GST 제외)" labelEn="EXCL GST" value={`$${fmt(r.excl_gst_sales)}`} />
-          <DetailRow label="현금" labelEn="HQ CASH" value={`$${fmt(r.hq_cash)}`} />
+          <DetailRow label="" labelEn="Total Sales inc.GST" value={`$${fmt(r.total_sales_inc_gst)}`} highlight />
+          <DetailRow label="" labelEn="EXCL GST" value={`$${fmt(r.excl_gst_sales)}`} />
+          <DetailRow label="" labelEn="HQ CASH" value={`$${fmt(r.hq_cash)}`} />
           <div className="border-t border-gray-100 my-2" />
-          <DetailRow label="매출원가 (GST 제외)" labelEn="COGS" value={`$${fmt(r.cogs)}`} ratio={salesRatio('cogs')} />
-          <DetailRow label="운영비용" labelEn="Operating Expenses" value={`$${fmt(r.operating_expenses)}`} ratio={salesRatio('operating_expenses')} />
-          <DetailRow label="총 인건비" labelEn="Total Labour" value={`$${fmt(r.sales_per_hour)}`} ratio={salesRatio('sales_per_hour')} />
+          <DetailRow label="" labelEn="COGS (excl.GST)" value={`$${fmt(r.cogs)}`} ratio={salesRatio('cogs')} />
+          <DetailRow label="" labelEn="Operating Expenses" value={`$${fmt(r.operating_expenses)}`} ratio={salesRatio('operating_expenses')} />
+          <DetailRow label="" labelEn="Total Labour" value={`$${fmt(r.sales_per_hour)}`} ratio={salesRatio('sales_per_hour')} />
           <div className="border-t border-gray-100 my-2" />
-          <DetailRow label="납부할 GST" labelEn="Payable GST" value={`$${fmt(r.payable_gst)}`} />
-          <DetailRow label="영업이익 (세전)" labelEn="Operating Profit" value={`$${fmt(r.operating_profit)}`} ratio={`${kpis.profit_ratio || 0}%`} highlight />
+          <DetailRow label="" labelEn="Payable GST" value={`$${fmt(r.payable_gst)}`} />
+          <DetailRow label="" labelEn="Operating Profit" value={`$${fmt(r.operating_profit)}`} ratio={`${kpis.profit_ratio || 0}%`} highlight />
         </div>
       </Card>
 
@@ -526,20 +526,20 @@ function ReportDetail({ report }) {
       <Card className="p-5">
         <h3 className="text-sm font-bold text-gray-900 mb-4">Input Data</h3>
         <div className="space-y-1">
-          <DetailRow label="자동" labelEn="Total Sales" value={`$${fmt(r.total_sales_garage)}`} />
-          <DetailRow label="자동" labelEn="HQ CASH" value={`$${fmt(r.hq_cash_garage)}`} />
+          <DetailRow label="Auto" labelEn="Total Sales" value={`$${fmt(r.total_sales_garage)}`} />
+          <DetailRow label="Auto" labelEn="HQ CASH" value={`$${fmt(r.hq_cash_garage)}`} />
           <div className="border-t border-gray-100 my-2" />
-          <DetailRow label="입력" labelEn="COGS (GST 포함)" value={`$${fmt(r.total_cogs_xero)}`} />
-          <DetailRow label="입력" labelEn="Total Expense" value={`$${fmt(r.total_expense_xero)}`} />
-          <DetailRow label="입력" labelEn="Labour" value={`$${fmt(r.labour_xero)}`} />
+          <DetailRow label="Input" labelEn="COGS (inc.GST)" value={`$${fmt(r.total_cogs_xero)}`} />
+          <DetailRow label="Input" labelEn="Total Expense" value={`$${fmt(r.total_expense_xero)}`} />
+          <DetailRow label="Input" labelEn="Labour" value={`$${fmt(r.labour_xero)}`} />
           {parseFloat(r.sub_contractor_xero) > 0 && (
-            <DetailRow label="입력" labelEn="Sub-contractor" value={`$${fmt(r.sub_contractor_xero)}`} />
+            <DetailRow label="Input" labelEn="Sub-contractor" value={`$${fmt(r.sub_contractor_xero)}`} />
           )}
           <DetailRow label="" labelEn="Trading Days" value={r.number_of_days || '-'} />
           <DetailRow label="" labelEn="Payruns" value={r.number_of_payruns || '-'} />
-          <DetailRow label="" labelEn="Tabs (탭수)" value={r.pos_sales > 0 ? r.pos_sales : '-'} />
-          <DetailRow label="" labelEn="Total Work Hours (총 근무시간)" value={parseFloat(r.other_sales) > 0 ? r.other_sales + 'h' : '-'} />
-          <DetailRow label="" labelEn="Opening Hours/Day (일 영업시간)" value={parseFloat(r.tab_allowance_sales) > 0 ? r.tab_allowance_sales + 'h' : '-'} />
+          <DetailRow label="" labelEn="Tabs" value={r.pos_sales > 0 ? r.pos_sales : '-'} />
+          <DetailRow label="" labelEn="Total Work Hours" value={parseFloat(r.other_sales) > 0 ? r.other_sales + 'h' : '-'} />
+          <DetailRow label="" labelEn="Opening Hours/Day" value={parseFloat(r.tab_allowance_sales) > 0 ? r.tab_allowance_sales + 'h' : '-'} />
         </div>
       </Card>
 
@@ -559,7 +559,7 @@ function ReportDetail({ report }) {
               const months = g === '18' ? 18 : g === '12' ? 12 : g === '6' ? 6 : 0
               const color = months >= 18 ? 'text-green-600 bg-green-100' : months >= 12 ? 'text-blue-600 bg-blue-100' : months >= 6 ? 'text-yellow-600 bg-yellow-100' : 'text-gray-600 bg-gray-100'
               return months > 0 ? (
-                <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${color}`}>{months}개월</span>
+                <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${color}`}>{months} months</span>
               ) : (
                 <span className="text-sm font-bold text-gray-400">{g || '-'}</span>
               )
@@ -573,10 +573,10 @@ function ReportDetail({ report }) {
         <Card className="p-5">
           <h3 className="text-sm font-bold text-gray-900 mb-4">Notes</h3>
           <div className="space-y-3">
-            {r.sales_notes && <NoteBlock title="매출 (Sales)" text={r.sales_notes} />}
-            {r.cogs_notes && <NoteBlock title="COGS / 운영비용" text={r.cogs_notes} />}
-            {r.wage_notes && <NoteBlock title="인건비 (Wages)" text={r.wage_notes} />}
-            {r.next_month_notes && <NoteBlock title="다음달 목표 (Next Month)" text={r.next_month_notes} />}
+            {r.sales_notes && <NoteBlock title="Sales" text={r.sales_notes} />}
+            {r.cogs_notes && <NoteBlock title="COGS / Operating Expenses" text={r.cogs_notes} />}
+            {r.wage_notes && <NoteBlock title="Wages" text={r.wage_notes} />}
+            {r.next_month_notes && <NoteBlock title="Next Month Goals" text={r.next_month_notes} />}
           </div>
         </Card>
       )}
@@ -591,22 +591,22 @@ function ReportForm({ form, updateField, handleSave, cancelEditing, saving, edit
       {/* Auto-filled from DailyClosing */}
       <Card className="p-5">
         <h3 className="text-sm font-bold text-gray-900 mb-1">Auto Data (DailyClosing)</h3>
-        <p className="text-xs text-gray-400 mb-4">CSV 업로드 데이터에서 자동 계산</p>
+        <p className="text-xs text-gray-400 mb-4">Auto-calculated from CSV upload data</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <div>
-            <label className={labelCls}>Total Sales (자동)</label>
+            <label className={labelCls}>Total Sales (Auto)</label>
             <div className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm text-right text-blue-700 font-medium">
               ${parseFloat(form.total_sales_garage || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2 })}
             </div>
           </div>
           <div>
-            <label className={labelCls}>HQ CASH (자동)</label>
+            <label className={labelCls}>HQ CASH (Auto)</label>
             <div className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm text-right text-blue-700 font-medium">
               ${parseFloat(form.hq_cash_garage || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2 })}
             </div>
           </div>
           <div>
-            <label className={labelCls}>Trading Days (자동)</label>
+            <label className={labelCls}>Trading Days (Auto)</label>
             <div className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm text-right text-blue-700 font-medium">
               {form.number_of_days || 0}
             </div>
@@ -617,33 +617,33 @@ function ReportForm({ form, updateField, handleSave, cancelEditing, saving, edit
       {/* Manager Input */}
       <Card className="p-5">
         <h3 className="text-sm font-bold text-gray-900 mb-1">Manager Input</h3>
-        <p className="text-xs text-gray-400 mb-4">매니저가 직접 입력하는 항목</p>
+        <p className="text-xs text-gray-400 mb-4">Manager manual input fields</p>
         <div className="space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <NumField label="COGS (GST 포함)" value={form.total_cogs_xero} onChange={v => updateField('total_cogs_xero', v)} prefix="$" />
-            <NumField label="Total Expense (운영비 총액)" value={form.total_expense_xero} onChange={v => updateField('total_expense_xero', v)} prefix="$" />
-            <NumField label="Labour (인건비)" value={form.labour_xero} onChange={v => updateField('labour_xero', v)} prefix="$" />
+            <NumField label="COGS (inc.GST)" value={form.total_cogs_xero} onChange={v => updateField('total_cogs_xero', v)} prefix="$" />
+            <NumField label="Total Expense" value={form.total_expense_xero} onChange={v => updateField('total_expense_xero', v)} prefix="$" />
+            <NumField label="Labour" value={form.labour_xero} onChange={v => updateField('labour_xero', v)} prefix="$" />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <NumField label="Sub-contractor (있으면)" value={form.sub_contractor_xero} onChange={v => updateField('sub_contractor_xero', v)} prefix="$" />
+            <NumField label="Sub-contractor" value={form.sub_contractor_xero} onChange={v => updateField('sub_contractor_xero', v)} prefix="$" />
             <div>
               <label className={labelCls}>Number of Payruns</label>
               <input type="number" value={form.number_of_payruns} onChange={e => updateField('number_of_payruns', e.target.value)} className={inputCls} min="1" max="4" />
             </div>
             <div>
-              <label className={labelCls}>Number of Tabs (탭수)</label>
+              <label className={labelCls}>Number of Tabs</label>
               <input type="number" value={form.pos_sales} onChange={e => updateField('pos_sales', e.target.value)} className={inputCls} min="0" />
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div>
-              <label className={labelCls}>총 근무시간 (Total Work Hours)</label>
-              <input type="number" step="0.5" value={form.other_sales} onChange={e => updateField('other_sales', e.target.value)} className={inputCls} min="0" placeholder="예: 480" />
+              <label className={labelCls}>Total Work Hours</label>
+              <input type="number" step="0.5" value={form.other_sales} onChange={e => updateField('other_sales', e.target.value)} className={inputCls} min="0" placeholder="e.g. 480" />
             </div>
             <div>
-              <label className={labelCls}>일 영업시간 (Opening Hours/Day)</label>
+              <label className={labelCls}>Opening Hours/Day</label>
               <div className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm text-right text-blue-700 font-medium">
-                {parseFloat(form.tab_allowance_sales || 0)}h (가게설정)
+                {parseFloat(form.tab_allowance_sales || 0)}h (from store settings)
               </div>
             </div>
           </div>
@@ -652,20 +652,20 @@ function ReportForm({ form, updateField, handleSave, cancelEditing, saving, edit
 
       <Card className="p-5">
         <h3 className="text-sm font-bold text-gray-900 mb-1">Goals & Review</h3>
-        <p className="text-xs text-gray-400 mb-4">다음달 목표 및 리뷰</p>
+        <p className="text-xs text-gray-400 mb-4">Next month targets & review</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <NumField label="Sales Goal ($)" value={form.sales_goal} onChange={v => updateField('sales_goal', v)} prefix="$" />
           <NumField label="COGS Goal (%)" value={form.cogs_goal} onChange={v => updateField('cogs_goal', v)} suffix="%" />
           <NumField label="Wage Goal (%)" value={form.wage_goal} onChange={v => updateField('wage_goal', v)} suffix="%" />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
-          <NumField label="이번달 리뷰 개수" value={form.review_rating} onChange={v => updateField('review_rating', v)} />
+          <NumField label="Reviews This Month" value={form.review_rating} onChange={v => updateField('review_rating', v)} />
           <NumField label="Review Goal (Next)" value={form.review_goal} onChange={v => updateField('review_goal', v)} />
           <div>
-            <label className={labelCls}>Hygiene (검사 주기)</label>
+            <label className={labelCls}>Hygiene Inspection Cycle</label>
             <select value={form.hygiene_grade} onChange={e => updateField('hygiene_grade', e.target.value)}
               className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-              {[['18', '18개월 (우수)'], ['12', '12개월 (양호)'], ['6', '6개월 (주의)']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              {[['18', '18 months (Excellent)'], ['12', '12 months (Good)'], ['6', '6 months (Caution)']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
         </div>
@@ -676,22 +676,22 @@ function ReportForm({ form, updateField, handleSave, cancelEditing, saving, edit
         <p className="text-xs text-gray-400 mb-4">Monthly observations and goals</p>
         <div className="space-y-3">
           <div>
-            <label className={labelCls}>Sales Notes (매출)</label>
+            <label className={labelCls}>Sales Notes</label>
             <textarea value={form.sales_notes} onChange={e => updateField('sales_notes', e.target.value)}
               rows={3} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
           </div>
           <div>
-            <label className={labelCls}>COGS / Expense Notes (매출원가/운영비용)</label>
+            <label className={labelCls}>COGS / Expense Notes</label>
             <textarea value={form.cogs_notes} onChange={e => updateField('cogs_notes', e.target.value)}
               rows={3} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
           </div>
           <div>
-            <label className={labelCls}>Wage Notes (인건비)</label>
+            <label className={labelCls}>Wage Notes</label>
             <textarea value={form.wage_notes} onChange={e => updateField('wage_notes', e.target.value)}
               rows={3} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
           </div>
           <div>
-            <label className={labelCls}>Next Month Goals (다음달 목표)</label>
+            <label className={labelCls}>Next Month Goals</label>
             <textarea value={form.next_month_notes} onChange={e => updateField('next_month_notes', e.target.value)}
               rows={3} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
           </div>
