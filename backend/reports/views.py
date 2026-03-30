@@ -2458,6 +2458,31 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
+    @action(detail=False, methods=['get'])
+    def history(self, request):
+        """Return all profit shares for a store (all years/periods) for the history dashboard."""
+        from users.filters import get_target_org
+        org = get_target_org(request)
+        if not org:
+            return Response({'error': 'No store selected.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        qs = ProfitShare.objects.filter(organization=org).order_by('year', 'period_type')
+        results = []
+        for ps in qs.prefetch_related('partners'):
+            net_profit_total = float(ps.net_profit_account + ps.net_profit_cash)
+            incentive_total = float(ps.incentive_account + ps.incentive_cash)
+            results.append({
+                'id': ps.id,
+                'year': ps.year,
+                'period_type': ps.period_type,
+                'period_display': ps.get_period_type_display(),
+                'net_profit_total': net_profit_total,
+                'incentive_total': incentive_total,
+                'partner_count': ps.partners.count(),
+                'is_locked': ps.is_locked,
+            })
+        return Response(results)
+
     @action(detail=True, methods=['post'])
     def toggle_lock(self, request, pk=None):
         """Toggle lock status. CEO/HQ only."""

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { profitShareAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import { useStore } from '../../context/StoreContext'
@@ -25,17 +25,15 @@ function fmtDec(v) {
   return '$' + n.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function pctDisplay(v) {
-  if (!v || parseFloat(v) === 0) return '-'
-  return (parseFloat(v) * 100).toFixed(1) + '%'
+function periodLabel(year, periodType) {
+  if (periodType === 'H1') return `${year} H1 (Apr-Sep)`
+  return `${year} H2 (Oct-Mar)`
 }
 
 const EMPTY_SUMMARY = {
   account_revenue: '',
   account_25: '',
   tax: '',
-  bank_account: '',
-  bank_cash: '',
   net_profit_account: '',
   net_profit_cash: '',
   incentive_account: '',
@@ -68,12 +66,31 @@ export default function ProfitShare() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [historyData, setHistoryData] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
 
   const isCEO = user?.role === 'CEO' || user?.role === 'HQ'
 
   useEffect(() => {
     loadProfitShare()
   }, [selectedStore?.id, year, periodType])
+
+  useEffect(() => {
+    loadHistory()
+  }, [selectedStore?.id])
+
+  const loadHistory = async () => {
+    if (!selectedStore?.id) return
+    setHistoryLoading(true)
+    try {
+      const res = await profitShareAPI.history(selectedStore.id)
+      setHistoryData(res.data || [])
+    } catch (err) {
+      console.warn('Failed to load history:', err)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
 
   const loadProfitShare = async () => {
     if (!selectedStore?.id) return
@@ -94,8 +111,6 @@ export default function ProfitShare() {
           account_revenue: ps.account_revenue || '',
           account_25: ps.account_25 || '',
           tax: ps.tax || '',
-          bank_account: ps.bank_account || '',
-          bank_cash: ps.bank_cash || '',
           net_profit_account: ps.net_profit_account || '',
           net_profit_cash: ps.net_profit_cash || '',
           incentive_account: ps.incentive_account || '',
@@ -112,7 +127,7 @@ export default function ProfitShare() {
           fixed_amount: p.fixed_amount || '',
           notes: p.notes || '',
           order: p.order || 0,
-          // Read-only calculated fields
+          // Read-only calculated fields (prefixed with _ to distinguish)
           _incentive_account: p.incentive_account,
           _incentive_cash: p.incentive_cash,
           _bank_account: p.bank_account,
@@ -139,10 +154,11 @@ export default function ProfitShare() {
     setSummary(prev => ({ ...prev, [field]: value }))
   }
 
-  const handlePartnerChange = (index, field, value) => {
+  const handlePartnerChange = (index, updates) => {
+    // Accept either an object of multiple fields or will be called with object
     setPartners(prev => {
       const updated = [...prev]
-      updated[index] = { ...updated[index], [field]: value }
+      updated[index] = { ...updated[index], ...updates }
       return updated
     })
   }
@@ -192,7 +208,6 @@ export default function ProfitShare() {
 
   // Auto-calculate computed fields locally for preview
   const totalRevenue = (parseFloat(summary.account_revenue) || 0) + (parseFloat(summary.account_25) || 0)
-  const totalBank = (parseFloat(summary.bank_account) || 0) + (parseFloat(summary.bank_cash) || 0)
   const incentiveTotal = (parseFloat(summary.incentive_account) || 0) + (parseFloat(summary.incentive_cash) || 0)
 
   const handleSave = async () => {
@@ -208,8 +223,8 @@ export default function ProfitShare() {
       account_revenue: n(summary.account_revenue),
       account_25: n(summary.account_25),
       tax: n(summary.tax),
-      bank_account: n(summary.bank_account),
-      bank_cash: n(summary.bank_cash),
+      bank_account: 0,
+      bank_cash: 0,
       net_profit_account: n(summary.net_profit_account),
       net_profit_cash: n(summary.net_profit_cash),
       incentive_account: n(summary.incentive_account),
@@ -247,6 +262,7 @@ export default function ProfitShare() {
       setSuccess('Saved successfully')
       setTimeout(() => setSuccess(''), 3000)
       loadProfitShare()
+      loadHistory()
     } catch (err) {
       console.error('Save error:', err?.response?.status, err?.response?.data)
       setError(err.response?.data?.detail || err.response?.data?.error || JSON.stringify(err.response?.data) || 'Failed to save')
@@ -265,6 +281,7 @@ export default function ProfitShare() {
       setPartners([])
       setSuccess('Deleted successfully')
       setTimeout(() => setSuccess(''), 3000)
+      loadHistory()
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to delete')
     }
@@ -277,12 +294,21 @@ export default function ProfitShare() {
       setIsLocked(res.data.is_locked)
       setSuccess(res.data.is_locked ? 'Locked' : 'Unlocked')
       setTimeout(() => setSuccess(''), 3000)
+      loadHistory()
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to toggle lock')
     }
   }
 
+  const navigateToPeriod = (h) => {
+    setYear(h.year)
+    setPeriodType(h.period_type)
+  }
+
   const disabled = isLocked || !isCEO
+
+  // History bar chart max
+  const maxProfit = Math.max(...historyData.map(h => Math.abs(h.net_profit_total || 0)), 1)
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -357,6 +383,84 @@ export default function ProfitShare() {
       {success && <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-600">{success}</div>}
       {loading && <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500">Loading...</div>}
 
+      {/* History Overview */}
+      {historyData.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <h2 className="text-lg font-semibold text-gray-900">History</h2>
+          </CardHeader>
+          <CardBody>
+            {/* Bar Chart */}
+            <div className="flex items-end gap-2 h-32 mb-4">
+              {historyData.map(h => {
+                const profit = h.net_profit_total || 0
+                const heightPct = maxProfit > 0 ? (Math.abs(profit) / maxProfit) * 100 : 0
+                const isNegative = profit < 0
+                const isCurrent = h.year === year && h.period_type === periodType
+                return (
+                  <div
+                    key={h.id}
+                    className="flex-1 flex flex-col items-center justify-end cursor-pointer"
+                    onClick={() => navigateToPeriod(h)}
+                    title={`${periodLabel(h.year, h.period_type)}: ${fmt(profit)}`}
+                  >
+                    <span className="text-xs text-gray-500 mb-1">{fmt(profit)}</span>
+                    <div
+                      className={`w-full rounded-t transition-all ${
+                        isCurrent
+                          ? 'bg-blue-600'
+                          : isNegative
+                            ? 'bg-red-400'
+                            : 'bg-blue-400'
+                      }`}
+                      style={{ height: `${Math.max(heightPct, 4)}%`, minHeight: '4px' }}
+                    />
+                    <span className={`text-xs mt-1 ${isCurrent ? 'font-bold text-blue-600' : 'text-gray-400'}`}>
+                      {h.year} {h.period_type}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-gray-400 border-b border-gray-100">
+                    <th className="text-left pb-2 font-medium">Period</th>
+                    <th className="text-right pb-2 font-medium">Net Profit</th>
+                    <th className="text-right pb-2 font-medium">Incentive</th>
+                    <th className="text-center pb-2 font-medium">Partners</th>
+                    <th className="text-center pb-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="text-gray-700">
+                  {historyData.map(h => {
+                    const isCurrent = h.year === year && h.period_type === periodType
+                    return (
+                      <tr
+                        key={h.id}
+                        onClick={() => navigateToPeriod(h)}
+                        className={`cursor-pointer hover:bg-gray-50 border-b border-gray-50 ${isCurrent ? 'bg-blue-50' : ''}`}
+                      >
+                        <td className={`py-2 ${isCurrent ? 'font-semibold text-blue-600' : ''}`}>
+                          {periodLabel(h.year, h.period_type)}
+                        </td>
+                        <td className="py-2 text-right">{fmt(h.net_profit_total)}</td>
+                        <td className="py-2 text-right">{fmt(h.incentive_total)}</td>
+                        <td className="py-2 text-center">{h.partner_count}</td>
+                        <td className="py-2 text-center">{h.is_locked ? '\uD83D\uDD12' : 'Open'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
       {/* Store Summary Card */}
       <Card className="mb-6">
         <CardHeader>
@@ -417,7 +521,6 @@ export default function ProfitShare() {
               </div>
             </div>
           </div>
-
 
           {/* Net Profit */}
           <div className="mb-4">
@@ -490,9 +593,12 @@ export default function ProfitShare() {
                   value={summary._incentive_pct_display ?? (summary.incentive_pct ? (parseFloat(summary.incentive_pct) * 100) : '')}
                   onChange={(e) => {
                     const raw = e.target.value
-                    setSummary(prev => ({ ...prev, _incentive_pct_display: raw }))
                     const num = parseFloat(raw)
-                    if (!isNaN(num)) handleSummaryChange('incentive_pct', (num / 100).toFixed(4))
+                    setSummary(prev => ({
+                      ...prev,
+                      _incentive_pct_display: raw,
+                      ...(isNaN(num) ? {} : { incentive_pct: (num / 100).toFixed(4) }),
+                    }))
                   }}
                   onBlur={(e) => {
                     const num = parseFloat(e.target.value)
@@ -557,7 +663,7 @@ export default function ProfitShare() {
                   <input
                     type="text"
                     value={partner.name}
-                    onChange={(e) => handlePartnerChange(index, 'name', e.target.value)}
+                    onChange={(e) => handlePartnerChange(index, { name: e.target.value })}
                     className={disabled ? readOnlyCls : inputCls}
                     style={{ textAlign: 'left' }}
                     disabled={disabled}
@@ -568,7 +674,7 @@ export default function ProfitShare() {
                   <label className={labelCls}>Type</label>
                 <select
                   value={partner.partner_type}
-                  onChange={(e) => handlePartnerChange(index, 'partner_type', e.target.value)}
+                  onChange={(e) => handlePartnerChange(index, { partner_type: e.target.value })}
                   className={selectCls + ' w-40'}
                   disabled={disabled}
                 >
@@ -602,15 +708,19 @@ export default function ProfitShare() {
                         value={partner._incentive_pct_display ?? (partner.incentive_pct ? (parseFloat(partner.incentive_pct) * 100) : '')}
                         onChange={(e) => {
                           const raw = e.target.value
-                          handlePartnerChange(index, '_incentive_pct_display', raw)
                           const num = parseFloat(raw)
-                          if (!isNaN(num)) handlePartnerChange(index, 'incentive_pct', (num / 100).toFixed(4))
+                          handlePartnerChange(index, {
+                            _incentive_pct_display: raw,
+                            ...(isNaN(num) ? {} : { incentive_pct: (num / 100).toFixed(4) }),
+                          })
                         }}
                         onBlur={(e) => {
                           const num = parseFloat(e.target.value)
                           if (!isNaN(num)) {
-                            handlePartnerChange(index, '_incentive_pct_display', undefined)
-                            handlePartnerChange(index, 'incentive_pct', (num / 100).toFixed(4))
+                            handlePartnerChange(index, {
+                              _incentive_pct_display: undefined,
+                              incentive_pct: (num / 100).toFixed(4),
+                            })
                           }
                         }}
                         className={disabled ? readOnlyCls : inputCls}
@@ -628,15 +738,19 @@ export default function ProfitShare() {
                         value={partner._equity_pct_display ?? (partner.equity_pct ? (parseFloat(partner.equity_pct) * 100) : '')}
                         onChange={(e) => {
                           const raw = e.target.value
-                          handlePartnerChange(index, '_equity_pct_display', raw)
                           const num = parseFloat(raw)
-                          if (!isNaN(num)) handlePartnerChange(index, 'equity_pct', (num / 100).toFixed(4))
+                          handlePartnerChange(index, {
+                            _equity_pct_display: raw,
+                            ...(isNaN(num) ? {} : { equity_pct: (num / 100).toFixed(4) }),
+                          })
                         }}
                         onBlur={(e) => {
                           const num = parseFloat(e.target.value)
                           if (!isNaN(num)) {
-                            handlePartnerChange(index, '_equity_pct_display', undefined)
-                            handlePartnerChange(index, 'equity_pct', (num / 100).toFixed(4))
+                            handlePartnerChange(index, {
+                              _equity_pct_display: undefined,
+                              equity_pct: (num / 100).toFixed(4),
+                            })
                           }
                         }}
                         className={disabled ? readOnlyCls : inputCls}
@@ -651,7 +765,7 @@ export default function ProfitShare() {
                     <input
                       type="number" step="0.01"
                       value={partner.fixed_amount}
-                      onChange={(e) => handlePartnerChange(index, 'fixed_amount', e.target.value)}
+                      onChange={(e) => handlePartnerChange(index, { fixed_amount: e.target.value })}
                       className={disabled ? readOnlyCls : inputCls}
                       disabled={disabled}
                       placeholder="0"
@@ -708,7 +822,7 @@ export default function ProfitShare() {
                 <input
                   type="text"
                   value={partner.notes}
-                  onChange={(e) => handlePartnerChange(index, 'notes', e.target.value)}
+                  onChange={(e) => handlePartnerChange(index, { notes: e.target.value })}
                   className={`w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${disabled ? 'bg-gray-100 text-gray-500' : 'bg-gray-50'}`}
                   disabled={disabled}
                   placeholder="Notes..."
