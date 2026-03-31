@@ -304,16 +304,14 @@ export default function SkyReport() {
               Custom
             </button>
           </div>
-          {tab === 'monthly' && !editing && !currentReport && (
+          {tab === 'monthly' && !editing && (
             <button onClick={startEditing}
-              className="px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition whitespace-nowrap">
-              + Create
-            </button>
-          )}
-          {tab === 'monthly' && !editing && currentReport && (
-            <button onClick={startEditing}
-              className="px-4 py-2.5 text-sm font-semibold text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition whitespace-nowrap">
-              Edit
+              className={`px-4 py-2.5 text-sm font-semibold rounded-xl transition whitespace-nowrap ${
+                currentReport
+                  ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+                  : 'text-white bg-blue-600 hover:bg-blue-700'
+              }`}>
+              {currentReport ? 'Edit' : '+ Create'}
             </button>
           )}
         </div>
@@ -1017,10 +1015,6 @@ function MonthlyView({
       ) : (
         <Card className="p-8 text-center">
           <p className="text-gray-400 text-sm">No report for {monthLabel} {year}</p>
-          <button onClick={startEditing}
-            className="mt-3 px-4 py-2 text-sm font-semibold text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition">
-            + Create Report
-          </button>
         </Card>
       )}
     </>
