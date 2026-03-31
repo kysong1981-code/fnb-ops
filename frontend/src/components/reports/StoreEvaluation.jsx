@@ -163,18 +163,18 @@ export default function StoreEvaluation() {
     }
     if (key === 'cogs') {
       // COGS (20pts): at/below target = 20, +1%p = 18, +2%p = 14, +3%p+ = 7
-      const diff = achievement - target
+      const diff = achievement - target  // both in percentage points (e.g. 33.5 - 33.0 = 0.5)
       if (diff <= 0) return 20
-      if (diff <= 0.01) return 18
-      if (diff <= 0.02) return 14
+      if (diff <= 1) return 18
+      if (diff <= 2) return 14
       return 7
     }
     if (key === 'wage') {
       // Wage (25pts): at/below target = 25, +1%p = 15, +2%p = 10, +3%p+ = 0
-      const diff = achievement - target
+      const diff = achievement - target  // both in percentage points
       if (diff <= 0) return 25
-      if (diff <= 0.01) return 15
-      if (diff <= 0.02) return 10
+      if (diff <= 1) return 15
+      if (diff <= 2) return 10
       return 0
     }
     if (key === 'service') {
@@ -232,12 +232,25 @@ export default function StoreEvaluation() {
     try {
       const res = await evaluationAPI.autoFill(year, periodType, selectedStore.id)
       const data = res.data
-      setForm(prev => ({
-        ...prev,
-        sales_achievement: data.total_sales || prev.sales_achievement,
-        cogs_achievement: data.cogs_percent || prev.cogs_achievement,
-        wage_achievement: data.wage_percent || prev.wage_achievement,
-      }))
+      // Backend returns decimals (e.g. 0.335), convert to percentage (33.5)
+      const cogsVal = data.cogs_percent ? (parseFloat(data.cogs_percent) * 100).toFixed(1) : null
+      const wageVal = data.wage_percent ? (parseFloat(data.wage_percent) * 100).toFixed(1) : null
+      setForm(prev => {
+        const updated = {
+          ...prev,
+          sales_achievement: data.total_sales || prev.sales_achievement,
+          cogs_achievement: cogsVal || prev.cogs_achievement,
+          wage_achievement: wageVal || prev.wage_achievement,
+          service_achievement: data.service_rating || prev.service_achievement,
+        }
+        // Auto-calculate scores for filled fields
+        for (const cfg of SCORE_CONFIG) {
+          if (cfg.hasTarget || cfg.key === 'service') {
+            updated[`${cfg.key}_score`] = calcScore(cfg.key, updated)
+          }
+        }
+        return updated
+      })
       setSuccess('Auto-filled from Sky Report data')
       setTimeout(() => setSuccess(''), 3000)
     } catch (err) {

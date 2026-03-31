@@ -69,8 +69,7 @@ export default function SkyReport() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  // Upload state
-  const [uploading, setUploading] = useState(false)
+  // Upload state (kept for potential future use)
   const [uploadResult, setUploadResult] = useState(null)
 
   // Custom view state
@@ -211,40 +210,6 @@ export default function SkyReport() {
     setForm(prev => ({ ...prev, [key]: value }))
   }
 
-  const handleDownloadTemplate = async () => {
-    try {
-      const res = await skyReportAPI.downloadTemplate()
-      const url = window.URL.createObjectURL(new Blob([res.data]))
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'sky_report_template.xlsx'
-      a.click()
-      window.URL.revokeObjectURL(url)
-    } catch {
-      setError('Failed to download template')
-    }
-  }
-
-  const handleUpload = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    setError('')
-    setUploadResult(null)
-    try {
-      const res = await skyReportAPI.upload(file)
-      setUploadResult(res.data)
-      setSuccess(`Uploaded: ${res.data.created} created, ${res.data.updated} updated`)
-      loadReports()
-      loadSummary()
-      setTimeout(() => { setSuccess(''); setUploadResult(null) }, 5000)
-    } catch (err) {
-      setError(err.response?.data?.error || 'Upload failed')
-    } finally {
-      setUploading(false)
-      e.target.value = ''
-    }
-  }
 
   const monthLabel = MONTHS.find(m => m.value === selectedMonth)?.full || ''
 
@@ -304,8 +269,8 @@ export default function SkyReport() {
               Custom
             </button>
           </div>
-          {tab === 'monthly' && !editing && (
-            <button onClick={startEditing}
+          {!editing && (
+            <button onClick={() => { setTab('monthly'); startEditing() }}
               className={`px-4 py-2.5 text-sm font-semibold rounded-xl transition whitespace-nowrap ${
                 currentReport
                   ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
