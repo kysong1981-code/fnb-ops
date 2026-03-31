@@ -304,14 +304,6 @@ export default function SkyReport() {
               Custom
             </button>
           </div>
-          <button onClick={handleDownloadTemplate}
-            className="px-3 py-2.5 text-xs font-semibold text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition whitespace-nowrap">
-            Template
-          </button>
-          <label className={`px-3 py-2.5 text-xs font-semibold text-green-600 bg-green-50 rounded-xl hover:bg-green-100 transition cursor-pointer whitespace-nowrap ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
-            {uploading ? 'Uploading...' : 'Upload'}
-            <input type="file" accept=".xlsx,.xls" onChange={handleUpload} className="hidden" />
-          </label>
         </div>
       </Card>
 
