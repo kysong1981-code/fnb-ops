@@ -2548,18 +2548,22 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
             profile = request.user.profile
 
             for partner in instance.partners.all():
-                # NON_EQUITY partners → INCENTIVE, EQUITY/OWNER → PROFIT
-                tx_type = 'INCENTIVE' if partner.partner_type == 'NON_EQUITY' else 'PROFIT'
-                type_label = 'Incentive' if tx_type == 'INCENTIVE' else 'Profit Share'
+                # OWNER → COLLECTION (owner's profit)
+                # NON_EQUITY → INCENTIVE (partner incentive)
+                # EQUITY → PROFIT (equity distribution)
+                if partner.partner_type == 'OWNER':
+                    tx_type = 'COLLECTION'
+                    type_label = 'Owner Profit'
+                elif partner.partner_type == 'NON_EQUITY':
+                    tx_type = 'INCENTIVE'
+                    type_label = 'Incentive'
+                else:
+                    tx_type = 'PROFIT'
+                    type_label = 'Equity Share'
 
-                # Combine Account + Cash into total amount per partner (single record)
+                # Single record per partner (Account + Cash combined)
                 total_amount = (partner.total_account or Decimal('0')) + (partner.total_cash or Decimal('0'))
                 if total_amount and total_amount != Decimal('0'):
-                    # Determine account_type: if both exist, mark as ACCOUNT (primary)
-                    acct_type = 'ACCOUNT'
-                    if (not partner.total_account or partner.total_account == Decimal('0')):
-                        acct_type = 'CASH'
-
                     CQTransaction.objects.create(
                         organization=instance.organization,
                         date=period_end_date,
@@ -2567,7 +2571,7 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
                         transaction_type=tx_type,
                         person=partner.name,
                         amount=total_amount,
-                        account_type=acct_type,
+                        account_type='ACCOUNT',
                         note=f"{type_label} {instance.year} {instance.get_period_type_display()} - {partner.name}",
                         period=period_label,
                         profit_share=instance,

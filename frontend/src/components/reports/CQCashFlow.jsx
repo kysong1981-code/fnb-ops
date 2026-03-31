@@ -345,30 +345,31 @@ export default function CQCashFlow() {
       {view === 'summary' && summary && !loading && (
         <div className="space-y-4">
           {/* Main KPI */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="bg-green-50 rounded-2xl p-4 border border-green-100">
-              <div className="text-xs text-gray-500 mb-1">Total Collection</div>
-              <div className="text-xl font-bold text-green-600">{fmt(summary.totals.collection)}</div>
-              <div className="text-xs text-gray-400 mt-1">Revenue from stores</div>
-            </div>
-            <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100">
-              <div className="text-xs text-gray-500 mb-1">Incentive</div>
-              <div className="text-xl font-bold text-purple-600">{fmt(summary.totals.incentive)}</div>
-              <div className="text-xs text-gray-400 mt-1">Non-equity partners</div>
-            </div>
-            <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-              <div className="text-xs text-gray-500 mb-1">Profit Share</div>
-              <div className="text-xl font-bold text-blue-600">{fmt(summary.totals.profit)}</div>
-              <div className="text-xs text-gray-400 mt-1">Equity distribution</div>
-            </div>
-            <div className={`rounded-2xl p-4 border ${summary.totals.net >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-              <div className="text-xs text-gray-500 mb-1">Remaining</div>
-              <div className={`text-xl font-bold ${summary.totals.net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {fmt(summary.totals.net)}
-              </div>
-              <div className="text-xs text-gray-400 mt-1">After all distributions</div>
-            </div>
-          </div>
+          {(() => {
+            const totalDistributed = (summary.totals.collection || 0) + (summary.totals.incentive || 0) + (summary.totals.profit || 0)
+            return (
+              <>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="bg-green-50 rounded-2xl p-4 border border-green-100">
+                    <div className="text-xs text-gray-500 mb-1">Owner Profit</div>
+                    <div className="text-xl font-bold text-green-600">{fmt(summary.totals.collection)}</div>
+                  </div>
+                  <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100">
+                    <div className="text-xs text-gray-500 mb-1">Incentive</div>
+                    <div className="text-xl font-bold text-purple-600">{fmt(summary.totals.incentive)}</div>
+                  </div>
+                  <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
+                    <div className="text-xs text-gray-500 mb-1">Equity Share</div>
+                    <div className="text-xl font-bold text-blue-600">{fmt(summary.totals.profit)}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
+                    <div className="text-xs text-gray-500 mb-1">Total (Net Profit)</div>
+                    <div className="text-xl font-bold text-gray-800">{fmt(totalDistributed)}</div>
+                  </div>
+                </div>
+              </>
+            )
+          })()}
 
           {/* Store Summary Table */}
           {summary.stores?.length > 0 && (
@@ -380,15 +381,15 @@ export default function CQCashFlow() {
                     <thead>
                       <tr className="text-left text-gray-500 border-b">
                         <th className="pb-2 pr-4">Store</th>
-                        <th className="pb-2 pr-4 text-right">Collection</th>
+                        <th className="pb-2 pr-4 text-right">Owner Profit</th>
                         <th className="pb-2 pr-4 text-right">Incentive</th>
-                        <th className="pb-2 pr-4 text-right">Profit Share</th>
-                        <th className="pb-2 text-right">Remaining</th>
+                        <th className="pb-2 pr-4 text-right">Equity Share</th>
+                        <th className="pb-2 text-right">Total</th>
                       </tr>
                     </thead>
                     <tbody>
                       {summary.stores.map(s => {
-                        const remaining = (parseFloat(s.collection) || 0) - (parseFloat(s.incentive) || 0) - (parseFloat(s.profit) || 0)
+                        const total = (parseFloat(s.collection) || 0) + (parseFloat(s.incentive) || 0) + (parseFloat(s.profit) || 0)
                         return (
                           <tr key={s.store_name} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
                             onClick={() => { setSelectedStore(s.store_name); setView('stores') }}>
@@ -396,22 +397,23 @@ export default function CQCashFlow() {
                             <td className="py-2.5 pr-4 text-right text-green-600 font-medium">{fmt(s.collection)}</td>
                             <td className="py-2.5 pr-4 text-right text-purple-600">{fmt(s.incentive)}</td>
                             <td className="py-2.5 pr-4 text-right text-blue-600">{fmt(s.profit)}</td>
-                            <td className={`py-2.5 text-right font-semibold ${remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                              {fmt(remaining)}
-                            </td>
+                            <td className="py-2.5 text-right font-semibold text-gray-800">{fmt(total)}</td>
                           </tr>
                         )
                       })}
                       {/* Total row */}
-                      <tr className="border-t-2 border-gray-200 font-bold">
-                        <td className="py-3 pr-4 text-gray-900">Total</td>
-                        <td className="py-3 pr-4 text-right text-green-600">{fmt(summary.totals.collection)}</td>
-                        <td className="py-3 pr-4 text-right text-purple-600">{fmt(summary.totals.incentive)}</td>
-                        <td className="py-3 pr-4 text-right text-blue-600">{fmt(summary.totals.profit)}</td>
-                        <td className={`py-3 text-right ${summary.totals.net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {fmt(summary.totals.net)}
-                        </td>
-                      </tr>
+                      {(() => {
+                        const grandTotal = (summary.totals.collection || 0) + (summary.totals.incentive || 0) + (summary.totals.profit || 0)
+                        return (
+                          <tr className="border-t-2 border-gray-200 font-bold">
+                            <td className="py-3 pr-4 text-gray-900">Total</td>
+                            <td className="py-3 pr-4 text-right text-green-600">{fmt(summary.totals.collection)}</td>
+                            <td className="py-3 pr-4 text-right text-purple-600">{fmt(summary.totals.incentive)}</td>
+                            <td className="py-3 pr-4 text-right text-blue-600">{fmt(summary.totals.profit)}</td>
+                            <td className="py-3 text-right text-gray-900">{fmt(grandTotal)}</td>
+                          </tr>
+                        )
+                      })()}
                     </tbody>
                   </table>
                 </div>
