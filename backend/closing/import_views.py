@@ -276,6 +276,34 @@ class ImportDataView(APIView):
             else:
                 col_map.append((i, 'skip', None))
 
+        # First pass: collect all dates to determine range
+        all_dates = []
+        for row in rows[1:]:
+            if not row or not row[0].strip():
+                continue
+            try:
+                raw = row[0].strip()
+                if '/' in raw:
+                    parts = raw.split('/')
+                    if len(parts) == 3:
+                        all_dates.append(date(int(parts[2]), int(parts[1]), int(parts[0])))
+                else:
+                    all_dates.append(date.fromisoformat(raw))
+            except (ValueError, IndexError):
+                continue
+
+        # Delete ALL existing closings in the CSV date range (overwrite)
+        if all_dates:
+            min_date, max_date = min(all_dates), max(all_dates)
+            existing = DailyClosing.objects.filter(
+                organization=org,
+                closing_date__gte=min_date,
+                closing_date__lte=max_date,
+            )
+            del_count = existing.count()
+            existing.delete()
+            stats['closings_deleted'] = del_count
+
         for row in rows[1:]:
             if not row or not row[0].strip():
                 continue
@@ -330,27 +358,20 @@ class ImportDataView(APIView):
                     elif section == 'ct_movement':
                         ct_movement = val
 
-                # Check if any data exists
+                # Skip rows with no data at all
                 has_data = (income_cash or income_card or surcharge or
                             other_sales or cogs_items or
                             ct_cash or ct_banking or ct_deposit or ct_movement)
                 if not has_data:
                     continue
 
-                # Create/update DailyClosing
-                closing, created = DailyClosing.objects.get_or_create(
+                # Create DailyClosing (existing ones already deleted above)
+                closing = DailyClosing.objects.create(
                     organization=org,
                     closing_date=d,
-                    defaults={'status': 'APPROVED'}
+                    status='APPROVED',
                 )
-                if created:
-                    stats['closings_created'] += 1
-                else:
-                    stats['closings_updated'] += 1
-                    closing.other_sales.all().delete()
-                    closing.supplier_costs.all().delete()
-                    closing.cash_expenses.all().delete()
-                    closing.hr_cash_entries.all().delete()
+                stats['closings_created'] += 1
 
                 # Income → pos_cash, pos_card
                 closing.pos_cash = income_cash
