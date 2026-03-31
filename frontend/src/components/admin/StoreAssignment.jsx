@@ -82,11 +82,13 @@ export default function StoreAssignment() {
   }
 
   const allStores = stores
-  const filtered = filter === 'ALL' ? users
-    : filter === 'MANAGERS' ? users.filter(u => MANAGER_ROLES.includes(u.role))
-    : users.filter(u => !MANAGER_ROLES.includes(u.role))
+  // Filter out terminated/resigned employees (in case backend returns any)
+  const activeUsers = users.filter(u => u.employment_status !== 'TERMINATED' && u.employment_status !== 'RESIGNED')
+  const filtered = filter === 'ALL' ? activeUsers
+    : filter === 'MANAGERS' ? activeUsers.filter(u => MANAGER_ROLES.includes(u.role))
+    : activeUsers.filter(u => !MANAGER_ROLES.includes(u.role))
 
-  const managerCount = users.filter(u => MANAGER_ROLES.includes(u.role)).length
+  const managerCount = activeUsers.filter(u => MANAGER_ROLES.includes(u.role)).length
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -94,7 +96,7 @@ export default function StoreAssignment() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Store Assignment</h1>
           <p className="text-gray-500 text-sm mt-1">
-            {users.length} staff · {managerCount} manager{managerCount !== 1 ? 's' : ''}
+            {activeUsers.length} staff · {managerCount} manager{managerCount !== 1 ? 's' : ''}
           </p>
         </div>
       </div>
@@ -110,9 +112,9 @@ export default function StoreAssignment() {
       {/* Filter */}
       <div className="flex gap-2 mb-4">
         {[
-          { key: 'ALL', label: `All (${users.length})` },
+          { key: 'ALL', label: `All (${activeUsers.length})` },
           { key: 'MANAGERS', label: `Managers (${managerCount})` },
-          { key: 'EMPLOYEES', label: `Staff (${users.length - managerCount})` },
+          { key: 'EMPLOYEES', label: `Staff (${activeUsers.length - managerCount})` },
         ].map(f => (
           <button key={f.key} onClick={() => setFilter(f.key)}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${

@@ -59,6 +59,7 @@ import ForgotPassword from './components/auth/ForgotPassword'
 import ResetPassword from './components/auth/ResetPassword'
 import StoreApplications from './components/admin/StoreApplications'
 import StoreAssignment from './components/admin/StoreAssignment'
+import StoreManagement from './components/stores/StoreManagement'
 import ManagerRoute from './components/auth/ManagerRoute'
 import ImportPage from './components/import/ImportPage'
 import CQReport from './components/reports/CQReport'
@@ -419,6 +420,16 @@ function App() {
             element={
               <ManagerWithLayout>
                 <StoreAssignment />
+              </ManagerWithLayout>
+            }
+          />
+
+          {/* Admin - Store Management (CEO/HQ only) */}
+          <Route
+            path="/store-management"
+            element={
+              <ManagerWithLayout>
+                <StoreManagement />
               </ManagerWithLayout>
             }
           />

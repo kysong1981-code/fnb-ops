@@ -379,8 +379,11 @@ export const storeAPI = {
       params,
     }),
 
-  // Create Store
+  // Store Management (CRUD)
+  getStores: () => api.get('/users/stores/'),
   createStore: (data) => api.post('/users/stores/create/', data),
+  updateStore: (id, data) => api.put(`/users/stores/${id}/`, data),
+  deleteStore: (id) => api.delete(`/users/stores/${id}/`),
 
   // Suppliers
   getSuppliers: (params) => api.get('/closing/suppliers/', { params }),

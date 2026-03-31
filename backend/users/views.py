@@ -55,16 +55,91 @@ class StoreCreateView(APIView):
         if Organization.objects.filter(name__iexact=name).exists():
             return Response({'error': f'Store "{name}" already exists'}, status=status.HTTP_400_BAD_REQUEST)
 
-        hq_org = Organization.objects.filter(level='HQ').first()
+        parent_id = request.data.get('parent')
+        if parent_id:
+            try:
+                parent_org = Organization.objects.get(id=parent_id, level='STORE')
+            except Organization.DoesNotExist:
+                return Response({'error': 'Parent store not found'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            parent_org = Organization.objects.filter(level='HQ').first()
+
         org = Organization.objects.create(
             name=name,
             level='STORE',
-            parent=hq_org,
+            parent=parent_org,
             region=request.data.get('region', ''),
             address=request.data.get('address', ''),
             phone=request.data.get('phone', ''),
+            opening_time=request.data.get('opening_time') or None,
+            closing_time=request.data.get('closing_time') or None,
         )
         return Response(OrganizationSerializer(org).data, status=status.HTTP_201_CREATED)
+
+
+class StoreUpdateDeleteView(APIView):
+    """CEO only: Update or delete a store"""
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, pk):
+        profile = request.user.profile
+        if profile.role not in ('CEO', 'HQ', 'ADMIN'):
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            org = Organization.objects.get(id=pk, level='STORE')
+        except Organization.DoesNotExist:
+            return Response({'error': 'Store not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        name = request.data.get('name', '').strip()
+        if name:
+            # Check uniqueness excluding self
+            if Organization.objects.filter(name__iexact=name).exclude(id=pk).exists():
+                return Response({'error': f'Store "{name}" already exists'}, status=status.HTTP_400_BAD_REQUEST)
+            org.name = name
+
+        if 'region' in request.data:
+            org.region = request.data['region']
+        if 'opening_time' in request.data:
+            org.opening_time = request.data['opening_time'] or None
+        if 'closing_time' in request.data:
+            org.closing_time = request.data['closing_time'] or None
+        if 'parent' in request.data:
+            parent_id = request.data['parent']
+            if parent_id:
+                try:
+                    parent_org = Organization.objects.get(id=parent_id, level='STORE')
+                    if parent_org.id == org.id:
+                        return Response({'error': 'Store cannot be its own parent'}, status=status.HTTP_400_BAD_REQUEST)
+                    org.parent = parent_org
+                except Organization.DoesNotExist:
+                    return Response({'error': 'Parent store not found'}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                org.parent = Organization.objects.filter(level='HQ').first()
+
+        org.save()
+        return Response(OrganizationSerializer(org).data)
+
+    def delete(self, request, pk):
+        profile = request.user.profile
+        if profile.role not in ('CEO', 'HQ', 'ADMIN'):
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            org = Organization.objects.get(id=pk, level='STORE')
+        except Organization.DoesNotExist:
+            return Response({'error': 'Store not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Check if store has employees
+        employee_count = UserProfile.objects.filter(organization=org).count()
+        if employee_count > 0:
+            return Response(
+                {'error': f'Cannot delete store with {employee_count} employee(s). Reassign them first.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        org.delete()
+        return Response({'message': 'Store deleted'}, status=status.HTTP_204_NO_CONTENT)
 
 
 class AssignStoresView(APIView):
@@ -120,9 +195,13 @@ class AssignStoresView(APIView):
         if profile.role not in ('CEO', 'HQ', 'ADMIN'):
             return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
 
-        # Return all users except CEO/HQ/ADMIN
+        # Return all active users except CEO/HQ/ADMIN (exclude terminated/resigned)
         profiles = UserProfile.objects.exclude(
             role__in=['CEO', 'HQ', 'ADMIN']
+        ).exclude(
+            employment_status__in=['TERMINATED', 'RESIGNED']
+        ).filter(
+            is_active=True
         ).select_related('user', 'organization')
 
         result = []
@@ -134,6 +213,7 @@ class AssignStoresView(APIView):
                 'role': m.role,
                 'role_display': m.get_role_display(),
                 'organization': m.organization.name if m.organization else None,
+                'employment_status': m.employment_status,
                 'managed_stores': OrganizationSerializer(m.managed_stores.all(), many=True).data
             })
 
