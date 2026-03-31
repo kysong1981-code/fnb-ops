@@ -54,7 +54,8 @@ export default function StoreManagement() {
   const fetchStores = async () => {
     try {
       const res = await storeAPI.getStores()
-      setStores(res.data)
+      const data = res.data?.results || res.data
+      setStores(Array.isArray(data) ? data : [])
     } catch (err) {
       console.error('Failed to load stores', err)
     } finally {
