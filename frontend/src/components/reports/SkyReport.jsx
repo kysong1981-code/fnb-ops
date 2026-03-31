@@ -340,6 +340,7 @@ export default function SkyReport() {
 
 // ===== OVERVIEW DASHBOARD =====
 function OverviewDashboard({ reports, lastYearReports, twoYearsAgoReports, year }) {
+  const [chartPeriod, setChartPeriod] = useState('ALL') // 'ALL' | 'H1' | 'H2'
   const [periodTab, setPeriodTab] = useState('current') // 'current' | 'previous'
 
   // Helper: get monthly data mapped by month number
@@ -545,53 +546,95 @@ function OverviewDashboard({ reports, lastYearReports, twoYearsAgoReports, year 
 
   return (
     <>
-      {/* A. Annual Sales Bar Chart - 3 years */}
+      {/* A. Sales Bar Chart with Period Filter */}
       <Card className="p-5">
-        <h3 className="text-sm font-bold text-gray-900 mb-1">Annual Sales Comparison</h3>
-        <p className="text-xs text-gray-400 mb-4">{year - 2} vs {year - 1} vs {year}</p>
-        <div className="flex items-end gap-1 sm:gap-2" style={{ height: 200 }}>
-          {MONTHS.map((m, i) => {
-            const curH = maxSales > 0 ? (currentSales[i] / maxSales * 100) : 0
-            const lyH = maxSales > 0 ? (lastYearSales[i] / maxSales * 100) : 0
-            const ty2H = maxSales > 0 ? (twoYearsAgoSales[i] / maxSales * 100) : 0
-            return (
-              <div key={m.value} className="flex-1 flex flex-col items-center gap-0">
-                <div className="w-full flex items-end justify-center gap-px" style={{ height: 180 }}>
-                  <div
-                    className="flex-1 max-w-[10px] bg-gray-300 rounded-t"
-                    style={{ height: `${ty2H}%`, minHeight: ty2H > 0 ? 2 : 0 }}
-                    title={`${year - 2}: $${twoYearsAgoSales[i].toLocaleString()}`}
-                  />
-                  <div
-                    className="flex-1 max-w-[10px] bg-gray-400 rounded-t"
-                    style={{ height: `${lyH}%`, minHeight: lyH > 0 ? 2 : 0 }}
-                    title={`${year - 1}: $${lastYearSales[i].toLocaleString()}`}
-                  />
-                  <div
-                    className="flex-1 max-w-[10px] bg-blue-500 rounded-t"
-                    style={{ height: `${curH}%`, minHeight: curH > 0 ? 2 : 0 }}
-                    title={`${year}: $${currentSales[i].toLocaleString()}`}
-                  />
-                </div>
-                <span className="text-[10px] text-gray-400 mt-1">{m.label}</span>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-bold text-gray-900">Sales Comparison</h3>
+            <p className="text-xs text-gray-400">{year} vs {year - 1} vs {year - 2}</p>
+          </div>
+          <div className="flex bg-gray-100 rounded-lg p-0.5 gap-0.5">
+            {['ALL', 'H1', 'H2'].map(p => (
+              <button key={p} onClick={() => setChartPeriod(p)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${
+                  chartPeriod === p ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}>
+                {p === 'ALL' ? 'Full Year' : p === 'H1' ? 'H1 (Apr-Sep)' : 'H2 (Oct-Mar)'}
+              </button>
+            ))}
+          </div>
+        </div>
+        {(() => {
+          const orderedMonths = chartPeriod === 'H1'
+            ? MONTHS.filter(m => [4,5,6,7,8,9].includes(m.value))
+            : chartPeriod === 'H2'
+            ? [...MONTHS.filter(m => [10,11,12].includes(m.value)), ...MONTHS.filter(m => [1,2,3].includes(m.value))]
+            : MONTHS
+
+          // For H2, "current year" Oct-Dec comes from lastYearReports, Jan-Mar from reports
+          const getSales = (monthObj, curMap, lyMap, ty2Map) => {
+            if (chartPeriod === 'H2' && monthObj.value >= 10) {
+              return parseFloat(lyMap[monthObj.value]?.total_sales_inc_gst) || 0
+            }
+            return parseFloat(curMap[monthObj.value]?.total_sales_inc_gst) || 0
+          }
+          const getLySales = (monthObj, lyMap, ty2Map) => {
+            if (chartPeriod === 'H2' && monthObj.value >= 10) {
+              return parseFloat(ty2Map[monthObj.value]?.total_sales_inc_gst) || 0
+            }
+            return parseFloat(lyMap[monthObj.value]?.total_sales_inc_gst) || 0
+          }
+
+          const curSales = orderedMonths.map(m => getSales(m, currentMap, lastYearMap, twoYearsAgoMap))
+          const lySales = orderedMonths.map(m => getLySales(m, lastYearMap, twoYearsAgoMap))
+          const ty2Sales = orderedMonths.map(() => 0) // 3 years ago not available
+          const chartMax = Math.max(...curSales, ...lySales, 1)
+
+          const curTotal = curSales.reduce((a, b) => a + b, 0)
+          const lyTotal = lySales.reduce((a, b) => a + b, 0)
+          const lyChangePct = lyTotal > 0 ? ((curTotal - lyTotal) / lyTotal * 100).toFixed(1) : null
+
+          return (
+            <>
+              <div className="flex items-end gap-1 sm:gap-2" style={{ height: 200 }}>
+                {orderedMonths.map((m, i) => {
+                  const curH = chartMax > 0 ? (curSales[i] / chartMax * 100) : 0
+                  const lyH = chartMax > 0 ? (lySales[i] / chartMax * 100) : 0
+                  return (
+                    <div key={m.value + '-' + i} className="flex-1 flex flex-col items-center gap-0">
+                      <div className="w-full flex items-end justify-center gap-px" style={{ height: 180 }}>
+                        <div className="flex-1 max-w-[14px] bg-gray-300 rounded-t"
+                          style={{ height: `${lyH}%`, minHeight: lyH > 0 ? 2 : 0 }}
+                          title={`LY: $${lySales[i].toLocaleString()}`} />
+                        <div className="flex-1 max-w-[14px] bg-blue-500 rounded-t"
+                          style={{ height: `${curH}%`, minHeight: curH > 0 ? 2 : 0 }}
+                          title={`CY: $${curSales[i].toLocaleString()}`} />
+                      </div>
+                      <span className="text-[10px] text-gray-400 mt-1">{m.label}</span>
+                    </div>
+                  )
+                })}
               </div>
-            )
-          })}
-        </div>
-        <div className="flex items-center justify-center gap-4 mt-3">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 bg-blue-500 rounded-sm" />
-            <span className="text-xs text-gray-500">{year}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 bg-gray-400 rounded-sm" />
-            <span className="text-xs text-gray-500">{year - 1}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 bg-gray-300 rounded-sm" />
-            <span className="text-xs text-gray-500">{year - 2}</span>
-          </div>
-        </div>
+              <div className="flex items-center justify-between mt-3 px-1">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 bg-blue-500 rounded-sm" />
+                    <span className="text-xs text-gray-500">Current: ${curTotal.toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 bg-gray-300 rounded-sm" />
+                    <span className="text-xs text-gray-500">Last Year: ${lyTotal.toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</span>
+                  </div>
+                </div>
+                {lyChangePct && (
+                  <span className={`text-xs font-bold ${parseFloat(lyChangePct) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {parseFloat(lyChangePct) >= 0 ? '▲' : '▼'} {Math.abs(parseFloat(lyChangePct))}%
+                  </span>
+                )}
+              </div>
+            </>
+          )
+        })()}
       </Card>
 
       {/* B. YTD Summary Cards - with 2-year comparison */}
