@@ -1217,7 +1217,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                 'profit': store_qs.filter(transaction_type='PROFIT').aggregate(
                     total=Sum('amount'))['total'] or 0,
             })
-        store_summary.sort(key=lambda x: float(x['collection']), reverse=True)
+        store_summary.sort(key=lambda x: float(x['collection']) + float(x['profit']) + float(x['incentive']), reverse=True)
 
         # Per-person summary
         person_summary = []

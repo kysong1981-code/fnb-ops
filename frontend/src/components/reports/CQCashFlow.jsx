@@ -344,43 +344,29 @@ export default function CQCashFlow() {
       {/* ===== SUMMARY VIEW ===== */}
       {view === 'summary' && summary && !loading && (
         <div className="space-y-4">
-          {/* Main KPI - Total Picture */}
+          {/* Main KPI */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="bg-green-50 rounded-2xl p-4 border border-green-100">
               <div className="text-xs text-gray-500 mb-1">Total Collection</div>
               <div className="text-xl font-bold text-green-600">{fmt(summary.totals.collection)}</div>
               <div className="text-xs text-gray-400 mt-1">Revenue from stores</div>
             </div>
-            <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-              <div className="text-xs text-gray-500 mb-1">Distributed</div>
-              <div className="text-xl font-bold text-blue-600">
-                {fmt((summary.totals.incentive || 0) + (summary.totals.profit || 0))}
-              </div>
-              <div className="text-xs text-gray-400 mt-1">Incentive + Profit Share</div>
+            <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100">
+              <div className="text-xs text-gray-500 mb-1">Incentive</div>
+              <div className="text-xl font-bold text-purple-600">{fmt(summary.totals.incentive)}</div>
+              <div className="text-xs text-gray-400 mt-1">Non-equity partners</div>
             </div>
-            <div className="bg-red-50 rounded-2xl p-4 border border-red-100">
-              <div className="text-xs text-gray-500 mb-1">Expenses</div>
-              <div className="text-xl font-bold text-red-600">{fmt(summary.totals.expense)}</div>
-              <div className="text-xs text-gray-400 mt-1">Operating costs</div>
+            <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
+              <div className="text-xs text-gray-500 mb-1">Profit Share</div>
+              <div className="text-xl font-bold text-blue-600">{fmt(summary.totals.profit)}</div>
+              <div className="text-xs text-gray-400 mt-1">Equity distribution</div>
             </div>
             <div className={`rounded-2xl p-4 border ${summary.totals.net >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-              <div className="text-xs text-gray-500 mb-1">Remaining Balance</div>
+              <div className="text-xs text-gray-500 mb-1">Remaining</div>
               <div className={`text-xl font-bold ${summary.totals.net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                 {fmt(summary.totals.net)}
               </div>
               <div className="text-xs text-gray-400 mt-1">After all distributions</div>
-            </div>
-          </div>
-
-          {/* Breakdown: Incentive vs Profit Share */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100">
-              <div className="text-xs text-gray-500 mb-1">Incentive</div>
-              <div className="text-lg font-bold text-purple-600">{fmt(summary.totals.incentive)}</div>
-            </div>
-            <div className="bg-indigo-50 rounded-2xl p-4 border border-indigo-100">
-              <div className="text-xs text-gray-500 mb-1">Equity Distribution</div>
-              <div className="text-lg font-bold text-indigo-600">{fmt(summary.totals.profit)}</div>
             </div>
           </div>
 

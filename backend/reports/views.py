@@ -2548,32 +2548,27 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
             profile = request.user.profile
 
             for partner in instance.partners.all():
-                # Create Account record if amount is non-zero
-                if partner.total_account and partner.total_account != Decimal('0'):
+                # NON_EQUITY partners → INCENTIVE, EQUITY/OWNER → PROFIT
+                tx_type = 'INCENTIVE' if partner.partner_type == 'NON_EQUITY' else 'PROFIT'
+                type_label = 'Incentive' if tx_type == 'INCENTIVE' else 'Profit Share'
+
+                # Combine Account + Cash into total amount per partner (single record)
+                total_amount = (partner.total_account or Decimal('0')) + (partner.total_cash or Decimal('0'))
+                if total_amount and total_amount != Decimal('0'):
+                    # Determine account_type: if both exist, mark as ACCOUNT (primary)
+                    acct_type = 'ACCOUNT'
+                    if (not partner.total_account or partner.total_account == Decimal('0')):
+                        acct_type = 'CASH'
+
                     CQTransaction.objects.create(
                         organization=instance.organization,
                         date=period_end_date,
                         store_name=store_name,
-                        transaction_type='PROFIT',
+                        transaction_type=tx_type,
                         person=partner.name,
-                        amount=partner.total_account,
-                        account_type='ACCOUNT',
-                        note=f"Profit Share {instance.year} {instance.get_period_type_display()} - {partner.name} (Account)",
-                        period=period_label,
-                        profit_share=instance,
-                        created_by=profile,
-                    )
-                # Create Cash record if amount is non-zero
-                if partner.total_cash and partner.total_cash != Decimal('0'):
-                    CQTransaction.objects.create(
-                        organization=instance.organization,
-                        date=period_end_date,
-                        store_name=store_name,
-                        transaction_type='PROFIT',
-                        person=partner.name,
-                        amount=partner.total_cash,
-                        account_type='CASH',
-                        note=f"Profit Share {instance.year} {instance.get_period_type_display()} - {partner.name} (Cash)",
+                        amount=total_amount,
+                        account_type=acct_type,
+                        note=f"{type_label} {instance.year} {instance.get_period_type_display()} - {partner.name}",
                         period=period_label,
                         profit_share=instance,
                         created_by=profile,
