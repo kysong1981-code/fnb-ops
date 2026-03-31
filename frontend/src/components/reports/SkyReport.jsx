@@ -57,6 +57,7 @@ export default function SkyReport() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [reports, setReports] = useState([])
   const [lastYearReports, setLastYearReports] = useState([])
+  const [twoYearsAgoReports, setTwoYearsAgoReports] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Form state
@@ -98,10 +99,18 @@ export default function SkyReport() {
     } catch { setLastYearReports([]) }
   }
 
+  const loadTwoYearsAgo = async () => {
+    try {
+      const res = await skyReportAPI.list({ year: year - 2 })
+      setTwoYearsAgoReports(Array.isArray(res.data) ? res.data : res.data.results || [])
+    } catch { setTwoYearsAgoReports([]) }
+  }
+
   useEffect(() => {
     loadReports()
     loadSummary()
     loadLastYear()
+    loadTwoYearsAgo()
   }, [year])
 
   const currentReport = reports.find(r => r.month === selectedMonth)
@@ -303,7 +312,7 @@ export default function SkyReport() {
           <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : tab === 'overview' ? (
-        <OverviewDashboard reports={reports} lastYearReports={lastYearReports} year={year} />
+        <OverviewDashboard reports={reports} lastYearReports={lastYearReports} twoYearsAgoReports={twoYearsAgoReports} year={year} />
       ) : tab === 'monthly' ? (
         <MonthlyView
           year={year}
@@ -330,7 +339,9 @@ export default function SkyReport() {
 }
 
 // ===== OVERVIEW DASHBOARD =====
-function OverviewDashboard({ reports, lastYearReports, year }) {
+function OverviewDashboard({ reports, lastYearReports, twoYearsAgoReports, year }) {
+  const [periodTab, setPeriodTab] = useState('current') // 'current' | 'previous'
+
   // Helper: get monthly data mapped by month number
   const getMonthData = (reps) => {
     const map = {}
@@ -339,11 +350,13 @@ function OverviewDashboard({ reports, lastYearReports, year }) {
   }
   const currentMap = getMonthData(reports)
   const lastYearMap = getMonthData(lastYearReports)
+  const twoYearsAgoMap = getMonthData(twoYearsAgoReports || [])
 
-  // Sales values for bar chart
+  // Sales values for bar chart (3 years)
   const currentSales = MONTHS.map(m => parseFloat(currentMap[m.value]?.total_sales_inc_gst) || 0)
   const lastYearSales = MONTHS.map(m => parseFloat(lastYearMap[m.value]?.total_sales_inc_gst) || 0)
-  const maxSales = Math.max(...currentSales, ...lastYearSales, 1)
+  const twoYearsAgoSales = MONTHS.map(m => parseFloat(twoYearsAgoMap[m.value]?.total_sales_inc_gst) || 0)
+  const maxSales = Math.max(...currentSales, ...lastYearSales, ...twoYearsAgoSales, 1)
 
   // YTD calculations
   const monthsWithData = reports.filter(r => parseFloat(r.total_sales_inc_gst) > 0)
@@ -353,6 +366,11 @@ function OverviewDashboard({ reports, lastYearReports, year }) {
   const lastYearMonthsWithData = lastYearReports.filter(r => parseFloat(r.total_sales_inc_gst) > 0)
   const lastYearTotalSales = lastYearMonthsWithData.reduce((s, r) => s + (parseFloat(r.total_sales_inc_gst) || 0), 0)
   const yoyChange = lastYearTotalSales > 0 ? ((totalSalesYTD - lastYearTotalSales) / lastYearTotalSales * 100).toFixed(1) : null
+
+  // 2-year-ago YTD
+  const twoYearsAgoMonthsWithData = (twoYearsAgoReports || []).filter(r => parseFloat(r.total_sales_inc_gst) > 0)
+  const twoYearsAgoTotalSales = twoYearsAgoMonthsWithData.reduce((s, r) => s + (parseFloat(r.total_sales_inc_gst) || 0), 0)
+  const yoy2Change = twoYearsAgoTotalSales > 0 ? ((totalSalesYTD - twoYearsAgoTotalSales) / twoYearsAgoTotalSales * 100).toFixed(1) : null
 
   // Best month
   let bestMonth = null
@@ -381,7 +399,9 @@ function OverviewDashboard({ reports, lastYearReports, year }) {
     const cogsP = excl > 0 ? (cogs / excl * 100).toFixed(1) : '0.0'
     const wageP = excl > 0 ? (wages / excl * 100).toFixed(1) : '0.0'
     const marginP = excl > 0 ? (profit / excl * 100).toFixed(1) : '0.0'
-    return { label: m.label, sales, cogs, cogsP, wages, wageP, profit, marginP, month: m.value }
+    // LY Sales for same month
+    const lySales = parseFloat(lastYearMap[m.value]?.total_sales_inc_gst) || 0
+    return { label: m.label, sales, cogs, cogsP, wages, wageP, profit, marginP, month: m.value, lySales }
   }).filter(Boolean)
 
   // Get goals from most recent report
@@ -390,10 +410,128 @@ function OverviewDashboard({ reports, lastYearReports, year }) {
   const cogsGoal = parseFloat(latestReport?.cogs_goal) || 0
   const wageGoal = parseFloat(latestReport?.wage_goal) || 0
 
+  // Goal Progress - current month report (or latest with goals)
+  const now = new Date()
+  const currentMonth = now.getMonth() + 1
+  const currentMonthReport = currentMap[currentMonth]
+  const goalReport = currentMonthReport || sortedReports.find(r => parseFloat(r.sales_goal) > 0 || parseFloat(r.cogs_goal) > 0 || parseFloat(r.wage_goal) > 0)
+  const salesGoal = parseFloat(goalReport?.sales_goal) || 0
+  const goalCogsTarget = parseFloat(goalReport?.cogs_goal) || 0
+  const goalWageTarget = parseFloat(goalReport?.wage_goal) || 0
+  const goalMonthLabel = MONTHS.find(m => m.value === (currentMonthReport ? currentMonth : goalReport?.month))?.full || ''
+  const goalMonthYear = currentMonthReport ? year : (goalReport?.year || year)
+
+  // Current month actuals for goal progress
+  const goalActualSales = parseFloat(currentMonthReport?.total_sales_inc_gst) || 0
+  const goalActualExcl = parseFloat(currentMonthReport?.excl_gst_sales) || 0
+  const goalActualCogs = parseFloat(currentMonthReport?.cogs) || 0
+  const goalActualWages = parseFloat(currentMonthReport?.sales_per_hour) || 0
+  const goalActualCogsP = goalActualExcl > 0 ? (goalActualCogs / goalActualExcl * 100) : 0
+  const goalActualWageP = goalActualExcl > 0 ? (goalActualWages / goalActualExcl * 100) : 0
+  const salesProgress = salesGoal > 0 ? (goalActualSales / salesGoal * 100) : 0
+
+  // H1/H2 Period calculations
+  const H1_MONTHS = [4, 5, 6, 7, 8, 9]
+  const H2_MONTHS = [10, 11, 12, 1, 2, 3]
+  const isH2 = H2_MONTHS.includes(currentMonth)
+  const currentPeriodLabel = isH2 ? 'H2' : 'H1'
+
+  // Helper to compute period stats from reports array filtered by months
+  const computePeriodStats = (reportsForPeriod) => {
+    const valid = reportsForPeriod.filter(r => parseFloat(r.total_sales_inc_gst) > 0)
+    if (valid.length === 0) return null
+    const totalSales = valid.reduce((s, r) => s + (parseFloat(r.total_sales_inc_gst) || 0), 0)
+    const totalExcl = valid.reduce((s, r) => s + (parseFloat(r.excl_gst_sales) || 0), 0)
+    const totalCogs = valid.reduce((s, r) => s + (parseFloat(r.cogs) || 0), 0)
+    const totalWages = valid.reduce((s, r) => s + (parseFloat(r.sales_per_hour) || 0), 0)
+    const totalProfit = valid.reduce((s, r) => s + (parseFloat(r.operating_profit) || 0), 0)
+    const avgCogsP = totalExcl > 0 ? (totalCogs / totalExcl * 100) : 0
+    const avgWageP = totalExcl > 0 ? (totalWages / totalExcl * 100) : 0
+    const profitMargin = totalExcl > 0 ? (totalProfit / totalExcl * 100) : 0
+    return { totalSales, totalCogs, totalWages, totalProfit, avgCogsP, avgWageP, profitMargin, months: valid.length }
+  }
+
+  // Current H2 (Oct year-1 to Mar year): Oct-Dec from lastYearReports, Jan-Mar from reports
+  const currentH2Reports = [
+    ...lastYearReports.filter(r => [10, 11, 12].includes(r.month)),
+    ...reports.filter(r => [1, 2, 3].includes(r.month)),
+  ]
+  // Previous H2 (Oct year-2 to Mar year-1): Oct-Dec from twoYearsAgoReports, Jan-Mar from lastYearReports
+  const prevH2Reports = [
+    ...(twoYearsAgoReports || []).filter(r => [10, 11, 12].includes(r.month)),
+    ...lastYearReports.filter(r => [1, 2, 3].includes(r.month)),
+  ]
+  // Current H1 (Apr-Sep year): from reports
+  const currentH1Reports = reports.filter(r => H1_MONTHS.includes(r.month))
+  // Previous H1 (Apr-Sep year-1): from lastYearReports
+  const prevH1Reports = lastYearReports.filter(r => H1_MONTHS.includes(r.month))
+  // Previous H2 for H1 comparison (Oct year-1 to Mar year): same as currentH2
+  const prevH2ForH1 = currentH2Reports
+
+  const currentH2Stats = computePeriodStats(currentH2Reports)
+  const prevH2Stats = computePeriodStats(prevH2Reports)
+  const currentH1Stats = computePeriodStats(currentH1Reports)
+  const prevH1Stats = computePeriodStats(prevH1Reports)
+  const prevH2ForH1Stats = computePeriodStats(prevH2ForH1)
+
+  // Determine which stats to show
+  const activePeriodStats = isH2
+    ? (periodTab === 'current' ? currentH2Stats : currentH1Stats)
+    : (periodTab === 'current' ? currentH1Stats : currentH2Stats)
+
+  const activePeriodLabel = isH2
+    ? (periodTab === 'current' ? `H2 (Oct ${year - 1} - Mar ${year})` : `H1 (Apr - Sep ${year})`)
+    : (periodTab === 'current' ? `H1 (Apr - Sep ${year})` : `H2 (Oct ${year - 1} - Mar ${year})`)
+
+  // Comparisons for active period
+  const getComparisons = () => {
+    if (isH2 && periodTab === 'current') {
+      // Current H2: compare vs previous H2 and previous H1
+      const vsPrevH2 = prevH2Stats && currentH2Stats && prevH2Stats.totalSales > 0
+        ? ((currentH2Stats.totalSales - prevH2Stats.totalSales) / prevH2Stats.totalSales * 100).toFixed(1) : null
+      const vsPrevH1 = prevH1Stats && currentH2Stats && prevH1Stats.totalSales > 0
+        ? ((currentH2Stats.totalSales - prevH1Stats.totalSales) / prevH1Stats.totalSales * 100).toFixed(1) : null
+      return [
+        { label: `vs H2 ${year - 2}/${year - 1}`, value: vsPrevH2 },
+        { label: `vs H1 ${year - 1}`, value: vsPrevH1 },
+      ]
+    } else if (isH2 && periodTab !== 'current') {
+      // Showing H1: compare vs prev H1 and prev H2
+      const vsPrevH1 = prevH1Stats && currentH1Stats && prevH1Stats.totalSales > 0
+        ? ((currentH1Stats.totalSales - prevH1Stats.totalSales) / prevH1Stats.totalSales * 100).toFixed(1) : null
+      const vsPrevH2 = currentH2Stats && currentH1Stats && currentH2Stats.totalSales > 0
+        ? ((currentH1Stats.totalSales - currentH2Stats.totalSales) / currentH2Stats.totalSales * 100).toFixed(1) : null
+      return [
+        { label: `vs H1 ${year - 1}`, value: vsPrevH1 },
+        { label: `vs H2 ${year - 1}/${year}`, value: vsPrevH2 },
+      ]
+    } else if (!isH2 && periodTab === 'current') {
+      // Current H1: compare vs prev H1 and prev H2
+      const vsPrevH1 = prevH1Stats && currentH1Stats && prevH1Stats.totalSales > 0
+        ? ((currentH1Stats.totalSales - prevH1Stats.totalSales) / prevH1Stats.totalSales * 100).toFixed(1) : null
+      const vsPrevH2 = prevH2ForH1Stats && currentH1Stats && prevH2ForH1Stats.totalSales > 0
+        ? ((currentH1Stats.totalSales - prevH2ForH1Stats.totalSales) / prevH2ForH1Stats.totalSales * 100).toFixed(1) : null
+      return [
+        { label: `vs H1 ${year - 1}`, value: vsPrevH1 },
+        { label: `vs H2 ${year - 1}/${year}`, value: vsPrevH2 },
+      ]
+    } else {
+      // Showing H2 when in H1: compare vs prev H2 and current H1
+      const vsPrevH2 = prevH2Stats && currentH2Stats && prevH2Stats.totalSales > 0
+        ? ((currentH2Stats.totalSales - prevH2Stats.totalSales) / prevH2Stats.totalSales * 100).toFixed(1) : null
+      const vsH1 = currentH1Stats && currentH2Stats && currentH1Stats.totalSales > 0
+        ? ((currentH2Stats.totalSales - currentH1Stats.totalSales) / currentH1Stats.totalSales * 100).toFixed(1) : null
+      return [
+        { label: `vs H2 ${year - 2}/${year - 1}`, value: vsPrevH2 },
+        { label: `vs H1 ${year}`, value: vsH1 },
+      ]
+    }
+  }
+  const periodComparisons = getComparisons()
+
   // KPI Trends
   const trendData = plData.map(d => {
     const r = currentMap[d.month]
-    const excl = parseFloat(r?.excl_gst_sales) || 0
     const days = parseInt(r?.number_of_days) || 1
     const salesPerDay = (parseFloat(r?.total_sales_inc_gst) || 0) / days
     return {
@@ -407,24 +545,30 @@ function OverviewDashboard({ reports, lastYearReports, year }) {
 
   return (
     <>
-      {/* A. Annual Sales Bar Chart */}
+      {/* A. Annual Sales Bar Chart - 3 years */}
       <Card className="p-5">
         <h3 className="text-sm font-bold text-gray-900 mb-1">Annual Sales Comparison</h3>
-        <p className="text-xs text-gray-400 mb-4">{year} vs {year - 1}</p>
+        <p className="text-xs text-gray-400 mb-4">{year - 2} vs {year - 1} vs {year}</p>
         <div className="flex items-end gap-1 sm:gap-2" style={{ height: 200 }}>
           {MONTHS.map((m, i) => {
             const curH = maxSales > 0 ? (currentSales[i] / maxSales * 100) : 0
             const lyH = maxSales > 0 ? (lastYearSales[i] / maxSales * 100) : 0
+            const ty2H = maxSales > 0 ? (twoYearsAgoSales[i] / maxSales * 100) : 0
             return (
               <div key={m.value} className="flex-1 flex flex-col items-center gap-0">
                 <div className="w-full flex items-end justify-center gap-px" style={{ height: 180 }}>
                   <div
-                    className="flex-1 max-w-[14px] bg-gray-200 rounded-t"
+                    className="flex-1 max-w-[10px] bg-gray-300 rounded-t"
+                    style={{ height: `${ty2H}%`, minHeight: ty2H > 0 ? 2 : 0 }}
+                    title={`${year - 2}: $${twoYearsAgoSales[i].toLocaleString()}`}
+                  />
+                  <div
+                    className="flex-1 max-w-[10px] bg-gray-400 rounded-t"
                     style={{ height: `${lyH}%`, minHeight: lyH > 0 ? 2 : 0 }}
                     title={`${year - 1}: $${lastYearSales[i].toLocaleString()}`}
                   />
                   <div
-                    className="flex-1 max-w-[14px] bg-blue-500 rounded-t"
+                    className="flex-1 max-w-[10px] bg-blue-500 rounded-t"
                     style={{ height: `${curH}%`, minHeight: curH > 0 ? 2 : 0 }}
                     title={`${year}: $${currentSales[i].toLocaleString()}`}
                   />
@@ -440,20 +584,29 @@ function OverviewDashboard({ reports, lastYearReports, year }) {
             <span className="text-xs text-gray-500">{year}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 bg-gray-200 rounded-sm" />
+            <div className="w-3 h-3 bg-gray-400 rounded-sm" />
             <span className="text-xs text-gray-500">{year - 1}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 bg-gray-300 rounded-sm" />
+            <span className="text-xs text-gray-500">{year - 2}</span>
           </div>
         </div>
       </Card>
 
-      {/* B. YTD Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* B. YTD Summary Cards - with 2-year comparison */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <Card className="p-4 text-center">
           <div className="text-xs text-gray-500 mb-1">Total Sales YTD</div>
           <div className="text-lg font-bold text-gray-900">${totalSalesYTD.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
           {yoyChange !== null && (
             <div className={`text-xs font-medium mt-1 ${parseFloat(yoyChange) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {parseFloat(yoyChange) >= 0 ? '▲' : '▼'} {Math.abs(parseFloat(yoyChange))}% vs LY
+            </div>
+          )}
+          {yoy2Change !== null && (
+            <div className={`text-xs font-medium mt-0.5 ${parseFloat(yoy2Change) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {parseFloat(yoy2Change) >= 0 ? '▲' : '▼'} {Math.abs(parseFloat(yoy2Change))}% vs 2Y ago
             </div>
           )}
         </Card>
@@ -472,9 +625,134 @@ function OverviewDashboard({ reports, lastYearReports, year }) {
           <div className={`text-lg font-bold ${parseFloat(avgMargin) >= 0 ? 'text-gray-900' : 'text-red-600'}`}>{avgMargin}%</div>
           <div className="text-xs text-gray-400 mt-1">avg operating</div>
         </Card>
+        <Card className="p-4 text-center">
+          <div className="text-xs text-gray-500 mb-1">vs 2 Years Ago</div>
+          <div className="text-lg font-bold text-gray-900">
+            ${twoYearsAgoTotalSales.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          </div>
+          <div className="text-xs text-gray-400 mt-1">{year - 2} YTD</div>
+        </Card>
       </div>
 
-      {/* C. Monthly P&L Trend Table */}
+      {/* Goal Progress Section */}
+      {(salesGoal > 0 || goalCogsTarget > 0 || goalWageTarget > 0) && (
+        <Card className="p-5">
+          <h3 className="text-sm font-bold text-gray-900 mb-1">Goal Progress</h3>
+          <p className="text-xs text-gray-400 mb-4">{goalMonthLabel} {goalMonthYear}</p>
+          <div className="space-y-4">
+            {salesGoal > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-gray-700">Sales Goal: ${salesGoal.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                  <span className={`text-xs font-bold ${salesProgress >= 100 ? 'text-green-600' : salesProgress >= 80 ? 'text-amber-600' : 'text-red-600'}`}>
+                    {salesProgress.toFixed(0)}% (${goalActualSales.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div
+                    className={`h-3 rounded-full transition-all ${salesProgress >= 100 ? 'bg-green-500' : salesProgress >= 80 ? 'bg-amber-500' : 'bg-red-500'}`}
+                    style={{ width: `${Math.min(salesProgress, 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {goalCogsTarget > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-gray-700">COGS Target: {goalCogsTarget}%</span>
+                  <span className={`text-xs font-bold ${goalActualCogsP <= goalCogsTarget ? 'text-green-600' : goalActualCogsP <= goalCogsTarget * 1.05 ? 'text-amber-600' : 'text-red-600'}`}>
+                    Current: {goalActualCogsP.toFixed(1)}% {goalActualCogsP <= goalCogsTarget ? ' (on track)' : ' (over target)'}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div
+                    className={`h-3 rounded-full transition-all ${goalActualCogsP <= goalCogsTarget ? 'bg-green-500' : goalActualCogsP <= goalCogsTarget * 1.05 ? 'bg-amber-500' : 'bg-red-500'}`}
+                    style={{ width: `${Math.min(goalCogsTarget > 0 ? (goalActualCogsP / goalCogsTarget * 100) : 0, 120)}%`, maxWidth: '100%' }}
+                  />
+                </div>
+              </div>
+            )}
+            {goalWageTarget > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-gray-700">Wage Target: {goalWageTarget}%</span>
+                  <span className={`text-xs font-bold ${goalActualWageP <= goalWageTarget ? 'text-green-600' : goalActualWageP <= goalWageTarget * 1.05 ? 'text-amber-600' : 'text-red-600'}`}>
+                    Current: {goalActualWageP.toFixed(1)}% {goalActualWageP <= goalWageTarget ? ' (on track)' : ' (over target)'}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div
+                    className={`h-3 rounded-full transition-all ${goalActualWageP <= goalWageTarget ? 'bg-green-500' : goalActualWageP <= goalWageTarget * 1.05 ? 'bg-amber-500' : 'bg-red-500'}`}
+                    style={{ width: `${Math.min(goalWageTarget > 0 ? (goalActualWageP / goalWageTarget * 100) : 0, 120)}%`, maxWidth: '100%' }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {/* H1/H2 Period Performance Section */}
+      <Card className="p-5">
+        <h3 className="text-sm font-bold text-gray-900 mb-1">Period Performance</h3>
+        <div className="flex gap-2 mb-4 mt-2">
+          <button
+            onClick={() => setPeriodTab('current')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              periodTab === 'current' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {isH2 ? `H2 (Oct ${year - 1} - Mar ${year})` : `H1 (Apr - Sep ${year})`}
+          </button>
+          <button
+            onClick={() => setPeriodTab('previous')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              periodTab === 'previous' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {isH2 ? `H1 (Apr - Sep ${year})` : `H2 (Oct ${year - 1} - Mar ${year})`}
+          </button>
+        </div>
+
+        {activePeriodStats ? (
+          <div>
+            <p className="text-xs text-gray-500 mb-3">{activePeriodLabel}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <div className="text-xs text-gray-500 mb-1">Total Sales</div>
+                <div className="text-sm font-bold text-gray-900">${activePeriodStats.totalSales.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <div className="text-xs text-gray-500 mb-1">Avg COGS%</div>
+                <div className="text-sm font-bold text-gray-900">{activePeriodStats.avgCogsP.toFixed(1)}%</div>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <div className="text-xs text-gray-500 mb-1">Avg Wage%</div>
+                <div className="text-sm font-bold text-gray-900">{activePeriodStats.avgWageP.toFixed(1)}%</div>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <div className="text-xs text-gray-500 mb-1">Total Profit</div>
+                <div className="text-sm font-bold text-gray-900">${activePeriodStats.totalProfit.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <div className="text-xs text-gray-500 mb-1">Profit Margin</div>
+                <div className="text-sm font-bold text-gray-900">{activePeriodStats.profitMargin.toFixed(1)}%</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {periodComparisons.map((c, i) => c.value !== null && (
+                <div key={i} className={`text-xs font-medium px-2 py-1 rounded ${parseFloat(c.value) >= 0 ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'}`}>
+                  {parseFloat(c.value) >= 0 ? '▲' : '▼'} {Math.abs(parseFloat(c.value))}% {c.label}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 text-center py-4">No data for this period yet</p>
+        )}
+      </Card>
+
+      {/* C. Monthly P&L Trend Table - with LY Sales column */}
       <Card className="overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100">
           <h3 className="text-sm font-bold text-gray-900">Monthly P&L Trend</h3>
@@ -485,6 +763,7 @@ function OverviewDashboard({ reports, lastYearReports, year }) {
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="px-4 py-3 text-left text-gray-500 font-semibold">Month</th>
                 <th className="px-3 py-3 text-right text-gray-500 font-semibold">Sales</th>
+                <th className="px-3 py-3 text-right text-gray-400 font-semibold">LY Sales</th>
                 <th className="px-3 py-3 text-right text-gray-500 font-semibold">COGS</th>
                 <th className="px-3 py-3 text-right text-gray-500 font-semibold">COGS%</th>
                 <th className="px-3 py-3 text-right text-gray-500 font-semibold">Wages</th>
@@ -498,6 +777,7 @@ function OverviewDashboard({ reports, lastYearReports, year }) {
                 <tr key={d.label} className="border-b border-gray-50">
                   <td className="px-4 py-2.5 font-semibold text-gray-700">{d.label}</td>
                   <td className="px-3 py-2.5 text-right text-gray-600">${fmt(d.sales)}</td>
+                  <td className="px-3 py-2.5 text-right text-gray-400">{d.lySales > 0 ? `$${fmt(d.lySales)}` : '-'}</td>
                   <td className="px-3 py-2.5 text-right text-gray-600">${fmt(d.cogs)}</td>
                   <td className={`px-3 py-2.5 text-right font-medium ${cogsGoal > 0 && parseFloat(d.cogsP) > cogsGoal ? 'text-red-600' : 'text-gray-600'}`}>{d.cogsP}%</td>
                   <td className="px-3 py-2.5 text-right text-gray-600">${fmt(d.wages)}</td>
@@ -509,6 +789,7 @@ function OverviewDashboard({ reports, lastYearReports, year }) {
               {/* Totals row */}
               {plData.length > 0 && (() => {
                 const totSales = plData.reduce((s, d) => s + d.sales, 0)
+                const totLySales = plData.reduce((s, d) => s + d.lySales, 0)
                 const totCogs = plData.reduce((s, d) => s + d.cogs, 0)
                 const totWages = plData.reduce((s, d) => s + d.wages, 0)
                 const totProfit = plData.reduce((s, d) => s + d.profit, 0)
@@ -520,6 +801,7 @@ function OverviewDashboard({ reports, lastYearReports, year }) {
                   <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold">
                     <td className="px-4 py-2.5 text-gray-900">TOTAL</td>
                     <td className="px-3 py-2.5 text-right text-gray-900">${fmt(totSales)}</td>
+                    <td className="px-3 py-2.5 text-right text-gray-400">{totLySales > 0 ? `$${fmt(totLySales)}` : '-'}</td>
                     <td className="px-3 py-2.5 text-right text-gray-900">${fmt(totCogs)}</td>
                     <td className="px-3 py-2.5 text-right text-gray-900">{totCogsP}%</td>
                     <td className="px-3 py-2.5 text-right text-gray-900">${fmt(totWages)}</td>
