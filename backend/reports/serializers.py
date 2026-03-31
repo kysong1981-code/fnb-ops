@@ -246,6 +246,8 @@ class ProfitShareSerializer(serializers.ModelSerializer):
             'net_profit_account', 'net_profit_cash',
             # Incentive
             'incentive_account', 'incentive_cash', 'incentive_total', 'incentive_pct',
+            # Evaluation Score
+            'evaluation_score',
             # Lock & Notes
             'is_locked', 'notes',
             # Partners

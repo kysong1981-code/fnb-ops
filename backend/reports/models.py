@@ -263,6 +263,9 @@ class ProfitShare(models.Model):
     incentive_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     incentive_pct = models.DecimalField(max_digits=5, decimal_places=4, default=0)
 
+    # Evaluation Score (pulled from StoreEvaluation)
+    evaluation_score = models.IntegerField(default=0)
+
     # Lock & Notes
     is_locked = models.BooleanField(default=False)
     notes = models.TextField(blank=True, default='')
@@ -337,9 +340,22 @@ class PartnerShare(models.Model):
         return f"{self.name} ({self.get_partner_type_display()}) - {self.profit_share}"
 
     def calculate_amounts(self):
-        """Recalculate amounts from parent ProfitShare percentages."""
+        """Recalculate amounts from parent ProfitShare percentages.
+
+        If parent has an evaluation_score > 0, incentive amounts are scaled
+        by score_percentage (e.g. score 90 => 0.9).
+        """
         from decimal import Decimal
         parent = self.profit_share
+
+        # Score percentage: if evaluation_score is set, scale incentives
+        score_pct = Decimal('1')
+        if parent.evaluation_score and parent.evaluation_score > 0:
+            score_pct = Decimal(str(parent.evaluation_score)) / Decimal('100')
+
+        # Actual incentive after score adjustment
+        actual_incentive_account = (parent.incentive_account * score_pct).quantize(Decimal('0.01'))
+        actual_incentive_cash = (parent.incentive_cash * score_pct).quantize(Decimal('0.01'))
 
         if self.fixed_amount > 0:
             # Fixed amount partner: split evenly between account and cash
@@ -358,20 +374,20 @@ class PartnerShare(models.Model):
             total_other_bank_account = sum(p.bank_account for p in other_partners)
             total_other_bank_cash = sum(p.bank_cash for p in other_partners)
 
-            self.incentive_account = parent.incentive_account - total_other_incentive_account
-            self.incentive_cash = parent.incentive_cash - total_other_incentive_cash
-            self.bank_account = parent.net_profit_account - parent.incentive_account - total_other_bank_account
-            self.bank_cash = parent.net_profit_cash - parent.incentive_cash - total_other_bank_cash
+            self.incentive_account = actual_incentive_account - total_other_incentive_account
+            self.incentive_cash = actual_incentive_cash - total_other_incentive_cash
+            self.bank_account = parent.net_profit_account - actual_incentive_account - total_other_bank_account
+            self.bank_cash = parent.net_profit_cash - actual_incentive_cash - total_other_bank_cash
             self.total_account = self.incentive_account + self.bank_account
             self.total_cash = self.incentive_cash + self.bank_cash
             self.total = self.total_account + self.total_cash
         else:
             # Percentage-based partner
-            self.incentive_account = (parent.incentive_account * self.incentive_pct).quantize(Decimal('0.01'))
-            self.incentive_cash = (parent.incentive_cash * self.incentive_pct).quantize(Decimal('0.01'))
-            # Equity is based on net profit MINUS incentive
-            distributable_account = parent.net_profit_account - parent.incentive_account
-            distributable_cash = parent.net_profit_cash - parent.incentive_cash
+            self.incentive_account = (actual_incentive_account * self.incentive_pct).quantize(Decimal('0.01'))
+            self.incentive_cash = (actual_incentive_cash * self.incentive_pct).quantize(Decimal('0.01'))
+            # Equity is based on net profit MINUS actual incentive (after score)
+            distributable_account = parent.net_profit_account - actual_incentive_account
+            distributable_cash = parent.net_profit_cash - actual_incentive_cash
             self.bank_account = (distributable_account * self.equity_pct).quantize(Decimal('0.01'))
             self.bank_cash = (distributable_cash * self.equity_pct).quantize(Decimal('0.01'))
             self.total_account = self.incentive_account + self.bank_account

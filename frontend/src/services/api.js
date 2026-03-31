@@ -708,6 +708,7 @@ export const evaluationAPI = {
   delete: (id) => api.delete(`/reports/store-evaluations/${id}/`),
   autoFill: (year, period, storeId) => api.get('/reports/store-evaluations/auto-fill/', { params: { year, period_type: period, store_id: storeId } }),
   toggleLock: (id) => api.post(`/reports/store-evaluations/${id}/toggle-lock/`),
+  history: (storeId) => api.get('/reports/store-evaluations/history/', { params: { store_id: storeId } }),
 }
 
 // Profit Share API
@@ -720,6 +721,7 @@ export const profitShareAPI = {
   toggleLock: (id) => api.post(`/reports/profit-shares/${id}/toggle-lock/`),
   autoCalculate: (id) => api.post(`/reports/profit-shares/${id}/auto_calculate/`),
   history: (storeId) => api.get('/reports/profit-shares/history/', { params: { store_id: storeId } }),
+  pullScore: (year, periodType, storeId) => api.get('/reports/profit-shares/pull-score/', { params: { year, period_type: periodType, store_id: storeId } }),
 }
 
 export const skyReportAPI = {

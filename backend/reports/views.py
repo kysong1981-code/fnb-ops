@@ -2382,6 +2382,32 @@ class StoreEvaluationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
+    @action(detail=False, methods=['get'])
+    def history(self, request):
+        """Return all evaluations for a store for the history table."""
+        from users.filters import get_target_org
+        org = get_target_org(request)
+        if not org:
+            return Response({'error': 'No store selected.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        qs = StoreEvaluation.objects.filter(organization=org).order_by('-year', '-period_type')
+        results = []
+        for ev in qs:
+            results.append({
+                'id': ev.id,
+                'year': ev.year,
+                'period_type': ev.period_type,
+                'total_score': ev.total_score,
+                'sales_score': ev.sales_score,
+                'cogs_score': ev.cogs_score,
+                'wage_score': ev.wage_score,
+                'service_score': ev.service_score,
+                'hygiene_score': ev.hygiene_score,
+                'leadership_score_points': ev.leadership_score_points,
+                'is_locked': ev.is_locked,
+            })
+        return Response(results)
+
 
 class ProfitShareViewSet(viewsets.ModelViewSet):
     """
@@ -2502,3 +2528,33 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
         instance.save()
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='pull-score')
+    def pull_score(self, request):
+        """Pull evaluation score for the same period."""
+        from users.filters import get_target_org
+        org = get_target_org(request)
+        year = request.query_params.get('year')
+        period_type = request.query_params.get('period_type')
+
+        if not year or not period_type:
+            return Response({'error': 'year and period_type are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        evaluation = StoreEvaluation.objects.filter(
+            organization=org, year=int(year), period_type=period_type
+        ).first()
+
+        if not evaluation:
+            return Response({'error': 'No evaluation found for this period.'}, status=status.HTTP_404_NOT_FOUND)
+
+        total = evaluation.total_score or 0
+        return Response({
+            'total_score': total,
+            'score_percentage': float(total) / 100.0 if total else 0,
+            'sales_score': evaluation.sales_score,
+            'cogs_score': evaluation.cogs_score,
+            'wage_score': evaluation.wage_score,
+            'service_score': evaluation.service_score,
+            'hygiene_score': evaluation.hygiene_score,
+            'leadership_score_points': evaluation.leadership_score_points,
+        })

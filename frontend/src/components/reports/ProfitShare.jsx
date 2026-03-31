@@ -39,6 +39,7 @@ const EMPTY_SUMMARY = {
   incentive_account: '',
   incentive_cash: '',
   incentive_pct: '',
+  evaluation_score: 0,
   notes: '',
 }
 
@@ -68,6 +69,8 @@ export default function ProfitShare() {
   const [success, setSuccess] = useState('')
   const [historyData, setHistoryData] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [pullingScore, setPullingScore] = useState(false)
+  const [scoreData, setScoreData] = useState(null)
 
   const isCEO = user?.role === 'CEO' || user?.role === 'HQ'
 
@@ -116,8 +119,14 @@ export default function ProfitShare() {
           incentive_account: ps.incentive_account || '',
           incentive_cash: ps.incentive_cash || '',
           incentive_pct: ps.incentive_pct || '',
+          evaluation_score: ps.evaluation_score || 0,
           notes: ps.notes || '',
         })
+        if (ps.evaluation_score > 0) {
+          setScoreData({ total_score: ps.evaluation_score, score_percentage: ps.evaluation_score / 100 })
+        } else {
+          setScoreData(null)
+        }
         setPartners((ps.partners || []).map(p => ({
           id: p.id,
           name: p.name || '',
@@ -141,6 +150,7 @@ export default function ProfitShare() {
         setIsLocked(false)
         setSummary({ ...EMPTY_SUMMARY })
         setPartners([])
+        setScoreData(null)
       }
     } catch (err) {
       console.error('Failed to load profit share:', err)
@@ -230,6 +240,7 @@ export default function ProfitShare() {
       incentive_account: n(summary.incentive_account),
       incentive_cash: n(summary.incentive_cash),
       incentive_pct: n(summary.incentive_pct),
+      evaluation_score: parseInt(summary.evaluation_score) || 0,
       notes: summary.notes || '',
       partners: partners.map((p, i) => ({
         ...(p.id ? { id: p.id } : {}),
@@ -303,6 +314,24 @@ export default function ProfitShare() {
   const navigateToPeriod = (h) => {
     setYear(h.year)
     setPeriodType(h.period_type)
+  }
+
+  const handlePullScore = async () => {
+    if (!selectedStore?.id) return
+    setPullingScore(true)
+    setError('')
+    try {
+      const res = await profitShareAPI.pullScore(year, periodType, selectedStore.id)
+      const data = res.data
+      setScoreData(data)
+      setSummary(prev => ({ ...prev, evaluation_score: data.total_score || 0 }))
+      setSuccess(`Evaluation score pulled: ${data.total_score}/100 (${(data.score_percentage * 100).toFixed(0)}%)`)
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (err) {
+      setError(err.response?.data?.error || 'No evaluation found for this period. Create one in Store Evaluation first.')
+    } finally {
+      setPullingScore(false)
+    }
   }
 
   const disabled = isLocked || !isCEO
@@ -612,6 +641,54 @@ export default function ProfitShare() {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Evaluation Score */}
+          <div className="mb-4">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Evaluation Score</h3>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handlePullScore}
+                disabled={disabled || pullingScore}
+                className="px-4 py-2 bg-purple-50 text-purple-600 text-sm font-medium rounded-xl hover:bg-purple-100 border border-purple-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {pullingScore ? 'Pulling...' : 'Pull Evaluation Score'}
+              </button>
+              {(scoreData || summary.evaluation_score > 0) && (
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold text-gray-900">
+                    Score: {summary.evaluation_score}/100 ({summary.evaluation_score}%)
+                  </span>
+                  {scoreData && (
+                    <span className="text-xs text-gray-400">
+                      Sales {scoreData.sales_score} | COGS {scoreData.cogs_score} | Wage {scoreData.wage_score} | Service {scoreData.service_score} | Hygiene {scoreData.hygiene_score} | Leadership {scoreData.leadership_score_points}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            {(scoreData || summary.evaluation_score > 0) && (
+              <div className="mt-2 grid grid-cols-2 gap-3">
+                <div className="bg-purple-50 rounded-xl p-3">
+                  <p className="text-xs text-purple-600 mb-1">Actual Incentive Account</p>
+                  <p className="text-sm font-semibold text-purple-800">
+                    {fmt((parseFloat(summary.incentive_account) || 0) * (summary.evaluation_score / 100))}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {fmt(parseFloat(summary.incentive_account) || 0)} x {summary.evaluation_score}%
+                  </p>
+                </div>
+                <div className="bg-purple-50 rounded-xl p-3">
+                  <p className="text-xs text-purple-600 mb-1">Actual Incentive Cash</p>
+                  <p className="text-sm font-semibold text-purple-800">
+                    {fmt((parseFloat(summary.incentive_cash) || 0) * (summary.evaluation_score / 100))}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {fmt(parseFloat(summary.incentive_cash) || 0)} x {summary.evaluation_score}%
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Notes */}

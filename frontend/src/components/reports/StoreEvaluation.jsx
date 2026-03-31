@@ -38,18 +38,6 @@ const LEADERSHIP_OPTIONS = [0, 1, 2, 3, 4, 5]
 const EMPTY_FORM = {
   period_type: 'H1',
   year: new Date().getFullYear(),
-  manager_type: 'NON_EQUITY',
-  // Basic Info
-  net_profit: '',
-  account_split: '',
-  cash_split: '',
-  incentive_amount: '',
-  incentive_percent: '',
-  equity_share_percent: '',
-  staff_count: '',
-  staff_incentive_percent: '',
-  guarantee_percent: '',
-  guarantee_amount: '',
   // Evaluation scores
   sales_target: '',
   sales_achievement: '',
@@ -83,6 +71,8 @@ export default function StoreEvaluation() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [autoFilling, setAutoFilling] = useState(false)
+  const [history, setHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
 
   const isCEO = user?.role === 'CEO' || user?.role === 'HQ'
 
@@ -90,6 +80,24 @@ export default function StoreEvaluation() {
   useEffect(() => {
     loadEvaluation()
   }, [selectedStore?.id, year, periodType])
+
+  // Load history when store changes
+  useEffect(() => {
+    loadHistory()
+  }, [selectedStore?.id])
+
+  const loadHistory = async () => {
+    if (!selectedStore?.id) return
+    setHistoryLoading(true)
+    try {
+      const res = await evaluationAPI.history(selectedStore.id)
+      setHistory(res.data || [])
+    } catch {
+      setHistory([])
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
 
   const loadEvaluation = async () => {
     if (!selectedStore?.id) return
@@ -109,17 +117,6 @@ export default function StoreEvaluation() {
         setForm({
           period_type: eval_.period_type || periodType,
           year: eval_.year || year,
-          manager_type: eval_.manager_type || 'NON_EQUITY',
-          net_profit: eval_.net_profit || '',
-          account_split: eval_.account_split || '',
-          cash_split: eval_.cash_split || '',
-          incentive_amount: eval_.incentive_amount || '',
-          incentive_percent: eval_.incentive_percent || '',
-          equity_share_percent: eval_.equity_share_percent || '',
-          staff_count: eval_.staff_count || '',
-          staff_incentive_percent: eval_.staff_incentive_percent || '',
-          guarantee_percent: eval_.guarantee_percent || '',
-          guarantee_amount: eval_.guarantee_amount || '',
           sales_target: eval_.sales_target || '',
           sales_achievement: eval_.sales_achievement || '',
           sales_score: eval_.sales_score || '',
@@ -129,12 +126,12 @@ export default function StoreEvaluation() {
           wage_target: eval_.wage_target || '',
           wage_achievement: eval_.wage_achievement || '',
           wage_score: eval_.wage_score || '',
-          service_achievement: eval_.service_achievement || '',
+          service_achievement: eval_.service_achievement || eval_.service_rating || '',
           service_score: eval_.service_score || '',
-          hygiene_achievement: eval_.hygiene_achievement || '18',
+          hygiene_achievement: eval_.hygiene_achievement || eval_.hygiene_months || '18',
           hygiene_score: eval_.hygiene_score || '',
-          leadership_achievement: eval_.leadership_achievement || '5',
-          leadership_score: eval_.leadership_score || '',
+          leadership_achievement: eval_.leadership_achievement || eval_.leadership_score || '5',
+          leadership_score: eval_.leadership_score_points || eval_.leadership_score || '',
         })
       } else {
         setEvaluationId(null)
@@ -155,15 +152,6 @@ export default function StoreEvaluation() {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
-  // Auto-calculated values
-  const incentivePool = useMemo(() => {
-    const amount = parseFloat(form.incentive_amount) || 0
-    const percent = parseFloat(form.incentive_percent) || 0
-    if (amount > 0) return amount
-    const profit = parseFloat(form.net_profit) || 0
-    return profit * (percent / 100)
-  }, [form.net_profit, form.incentive_amount, form.incentive_percent])
-
   const totalScore = useMemo(() => {
     return SCORE_CONFIG.reduce((sum, cfg) => {
       const score = parseFloat(form[`${cfg.key}_score`]) || 0
@@ -174,17 +162,6 @@ export default function StoreEvaluation() {
   const maxScore = useMemo(() => {
     return SCORE_CONFIG.reduce((sum, cfg) => sum + cfg.max, 0)
   }, [])
-
-  const payoutRatio = totalScore / maxScore
-  const finalPayout = incentivePool * payoutRatio
-
-  const staffShare = useMemo(() => {
-    const staffPct = parseFloat(form.staff_incentive_percent) || 0
-    const staffCount = parseInt(form.staff_count) || 0
-    const totalStaff = finalPayout * (staffPct / 100)
-    const perStaff = staffCount > 0 ? totalStaff / staffCount : 0
-    return { total: totalStaff, perStaff, count: staffCount }
-  }, [finalPayout, form.staff_incentive_percent, form.staff_count])
 
   const handleAutoFill = async () => {
     if (!selectedStore?.id) return
@@ -198,7 +175,6 @@ export default function StoreEvaluation() {
         sales_achievement: data.total_sales || prev.sales_achievement,
         cogs_achievement: data.cogs_percent || prev.cogs_achievement,
         wage_achievement: data.wage_percent || prev.wage_achievement,
-        net_profit: data.net_profit || prev.net_profit,
       }))
       setSuccess('Auto-filled from Sky Report data')
       setTimeout(() => setSuccess(''), 3000)
@@ -220,6 +196,10 @@ export default function StoreEvaluation() {
         year,
         period_type: periodType,
         store: selectedStore?.id,
+        // Map frontend fields to backend model fields
+        service_rating: form.service_achievement || 0,
+        hygiene_months: form.hygiene_achievement || 0,
+        leadership_score: form.leadership_achievement || 0,
       }
       if (evaluationId) {
         await evaluationAPI.update(evaluationId, payload)
@@ -229,6 +209,8 @@ export default function StoreEvaluation() {
       }
       setSuccess('Evaluation saved successfully')
       setTimeout(() => setSuccess(''), 3000)
+      loadEvaluation()
+      loadHistory()
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to save evaluation')
     } finally {
@@ -247,6 +229,7 @@ export default function StoreEvaluation() {
       setForm({ ...EMPTY_FORM, year, period_type: periodType })
       setSuccess('Evaluation deleted')
       setTimeout(() => setSuccess(''), 3000)
+      loadHistory()
     } catch (err) {
       setError('Failed to delete evaluation')
     } finally {
@@ -261,9 +244,15 @@ export default function StoreEvaluation() {
       setIsLocked(res.data.is_locked)
       setSuccess(res.data.is_locked ? 'Evaluation locked' : 'Evaluation unlocked')
       setTimeout(() => setSuccess(''), 3000)
+      loadHistory()
     } catch (err) {
       setError('Failed to toggle lock')
     }
+  }
+
+  const navigateToPeriod = (h) => {
+    setYear(h.year)
+    setPeriodType(h.period_type)
   }
 
   const disabled = isLocked || loading
@@ -352,186 +341,62 @@ export default function StoreEvaluation() {
         </div>
       )}
 
+      {/* History Table */}
+      {history.length > 0 && (
+        <Card className="mb-4">
+          <CardHeader>
+            <h2 className="text-lg font-semibold text-gray-900">Past Evaluations</h2>
+          </CardHeader>
+          <CardBody className="border-t border-gray-100">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-gray-400 border-b border-gray-100">
+                    <th className="text-left pb-2 font-medium">Period</th>
+                    <th className="text-right pb-2 font-medium">Total</th>
+                    <th className="text-right pb-2 font-medium">Sales</th>
+                    <th className="text-right pb-2 font-medium">COGS</th>
+                    <th className="text-right pb-2 font-medium">Wage</th>
+                    <th className="text-right pb-2 font-medium">Service</th>
+                    <th className="text-right pb-2 font-medium">Hygiene</th>
+                    <th className="text-right pb-2 font-medium">Leader</th>
+                    <th className="text-center pb-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="text-gray-700">
+                  {history.map(h => {
+                    const isCurrent = h.year === year && h.period_type === periodType
+                    return (
+                      <tr
+                        key={h.id}
+                        onClick={() => navigateToPeriod(h)}
+                        className={`cursor-pointer hover:bg-gray-50 border-b border-gray-50 ${isCurrent ? 'bg-blue-50' : ''}`}
+                      >
+                        <td className={`py-2 ${isCurrent ? 'font-semibold text-blue-600' : ''}`}>
+                          {h.year} {h.period_type}
+                        </td>
+                        <td className="py-2 text-right font-semibold">{h.total_score}/100</td>
+                        <td className="py-2 text-right">{h.sales_score}</td>
+                        <td className="py-2 text-right">{h.cogs_score}</td>
+                        <td className="py-2 text-right">{h.wage_score}</td>
+                        <td className="py-2 text-right">{h.service_score}</td>
+                        <td className="py-2 text-right">{h.hygiene_score}</td>
+                        <td className="py-2 text-right">{h.leadership_score_points}</td>
+                        <td className="py-2 text-center">{h.is_locked ? 'Locked' : 'Open'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
       {loading ? (
         <div className="text-center py-12 text-gray-400">Loading...</div>
       ) : (
         <>
-          {/* Manager Type Toggle */}
-          <Card className="mb-4">
-            <CardBody>
-              <label className={labelCls}>Manager Type</label>
-              <div className="flex bg-gray-100 rounded-xl p-1 w-fit">
-                {[
-                  { value: 'NON_EQUITY', label: 'Non-Equity' },
-                  { value: 'EQUITY', label: 'Equity' },
-                ].map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => handleChange('manager_type', opt.value)}
-                    disabled={disabled}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      form.manager_type === opt.value
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'text-gray-500 hover:text-gray-700'
-                    } ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </CardBody>
-          </Card>
-
-          {/* Basic Info Card */}
-          <Card className="mb-4">
-            <CardHeader>
-              <h2 className="text-lg font-semibold text-gray-900">Basic Information</h2>
-            </CardHeader>
-            <CardBody className="border-t border-gray-100">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Net Profit */}
-                <div>
-                  <label className={labelCls}>Net Profit ($)</label>
-                  <input
-                    type="number"
-                    value={form.net_profit}
-                    onChange={e => handleChange('net_profit', e.target.value)}
-                    disabled={disabled}
-                    className={disabled ? readOnlyCls : inputCls}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Account Split ($)</label>
-                  <input
-                    type="number"
-                    value={form.account_split}
-                    onChange={e => handleChange('account_split', e.target.value)}
-                    disabled={disabled}
-                    className={disabled ? readOnlyCls : inputCls}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Cash Split ($)</label>
-                  <input
-                    type="number"
-                    value={form.cash_split}
-                    onChange={e => handleChange('cash_split', e.target.value)}
-                    disabled={disabled}
-                    className={disabled ? readOnlyCls : inputCls}
-                    placeholder="0.00"
-                  />
-                </div>
-
-                {/* Incentive */}
-                <div>
-                  <label className={labelCls}>Incentive Amount ($)</label>
-                  <input
-                    type="number"
-                    value={form.incentive_amount}
-                    onChange={e => handleChange('incentive_amount', e.target.value)}
-                    disabled={disabled}
-                    className={disabled ? readOnlyCls : inputCls}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Incentive %</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={form.incentive_percent}
-                    onChange={e => handleChange('incentive_percent', e.target.value)}
-                    disabled={disabled}
-                    className={disabled ? readOnlyCls : inputCls}
-                    placeholder="0.0"
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Incentive Pool ($)</label>
-                  <input
-                    type="text"
-                    value={incentivePool > 0 ? fmt(incentivePool) : '-'}
-                    readOnly
-                    className={readOnlyCls}
-                  />
-                  <p className="text-xs text-gray-400 mt-1">Auto-calculated</p>
-                </div>
-
-                {/* Equity Share (only for Equity managers) */}
-                {form.manager_type === 'EQUITY' && (
-                  <div>
-                    <label className={labelCls}>Equity Share %</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={form.equity_share_percent}
-                      onChange={e => handleChange('equity_share_percent', e.target.value)}
-                      disabled={disabled}
-                      className={disabled ? readOnlyCls : inputCls}
-                      placeholder="0.0"
-                    />
-                  </div>
-                )}
-
-                {/* Staff */}
-                <div>
-                  <label className={labelCls}>Staff Count</label>
-                  <input
-                    type="number"
-                    value={form.staff_count}
-                    onChange={e => handleChange('staff_count', e.target.value)}
-                    disabled={disabled}
-                    className={disabled ? readOnlyCls : inputCls}
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Staff Incentive %</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={form.staff_incentive_percent}
-                    onChange={e => handleChange('staff_incentive_percent', e.target.value)}
-                    disabled={disabled}
-                    className={disabled ? readOnlyCls : inputCls}
-                    placeholder="0.0"
-                  />
-                </div>
-
-                {/* Guarantee (Non-Equity only) */}
-                {form.manager_type === 'NON_EQUITY' && (
-                  <>
-                    <div>
-                      <label className={labelCls}>Guarantee %</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={form.guarantee_percent}
-                        onChange={e => handleChange('guarantee_percent', e.target.value)}
-                        disabled={disabled}
-                        className={disabled ? readOnlyCls : inputCls}
-                        placeholder="0.0"
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Guarantee Amount ($)</label>
-                      <input
-                        type="number"
-                        value={form.guarantee_amount}
-                        onChange={e => handleChange('guarantee_amount', e.target.value)}
-                        disabled={disabled}
-                        className={disabled ? readOnlyCls : inputCls}
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-            </CardBody>
-          </Card>
-
           {/* Evaluation Card */}
           <Card className="mb-4">
             <CardHeader className="flex items-center justify-between">
@@ -666,49 +531,19 @@ export default function StoreEvaluation() {
             </CardBody>
           </Card>
 
-          {/* Result Card */}
+          {/* Total Score Display */}
           <Card className="mb-4">
-            <CardHeader>
-              <h2 className="text-lg font-semibold text-gray-900">Result</h2>
-            </CardHeader>
-            <CardBody className="border-t border-gray-100">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="bg-gray-50 rounded-xl p-4 text-center">
+            <CardBody>
+              <div className="flex items-center justify-center gap-6">
+                <div className="bg-gray-50 rounded-xl p-6 text-center flex-1">
                   <p className="text-xs text-gray-500 mb-1">Total Score</p>
-                  <p className="text-2xl font-bold text-gray-900">{totalScore}<span className="text-sm text-gray-400">/{maxScore}</span></p>
+                  <p className="text-3xl font-bold text-gray-900">{totalScore}<span className="text-lg text-gray-400">/{maxScore}</span></p>
                 </div>
-                <div className="bg-blue-50 rounded-xl p-4 text-center">
-                  <p className="text-xs text-blue-600 mb-1">Payout Ratio</p>
-                  <p className="text-2xl font-bold text-blue-700">{(payoutRatio * 100).toFixed(0)}%</p>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-4 text-center">
-                  <p className="text-xs text-gray-500 mb-1">Incentive Pool</p>
-                  <p className="text-2xl font-bold text-gray-900">${fmt(incentivePool)}</p>
-                </div>
-                <div className="bg-green-50 rounded-xl p-4 text-center">
-                  <p className="text-xs text-green-600 mb-1">Final Payout</p>
-                  <p className="text-2xl font-bold text-green-700">${fmt(finalPayout)}</p>
+                <div className="bg-blue-50 rounded-xl p-6 text-center flex-1">
+                  <p className="text-xs text-blue-600 mb-1">Score Percentage</p>
+                  <p className="text-3xl font-bold text-blue-700">{maxScore > 0 ? ((totalScore / maxScore) * 100).toFixed(0) : 0}%</p>
                 </div>
               </div>
-
-              {/* Staff share breakdown */}
-              {staffShare.count > 0 && parseFloat(form.staff_incentive_percent) > 0 && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-xl">
-                  <p className="text-xs text-gray-500 mb-2">Staff Incentive Breakdown</p>
-                  <div className="flex flex-wrap gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-500">Staff Pool:</span>{' '}
-                      <span className="font-semibold">${fmt(staffShare.total)}</span>
-                      <span className="text-gray-400 ml-1">({form.staff_incentive_percent}% of payout)</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Per Staff:</span>{' '}
-                      <span className="font-semibold">${fmt(staffShare.perStaff)}</span>
-                      <span className="text-gray-400 ml-1">({staffShare.count} staff)</span>
-                    </div>
-                  </div>
-                </div>
-              )}
             </CardBody>
           </Card>
 
