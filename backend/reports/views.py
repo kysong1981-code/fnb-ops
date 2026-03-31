@@ -2548,31 +2548,52 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
             profile = request.user.profile
 
             for partner in instance.partners.all():
-                # OWNER → COLLECTION (owner's profit)
-                # NON_EQUITY → INCENTIVE (partner incentive)
-                # EQUITY → PROFIT (equity distribution)
-                if partner.partner_type == 'OWNER':
-                    tx_type = 'COLLECTION'
-                    type_label = 'Owner Profit'
-                elif partner.partner_type == 'NON_EQUITY':
-                    tx_type = 'INCENTIVE'
-                    type_label = 'Incentive'
-                else:
-                    tx_type = 'PROFIT'
-                    type_label = 'Equity Share'
+                incentive_total = (partner.incentive_account or Decimal('0')) + (partner.incentive_cash or Decimal('0'))
+                bank_total = (partner.bank_account or Decimal('0')) + (partner.bank_cash or Decimal('0'))
 
-                # Single record per partner (Account + Cash combined)
-                total_amount = (partner.total_account or Decimal('0')) + (partner.total_cash or Decimal('0'))
-                if total_amount and total_amount != Decimal('0'):
+                # 1) Incentive record — ALL partner types can have incentive
+                if incentive_total and incentive_total != Decimal('0'):
                     CQTransaction.objects.create(
                         organization=instance.organization,
                         date=period_end_date,
                         store_name=store_name,
-                        transaction_type=tx_type,
+                        transaction_type='INCENTIVE',
                         person=partner.name,
-                        amount=total_amount,
+                        amount=incentive_total,
                         account_type='ACCOUNT',
-                        note=f"{type_label} {instance.year} {instance.get_period_type_display()} - {partner.name}",
+                        note=f"Incentive {instance.year} {instance.get_period_type_display()} - {partner.name}",
+                        period=period_label,
+                        profit_share=instance,
+                        created_by=profile,
+                    )
+
+                # 2) Equity share — only EQUITY partners (bank = equity distribution)
+                if partner.partner_type == 'EQUITY' and bank_total and bank_total != Decimal('0'):
+                    CQTransaction.objects.create(
+                        organization=instance.organization,
+                        date=period_end_date,
+                        store_name=store_name,
+                        transaction_type='PROFIT',
+                        person=partner.name,
+                        amount=bank_total,
+                        account_type='ACCOUNT',
+                        note=f"Equity Share {instance.year} {instance.get_period_type_display()} - {partner.name}",
+                        period=period_label,
+                        profit_share=instance,
+                        created_by=profile,
+                    )
+
+                # 3) Owner remainder — OWNER's bank portion (after all distributions)
+                if partner.partner_type == 'OWNER' and bank_total and bank_total != Decimal('0'):
+                    CQTransaction.objects.create(
+                        organization=instance.organization,
+                        date=period_end_date,
+                        store_name=store_name,
+                        transaction_type='COLLECTION',
+                        person=partner.name,
+                        amount=bank_total,
+                        account_type='ACCOUNT',
+                        note=f"Owner Profit {instance.year} {instance.get_period_type_display()} - {partner.name}",
                         period=period_label,
                         profit_share=instance,
                         created_by=profile,
