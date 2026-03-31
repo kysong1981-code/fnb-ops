@@ -147,9 +147,71 @@ export default function StoreEvaluation() {
     }
   }
 
+  // Auto-calculate score based on achievement vs target
+  const calcScore = (key, updatedForm) => {
+    const target = parseFloat(updatedForm[`${key}_target`]) || 0
+    const achievement = parseFloat(updatedForm[`${key}_achievement`]) || 0
+
+    if (key === 'sales') {
+      // Sales (25pts): 110%+ = 25, 100-109% = 15, 90-99% = 10, 80-89% = 0, <80% = 0
+      if (target <= 0) return 0
+      const ratio = achievement / target
+      if (ratio >= 1.1) return 25
+      if (ratio >= 1.0) return 15
+      if (ratio >= 0.9) return 10
+      return 0
+    }
+    if (key === 'cogs') {
+      // COGS (20pts): at/below target = 20, +1%p = 18, +2%p = 14, +3%p+ = 7
+      const diff = achievement - target
+      if (diff <= 0) return 20
+      if (diff <= 0.01) return 18
+      if (diff <= 0.02) return 14
+      return 7
+    }
+    if (key === 'wage') {
+      // Wage (25pts): at/below target = 25, +1%p = 15, +2%p = 10, +3%p+ = 0
+      const diff = achievement - target
+      if (diff <= 0) return 25
+      if (diff <= 0.01) return 15
+      if (diff <= 0.02) return 10
+      return 0
+    }
+    if (key === 'service') {
+      // Service (10pts): 4.8+ = 10, 4.5-4.7 = 7, 4.2-4.4 = 5, 4.0-4.1 = 0, <4.0 = 0
+      if (achievement >= 4.8) return 10
+      if (achievement >= 4.5) return 7
+      if (achievement >= 4.2) return 5
+      return 0
+    }
+    if (key === 'hygiene') {
+      // Hygiene (10pts): 18mo = 10, 12mo = 5, 6mo = 0
+      if (achievement >= 18) return 10
+      if (achievement >= 12) return 5
+      return 0
+    }
+    if (key === 'leadership') {
+      // Leadership (10pts): 5 = 10, 4 = 5, 3 = 2, <=2 = 0
+      if (achievement >= 5) return 10
+      if (achievement >= 4) return 5
+      if (achievement >= 3) return 2
+      return 0
+    }
+    return 0
+  }
+
   const handleChange = (field, value) => {
     if (isLocked) return
-    setForm(prev => ({ ...prev, [field]: value }))
+    setForm(prev => {
+      const updated = { ...prev, [field]: value }
+      // Auto-calculate scores when target or achievement changes
+      for (const cfg of SCORE_CONFIG) {
+        if (field === `${cfg.key}_target` || field === `${cfg.key}_achievement`) {
+          updated[`${cfg.key}_score`] = calcScore(cfg.key, updated)
+        }
+      }
+      return updated
+    })
   }
 
   const totalScore = useMemo(() => {
