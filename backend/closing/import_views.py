@@ -188,7 +188,12 @@ class ImportDataView(APIView):
             if len(row) < 2 or not row[0].strip():
                 continue
             try:
-                d = date.fromisoformat(row[0].strip())
+                raw = row[0].strip()
+                if '/' in raw:
+                    parts = raw.split('/')
+                    d = date(int(parts[2]), int(parts[1]), int(parts[0])) if len(parts) == 3 else date.fromisoformat(raw)
+                else:
+                    d = date.fromisoformat(raw)
                 amount = _safe_decimal(row[1])
                 if amount is None:
                     continue
@@ -275,7 +280,15 @@ class ImportDataView(APIView):
             if not row or not row[0].strip():
                 continue
             try:
-                d = date.fromisoformat(row[0].strip())
+                raw = row[0].strip()
+                if '/' in raw:
+                    parts = raw.split('/')
+                    if len(parts) == 3:
+                        d = date(int(parts[2]), int(parts[1]), int(parts[0]))  # DD/MM/YYYY
+                    else:
+                        continue
+                else:
+                    d = date.fromisoformat(raw)
             except (ValueError, IndexError):
                 continue
 
