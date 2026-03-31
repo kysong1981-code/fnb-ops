@@ -623,16 +623,34 @@ export default function ProfitShare() {
                   onChange={(e) => {
                     const raw = e.target.value
                     const num = parseFloat(raw)
-                    setSummary(prev => ({
-                      ...prev,
-                      _incentive_pct_display: raw,
-                      ...(isNaN(num) ? {} : { incentive_pct: (num / 100).toFixed(4) }),
-                    }))
+                    setSummary(prev => {
+                      const updates = { ...prev, _incentive_pct_display: raw }
+                      if (!isNaN(num)) {
+                        const pct = num / 100
+                        updates.incentive_pct = pct.toFixed(4)
+                        const netAcc = parseFloat(prev.net_profit_account) || 0
+                        const netCash = parseFloat(prev.net_profit_cash) || 0
+                        updates.incentive_account = (netAcc * pct).toFixed(2)
+                        updates.incentive_cash = (netCash * pct).toFixed(2)
+                      }
+                      return updates
+                    })
                   }}
                   onBlur={(e) => {
                     const num = parseFloat(e.target.value)
                     if (!isNaN(num)) {
-                      setSummary(prev => ({ ...prev, _incentive_pct_display: undefined, incentive_pct: (num / 100).toFixed(4) }))
+                      const pct = num / 100
+                      setSummary(prev => {
+                        const netAcc = parseFloat(prev.net_profit_account) || 0
+                        const netCash = parseFloat(prev.net_profit_cash) || 0
+                        return {
+                          ...prev,
+                          _incentive_pct_display: undefined,
+                          incentive_pct: pct.toFixed(4),
+                          incentive_account: (netAcc * pct).toFixed(2),
+                          incentive_cash: (netCash * pct).toFixed(2),
+                        }
+                      })
                     }
                   }}
                   className={disabled ? readOnlyCls : inputCls}
