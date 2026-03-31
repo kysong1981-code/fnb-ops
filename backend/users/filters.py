@@ -55,7 +55,7 @@ class OrganizationFilterBackend(BaseFilterBackend):
             if managed.exists():
                 return queryset.filter(organization__in=managed)
             region = profile.organization
-            stores = region.children.all() if region else []
+            stores = region.sub_stores.all() if region else []
             org_list = [region] + list(stores)
             return queryset.filter(organization__in=org_list)
 
@@ -134,7 +134,7 @@ class UserPermissionFilterBackend(BaseFilterBackend):
             if managed.exists():
                 return queryset.filter(organization__in=managed)
             region = profile.organization
-            stores = region.children.all() if region else []
+            stores = region.sub_stores.all() if region else []
             org_list = [region] + list(stores)
             return queryset.filter(organization__in=org_list)
 
@@ -159,7 +159,7 @@ class UserPermissionFilterBackend(BaseFilterBackend):
             if managed.exists():
                 return queryset.filter(profile__organization__in=managed)
             region = profile.organization
-            stores = region.children.all() if region else []
+            stores = region.sub_stores.all() if region else []
             org_list = [region] + list(stores)
             return queryset.filter(profile__organization__in=org_list)
 

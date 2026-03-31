@@ -4,14 +4,24 @@ from .models import Organization, UserProfile, Permission, AuditLog, Integration
 
 
 # 1. 간단한 것부터: Organization
+class SubStoreSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for sub-stores (children of a company)"""
+    class Meta:
+        model = Organization
+        fields = ['id', 'name']
+
+
 class OrganizationSerializer(serializers.ModelSerializer):
     """조직 정보 기본 Serializer"""
-    parent_name = serializers.CharField(source='parent.name', read_only=True)
+    parent_name = serializers.CharField(source='parent.name', read_only=True, default=None)
+    sub_stores = SubStoreSerializer(many=True, read_only=True)
+    is_company = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Organization
         fields = [
             'id', 'name', 'level', 'parent', 'parent_name',
+            'sub_stores', 'is_company',
             'address', 'phone', 'email', 'region',
             'ird_number', 'logo',
             'opening_time', 'closing_time',

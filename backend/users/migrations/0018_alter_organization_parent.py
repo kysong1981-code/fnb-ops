@@ -1,0 +1,23 @@
+from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('users', '0017_add_initial_cash_balance'),
+    ]
+
+    operations = [
+        migrations.AlterField(
+            model_name='organization',
+            name='parent',
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name='sub_stores',
+                to='users.organization',
+            ),
+        ),
+    ]

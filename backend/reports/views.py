@@ -1734,8 +1734,10 @@ class SkyReportViewSet(viewsets.ModelViewSet):
         start = date(year, month, 1)
         end = date(year, month, days_in_month)
 
+        # If org is a company (has sub-stores), aggregate from all sub-stores
+        target_orgs = org.all_stores
         closings = DailyClosing.objects.filter(
-            organization=org,
+            organization__in=target_orgs,
             closing_date__range=[start, end],
         ).prefetch_related('other_sales', 'supplier_costs')
 
@@ -1763,11 +1765,18 @@ class SkyReportViewSet(viewsets.ModelViewSet):
                 close_dt += td2(days=1)  # e.g. 11:00 open, 21:00 close (next day handling)
             opening_hours = (close_dt - open_dt).seconds / 3600
 
+        # Build sub-store info for frontend display
+        sub_store_names = []
+        if org.is_company:
+            sub_store_names = list(target_orgs.values_list('name', flat=True))
+
         return Response({
             'total_sales_garage': float(total_sales),
             'hq_cash_garage': float(hr_cash),
             'number_of_days': num_days,
             'opening_hours_per_day': opening_hours,
+            'is_company': org.is_company,
+            'sub_store_names': sub_store_names,
         })
 
     def _aggregate_range(self, org, from_year, from_month, to_year, to_month):

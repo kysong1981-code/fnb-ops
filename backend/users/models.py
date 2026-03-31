@@ -89,7 +89,7 @@ class Organization(models.Model):
 
     name = models.CharField(max_length=255)
     level = models.CharField(max_length=10, choices=LEVEL_CHOICES)
-    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='children')
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='sub_stores')
 
     # Store specific fields
     address = models.TextField(null=True, blank=True)
@@ -122,6 +122,18 @@ class Organization(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def is_company(self):
+        """True if this org has sub-stores"""
+        return self.sub_stores.exists()
+
+    @property
+    def all_stores(self):
+        """Returns all sub-stores if company, or just self"""
+        if self.sub_stores.exists():
+            return self.sub_stores.all()
+        return Organization.objects.filter(id=self.id)
 
     class Meta:
         ordering = ['level', 'name']

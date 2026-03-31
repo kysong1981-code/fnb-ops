@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useStore } from '../../context/StoreContext'
 import { skyReportAPI } from '../../services/api'
 import PageHeader from '../ui/PageHeader'
 import Card from '../ui/Card'
@@ -75,6 +76,10 @@ export default function SkyReport() {
   // Custom view state
   const [summaryData, setSummaryData] = useState(null)
 
+  // Company aggregation info
+  const { selectedStore } = useStore()
+  const [aggregationInfo, setAggregationInfo] = useState(null)
+
   const loadReports = async () => {
     setLoading(true)
     try {
@@ -144,6 +149,11 @@ export default function SkyReport() {
         number_of_days: auto.number_of_days ? String(auto.number_of_days) : prev.number_of_days,
         tab_allowance_sales: auto.opening_hours_per_day ? String(auto.opening_hours_per_day) : prev.tab_allowance_sales,
       }))
+      if (auto.is_company && auto.sub_store_names?.length > 0) {
+        setAggregationInfo({ count: auto.sub_store_names.length, names: auto.sub_store_names })
+      } else {
+        setAggregationInfo(null)
+      }
     } catch {
       // Silently fail — auto-fill is optional
     }
@@ -252,6 +262,18 @@ export default function SkyReport() {
           </div>
         }
       />
+
+      {/* Company aggregation banner */}
+      {selectedStore?.is_company && selectedStore?.sub_stores?.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+          <p className="text-sm text-blue-700 font-medium">
+            Aggregated from {selectedStore.sub_stores.length} stores:
+            <span className="font-normal ml-1">
+              {selectedStore.sub_stores.map(s => s.name).join(', ')}
+            </span>
+          </p>
+        </div>
+      )}
 
       {/* Tab Toggle + Actions */}
       <Card className="p-4">
