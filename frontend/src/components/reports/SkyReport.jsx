@@ -603,7 +603,7 @@ function OverviewDashboard({ reports, lastYearReports, twoYearsAgoReports, year 
                   return (
                     <div key={m.value + '-' + i} className="flex-1 flex flex-col items-center gap-0">
                       <div className="w-full flex items-end justify-center gap-px" style={{ height: 180 }}>
-                        <div className="flex-1 max-w-[14px] bg-gray-300 rounded-t"
+                        <div className="flex-1 max-w-[14px] bg-amber-300 rounded-t"
                           style={{ height: `${lyH}%`, minHeight: lyH > 0 ? 2 : 0 }}
                           title={`LY: $${lySales[i].toLocaleString()}`} />
                         <div className="flex-1 max-w-[14px] bg-blue-500 rounded-t"
@@ -622,7 +622,7 @@ function OverviewDashboard({ reports, lastYearReports, twoYearsAgoReports, year 
                     <span className="text-xs text-gray-500">Current: ${curTotal.toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 bg-gray-300 rounded-sm" />
+                    <div className="w-3 h-3 bg-amber-300 rounded-sm" />
                     <span className="text-xs text-gray-500">Last Year: ${lyTotal.toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</span>
                   </div>
                 </div>
