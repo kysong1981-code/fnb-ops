@@ -52,10 +52,11 @@ function pct(v) {
 }
 
 export default function SkyReport() {
-  const [tab, setTab] = useState('monthly') // 'monthly' | 'custom'
+  const [tab, setTab] = useState('overview') // 'overview' | 'monthly' | 'custom'
   const [year, setYear] = useState(new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [reports, setReports] = useState([])
+  const [lastYearReports, setLastYearReports] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Form state
@@ -90,9 +91,17 @@ export default function SkyReport() {
     } catch { setSummaryData(null) }
   }
 
+  const loadLastYear = async () => {
+    try {
+      const res = await skyReportAPI.list({ year: year - 1 })
+      setLastYearReports(Array.isArray(res.data) ? res.data : res.data.results || [])
+    } catch { setLastYearReports([]) }
+  }
+
   useEffect(() => {
     loadReports()
     loadSummary()
+    loadLastYear()
   }, [year])
 
   const currentReport = reports.find(r => r.month === selectedMonth)
@@ -240,6 +249,14 @@ export default function SkyReport() {
         <div className="flex items-center gap-3">
           <div className="flex-1 bg-gray-100 rounded-xl p-1 flex gap-1">
             <button
+              onClick={() => { setTab('overview'); setEditing(false) }}
+              className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-semibold transition ${
+                tab === 'overview' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Overview
+            </button>
+            <button
               onClick={() => { setTab('monthly'); setEditing(false) }}
               className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-semibold transition ${
                 tab === 'monthly' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
@@ -285,6 +302,8 @@ export default function SkyReport() {
         <div className="flex justify-center py-12">
           <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
         </div>
+      ) : tab === 'overview' ? (
+        <OverviewDashboard reports={reports} lastYearReports={lastYearReports} year={year} />
       ) : tab === 'monthly' ? (
         <MonthlyView
           year={year}
@@ -306,6 +325,261 @@ export default function SkyReport() {
       ) : (
         <CustomView year={year} />
       )}
+    </div>
+  )
+}
+
+// ===== OVERVIEW DASHBOARD =====
+function OverviewDashboard({ reports, lastYearReports, year }) {
+  // Helper: get monthly data mapped by month number
+  const getMonthData = (reps) => {
+    const map = {}
+    reps.forEach(r => { map[r.month] = r })
+    return map
+  }
+  const currentMap = getMonthData(reports)
+  const lastYearMap = getMonthData(lastYearReports)
+
+  // Sales values for bar chart
+  const currentSales = MONTHS.map(m => parseFloat(currentMap[m.value]?.total_sales_inc_gst) || 0)
+  const lastYearSales = MONTHS.map(m => parseFloat(lastYearMap[m.value]?.total_sales_inc_gst) || 0)
+  const maxSales = Math.max(...currentSales, ...lastYearSales, 1)
+
+  // YTD calculations
+  const monthsWithData = reports.filter(r => parseFloat(r.total_sales_inc_gst) > 0)
+  const totalSalesYTD = monthsWithData.reduce((s, r) => s + (parseFloat(r.total_sales_inc_gst) || 0), 0)
+  const avgMonthlySales = monthsWithData.length > 0 ? totalSalesYTD / monthsWithData.length : 0
+
+  const lastYearMonthsWithData = lastYearReports.filter(r => parseFloat(r.total_sales_inc_gst) > 0)
+  const lastYearTotalSales = lastYearMonthsWithData.reduce((s, r) => s + (parseFloat(r.total_sales_inc_gst) || 0), 0)
+  const yoyChange = lastYearTotalSales > 0 ? ((totalSalesYTD - lastYearTotalSales) / lastYearTotalSales * 100).toFixed(1) : null
+
+  // Best month
+  let bestMonth = null
+  let bestSales = 0
+  monthsWithData.forEach(r => {
+    const s = parseFloat(r.total_sales_inc_gst) || 0
+    if (s > bestSales) { bestSales = s; bestMonth = r }
+  })
+  const bestMonthLabel = bestMonth ? MONTHS.find(m => m.value === bestMonth.month)?.full : '-'
+
+  // Avg profit margin
+  const marginMonths = monthsWithData.filter(r => parseFloat(r.excl_gst_sales) > 0)
+  const avgMargin = marginMonths.length > 0
+    ? (marginMonths.reduce((s, r) => s + ((parseFloat(r.operating_profit) || 0) / (parseFloat(r.excl_gst_sales) || 1) * 100), 0) / marginMonths.length).toFixed(1)
+    : '0.0'
+
+  // P&L Trend data
+  const plData = MONTHS.map(m => {
+    const r = currentMap[m.value]
+    if (!r) return null
+    const sales = parseFloat(r.total_sales_inc_gst) || 0
+    const excl = parseFloat(r.excl_gst_sales) || 0
+    const cogs = parseFloat(r.cogs) || 0
+    const wages = parseFloat(r.sales_per_hour) || 0
+    const profit = parseFloat(r.operating_profit) || 0
+    const cogsP = excl > 0 ? (cogs / excl * 100).toFixed(1) : '0.0'
+    const wageP = excl > 0 ? (wages / excl * 100).toFixed(1) : '0.0'
+    const marginP = excl > 0 ? (profit / excl * 100).toFixed(1) : '0.0'
+    return { label: m.label, sales, cogs, cogsP, wages, wageP, profit, marginP, month: m.value }
+  }).filter(Boolean)
+
+  // Get goals from most recent report
+  const sortedReports = [...monthsWithData].sort((a, b) => b.month - a.month)
+  const latestReport = sortedReports[0]
+  const cogsGoal = parseFloat(latestReport?.cogs_goal) || 0
+  const wageGoal = parseFloat(latestReport?.wage_goal) || 0
+
+  // KPI Trends
+  const trendData = plData.map(d => {
+    const r = currentMap[d.month]
+    const excl = parseFloat(r?.excl_gst_sales) || 0
+    const days = parseInt(r?.number_of_days) || 1
+    const salesPerDay = (parseFloat(r?.total_sales_inc_gst) || 0) / days
+    return {
+      label: d.label,
+      salesPerDay,
+      cogsP: parseFloat(d.cogsP),
+      wageP: parseFloat(d.wageP),
+      marginP: parseFloat(d.marginP),
+    }
+  })
+
+  return (
+    <>
+      {/* A. Annual Sales Bar Chart */}
+      <Card className="p-5">
+        <h3 className="text-sm font-bold text-gray-900 mb-1">Annual Sales Comparison</h3>
+        <p className="text-xs text-gray-400 mb-4">{year} vs {year - 1}</p>
+        <div className="flex items-end gap-1 sm:gap-2" style={{ height: 200 }}>
+          {MONTHS.map((m, i) => {
+            const curH = maxSales > 0 ? (currentSales[i] / maxSales * 100) : 0
+            const lyH = maxSales > 0 ? (lastYearSales[i] / maxSales * 100) : 0
+            return (
+              <div key={m.value} className="flex-1 flex flex-col items-center gap-0">
+                <div className="w-full flex items-end justify-center gap-px" style={{ height: 180 }}>
+                  <div
+                    className="flex-1 max-w-[14px] bg-gray-200 rounded-t"
+                    style={{ height: `${lyH}%`, minHeight: lyH > 0 ? 2 : 0 }}
+                    title={`${year - 1}: $${lastYearSales[i].toLocaleString()}`}
+                  />
+                  <div
+                    className="flex-1 max-w-[14px] bg-blue-500 rounded-t"
+                    style={{ height: `${curH}%`, minHeight: curH > 0 ? 2 : 0 }}
+                    title={`${year}: $${currentSales[i].toLocaleString()}`}
+                  />
+                </div>
+                <span className="text-[10px] text-gray-400 mt-1">{m.label}</span>
+              </div>
+            )
+          })}
+        </div>
+        <div className="flex items-center justify-center gap-4 mt-3">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 bg-blue-500 rounded-sm" />
+            <span className="text-xs text-gray-500">{year}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 bg-gray-200 rounded-sm" />
+            <span className="text-xs text-gray-500">{year - 1}</span>
+          </div>
+        </div>
+      </Card>
+
+      {/* B. YTD Summary Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card className="p-4 text-center">
+          <div className="text-xs text-gray-500 mb-1">Total Sales YTD</div>
+          <div className="text-lg font-bold text-gray-900">${totalSalesYTD.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+          {yoyChange !== null && (
+            <div className={`text-xs font-medium mt-1 ${parseFloat(yoyChange) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {parseFloat(yoyChange) >= 0 ? '▲' : '▼'} {Math.abs(parseFloat(yoyChange))}% vs LY
+            </div>
+          )}
+        </Card>
+        <Card className="p-4 text-center">
+          <div className="text-xs text-gray-500 mb-1">Avg Monthly Sales</div>
+          <div className="text-lg font-bold text-gray-900">${avgMonthlySales.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+          <div className="text-xs text-gray-400 mt-1">{monthsWithData.length} months</div>
+        </Card>
+        <Card className="p-4 text-center">
+          <div className="text-xs text-gray-500 mb-1">Best Month</div>
+          <div className="text-lg font-bold text-gray-900">{bestMonthLabel}</div>
+          <div className="text-xs text-gray-400 mt-1">${bestSales.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+        </Card>
+        <Card className="p-4 text-center">
+          <div className="text-xs text-gray-500 mb-1">Profit Margin</div>
+          <div className={`text-lg font-bold ${parseFloat(avgMargin) >= 0 ? 'text-gray-900' : 'text-red-600'}`}>{avgMargin}%</div>
+          <div className="text-xs text-gray-400 mt-1">avg operating</div>
+        </Card>
+      </div>
+
+      {/* C. Monthly P&L Trend Table */}
+      <Card className="overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100">
+          <h3 className="text-sm font-bold text-gray-900">Monthly P&L Trend</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="px-4 py-3 text-left text-gray-500 font-semibold">Month</th>
+                <th className="px-3 py-3 text-right text-gray-500 font-semibold">Sales</th>
+                <th className="px-3 py-3 text-right text-gray-500 font-semibold">COGS</th>
+                <th className="px-3 py-3 text-right text-gray-500 font-semibold">COGS%</th>
+                <th className="px-3 py-3 text-right text-gray-500 font-semibold">Wages</th>
+                <th className="px-3 py-3 text-right text-gray-500 font-semibold">Wage%</th>
+                <th className="px-3 py-3 text-right text-gray-500 font-semibold">Profit</th>
+                <th className="px-3 py-3 text-right text-gray-500 font-semibold">Margin%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {plData.map(d => (
+                <tr key={d.label} className="border-b border-gray-50">
+                  <td className="px-4 py-2.5 font-semibold text-gray-700">{d.label}</td>
+                  <td className="px-3 py-2.5 text-right text-gray-600">${fmt(d.sales)}</td>
+                  <td className="px-3 py-2.5 text-right text-gray-600">${fmt(d.cogs)}</td>
+                  <td className={`px-3 py-2.5 text-right font-medium ${cogsGoal > 0 && parseFloat(d.cogsP) > cogsGoal ? 'text-red-600' : 'text-gray-600'}`}>{d.cogsP}%</td>
+                  <td className="px-3 py-2.5 text-right text-gray-600">${fmt(d.wages)}</td>
+                  <td className={`px-3 py-2.5 text-right font-medium ${wageGoal > 0 && parseFloat(d.wageP) > wageGoal ? 'text-red-600' : 'text-gray-600'}`}>{d.wageP}%</td>
+                  <td className="px-3 py-2.5 text-right font-semibold text-gray-900">${fmt(d.profit)}</td>
+                  <td className={`px-3 py-2.5 text-right font-medium ${parseFloat(d.marginP) < 0 ? 'text-red-600' : 'text-gray-600'}`}>{d.marginP}%</td>
+                </tr>
+              ))}
+              {/* Totals row */}
+              {plData.length > 0 && (() => {
+                const totSales = plData.reduce((s, d) => s + d.sales, 0)
+                const totCogs = plData.reduce((s, d) => s + d.cogs, 0)
+                const totWages = plData.reduce((s, d) => s + d.wages, 0)
+                const totProfit = plData.reduce((s, d) => s + d.profit, 0)
+                const totExcl = monthsWithData.reduce((s, r) => s + (parseFloat(r.excl_gst_sales) || 0), 0)
+                const totCogsP = totExcl > 0 ? (totCogs / totExcl * 100).toFixed(1) : '0.0'
+                const totWageP = totExcl > 0 ? (totWages / totExcl * 100).toFixed(1) : '0.0'
+                const totMarginP = totExcl > 0 ? (totProfit / totExcl * 100).toFixed(1) : '0.0'
+                return (
+                  <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold">
+                    <td className="px-4 py-2.5 text-gray-900">TOTAL</td>
+                    <td className="px-3 py-2.5 text-right text-gray-900">${fmt(totSales)}</td>
+                    <td className="px-3 py-2.5 text-right text-gray-900">${fmt(totCogs)}</td>
+                    <td className="px-3 py-2.5 text-right text-gray-900">{totCogsP}%</td>
+                    <td className="px-3 py-2.5 text-right text-gray-900">${fmt(totWages)}</td>
+                    <td className="px-3 py-2.5 text-right text-gray-900">{totWageP}%</td>
+                    <td className="px-3 py-2.5 text-right text-gray-900">${fmt(totProfit)}</td>
+                    <td className="px-3 py-2.5 text-right text-gray-900">{totMarginP}%</td>
+                  </tr>
+                )
+              })()}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* D. KPI Trends */}
+      {trendData.length > 1 && (
+        <Card className="p-5">
+          <h3 className="text-sm font-bold text-gray-900 mb-4">KPI Trends</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <TrendMini label="Sales/Day" data={trendData.map(d => d.salesPerDay)} format="$" />
+            <TrendMini label="COGS%" data={trendData.map(d => d.cogsP)} format="%" invertColor />
+            <TrendMini label="Wage%" data={trendData.map(d => d.wageP)} format="%" invertColor />
+            <TrendMini label="Profit Margin%" data={trendData.map(d => d.marginP)} format="%" />
+          </div>
+        </Card>
+      )}
+    </>
+  )
+}
+
+// ===== TREND MINI SPARKLINE =====
+function TrendMini({ label, data, format = '', invertColor = false }) {
+  if (!data || data.length === 0) return null
+  const max = Math.max(...data, 0.01)
+  const min = Math.min(...data, 0)
+  const range = max - min || 1
+  const latest = data[data.length - 1]
+  const first = data[0]
+  const isUp = latest >= first
+  const color = invertColor ? (!isUp ? 'bg-green-500' : 'bg-red-500') : (isUp ? 'bg-green-500' : 'bg-red-500')
+  const textColor = invertColor ? (!isUp ? 'text-green-600' : 'text-red-600') : (isUp ? 'text-green-600' : 'text-red-600')
+
+  return (
+    <div className="bg-gray-50 rounded-xl p-3">
+      <div className="text-xs text-gray-500 mb-2">{label}</div>
+      <div className="flex items-end gap-px" style={{ height: 32 }}>
+        {data.map((v, i) => {
+          const h = range > 0 ? ((v - min) / range * 100) : 50
+          return (
+            <div
+              key={i}
+              className={`flex-1 rounded-t ${i === data.length - 1 ? color : 'bg-gray-300'}`}
+              style={{ height: `${Math.max(h, 8)}%` }}
+            />
+          )
+        })}
+      </div>
+      <div className={`text-sm font-bold mt-1.5 ${textColor}`}>
+        {format === '$' ? `$${latest.toLocaleString('en-NZ', { maximumFractionDigits: 0 })}` : `${latest.toFixed(1)}%`}
+      </div>
     </div>
   )
 }
