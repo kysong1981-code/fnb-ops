@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, Fragment } from 'react'
 import { cqTransactionAPI } from '../../services/api'
 import Card from '../ui/Card'
 import { PlusIcon, TrashIcon } from '../icons'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 const TX_TYPES = [
   { key: 'COLLECTION', label: 'Collection', color: 'text-green-600', bg: 'bg-green-50' },
@@ -20,11 +21,27 @@ const ACCOUNT_TYPES = [
 
 const VIEWS = [
   { key: 'summary', label: 'Summary' },
+  { key: 'history', label: 'History' },
   { key: 'stores', label: 'By Store' },
   { key: 'persons', label: 'By Person' },
   { key: 'all', label: 'All Transactions' },
   { key: 'import', label: 'CSV Import' },
 ]
+
+const CHART_COLORS = {
+  collection: '#10b981',  // green
+  collectionAccount: '#059669',
+  collectionCash: '#6ee7b7',
+  incentive: '#8b5cf6',   // purple
+  equity: '#3b82f6',      // blue
+}
+
+const tooltipStyle = {
+  borderRadius: '12px',
+  border: '1px solid #e5e7eb',
+  fontSize: '12px',
+  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+}
 
 const fmt = (v) => `$${parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 
@@ -76,6 +93,7 @@ export default function CQCashFlow() {
   const [personalLedger, setPersonalLedger] = useState(null)
   const [selectedStore, setSelectedStore] = useState('')
   const [selectedPerson, setSelectedPerson] = useState('')
+  const [historyData, setHistoryData] = useState([])
 
   // New transaction form
   const [showForm, setShowForm] = useState(false)
@@ -152,6 +170,15 @@ export default function CQCashFlow() {
       setPersonalLedger(res.data)
     } catch (e) {
       setError('Failed to load personal ledger')
+    }
+  }
+
+  const loadHistory = async () => {
+    try {
+      const res = await cqTransactionAPI.history()
+      setHistoryData(res.data || [])
+    } catch (e) {
+      setError('Failed to load history')
     }
   }
 
@@ -288,6 +315,7 @@ export default function CQCashFlow() {
             onClick={() => {
               setView(v.key)
               if (v.key === 'all') loadAllTransactions()
+              if (v.key === 'history') loadHistory()
             }}
             className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
               view === v.key ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
@@ -477,6 +505,123 @@ export default function CQCashFlow() {
         </div>
       )}
 
+      {/* ===== HISTORY VIEW ===== */}
+      {view === 'history' && (
+        <div className="space-y-4">
+          {historyData.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">No history data yet</div>
+          ) : (
+            <>
+              {/* Total Trend Chart */}
+              <Card>
+                <div className="p-4">
+                  <h3 className="font-semibold text-gray-800 mb-4">📊 Period Comparison</h3>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={historyData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="period" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
+                      <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false}
+                        tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v) => fmt(v)} />
+                      <Legend wrapperStyle={{ fontSize: '12px' }} />
+                      <Bar dataKey="collection" name="Owner Profit" fill={CHART_COLORS.collection} radius={[4, 4, 0, 0]} stackId="a" />
+                      <Bar dataKey="incentive" name="Incentive" fill={CHART_COLORS.incentive} radius={[0, 0, 0, 0]} stackId="a" />
+                      <Bar dataKey="equity" name="Equity Share" fill={CHART_COLORS.equity} radius={[4, 4, 0, 0]} stackId="a" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+
+              {/* Owner Account vs Cash Trend */}
+              <Card>
+                <div className="p-4">
+                  <h3 className="font-semibold text-gray-800 mb-4">💰 Owner Profit: Account vs Cash</h3>
+                  <ResponsiveContainer width="100%" height={240}>
+                    <BarChart data={historyData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="period" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
+                      <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false}
+                        tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v) => fmt(v)} />
+                      <Legend wrapperStyle={{ fontSize: '12px' }} />
+                      <Bar dataKey="collection_account" name="Account" fill={CHART_COLORS.collectionAccount} radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="collection_cash" name="Cash" fill={CHART_COLORS.collectionCash} radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+
+              {/* History Table */}
+              <Card>
+                <div className="p-4">
+                  <h3 className="font-semibold text-gray-800 mb-3">📋 Period Detail</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-gray-500 border-b">
+                          <th className="pb-2 pr-3">Period</th>
+                          <th className="pb-2 pr-3 text-right">Owner Profit</th>
+                          <th className="pb-2 pr-3 text-right">Account</th>
+                          <th className="pb-2 pr-3 text-right">Cash</th>
+                          <th className="pb-2 pr-3 text-right">Incentive</th>
+                          <th className="pb-2 pr-3 text-right">Equity</th>
+                          <th className="pb-2 text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {historyData.map(h => (
+                          <tr key={h.period} className="border-b border-gray-50 hover:bg-gray-50">
+                            <td className="py-2.5 pr-3 font-medium text-gray-800">{h.period}</td>
+                            <td className="py-2.5 pr-3 text-right text-green-600 font-medium">{fmt(h.collection)}</td>
+                            <td className="py-2.5 pr-3 text-right text-emerald-700 text-xs">{fmt(h.collection_account)}</td>
+                            <td className="py-2.5 pr-3 text-right text-emerald-500 text-xs">{fmt(h.collection_cash)}</td>
+                            <td className="py-2.5 pr-3 text-right text-purple-600">{fmt(h.incentive)}</td>
+                            <td className="py-2.5 pr-3 text-right text-blue-600">{fmt(h.equity)}</td>
+                            <td className="py-2.5 text-right font-semibold text-gray-800">{fmt(h.total)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Per-Store History (if multiple stores in data) */}
+              {(() => {
+                const allStores = [...new Set(historyData.flatMap(h => (h.stores || []).map(s => s.store_name)))]
+                if (allStores.length <= 1) return null
+                return allStores.map(storeName => {
+                  const storeHistory = historyData.map(h => {
+                    const s = h.stores?.find(s => s.store_name === storeName) || {}
+                    return { period: h.period, collection: s.collection || 0, incentive: s.incentive || 0, equity: s.equity || 0, total: s.total || 0 }
+                  }).filter(d => d.total > 0)
+                  if (storeHistory.length === 0) return null
+                  return (
+                    <Card key={storeName}>
+                      <div className="p-4">
+                        <h3 className="font-semibold text-gray-800 mb-4">🏪 {storeName}</h3>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <BarChart data={storeHistory} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis dataKey="period" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
+                            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false}
+                              tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                            <Tooltip contentStyle={tooltipStyle} formatter={(v) => fmt(v)} />
+                            <Bar dataKey="collection" name="Owner" fill={CHART_COLORS.collection} radius={[4, 4, 0, 0]} stackId="a" />
+                            <Bar dataKey="incentive" name="Incentive" fill={CHART_COLORS.incentive} stackId="a" />
+                            <Bar dataKey="equity" name="Equity" fill={CHART_COLORS.equity} radius={[4, 4, 0, 0]} stackId="a" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </Card>
+                  )
+                })
+              })()}
+            </>
+          )}
+        </div>
+      )}
+
       {/* ===== STORE VIEW ===== */}
       {view === 'stores' && (
         <div className="space-y-4">
@@ -489,22 +634,48 @@ export default function CQCashFlow() {
           </div>
           {storeLedger && selectedStore && (
             <>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-green-50 rounded-2xl p-4">
-                  <div className="text-xs text-gray-500">Total Collection</div>
-                  <div className="text-lg font-bold text-green-600">{fmt(storeLedger.total_collection)}</div>
-                </div>
-                <div className="bg-red-50 rounded-2xl p-4">
-                  <div className="text-xs text-gray-500">Total Distributed</div>
-                  <div className="text-lg font-bold text-red-600">{fmt(storeLedger.total_distributed)}</div>
-                </div>
-                <div className="bg-gray-50 rounded-2xl p-4">
-                  <div className="text-xs text-gray-500">Balance</div>
-                  <div className={`text-lg font-bold ${storeLedger.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {fmt(storeLedger.balance)}
+              {/* Owner Account/Cash + Summary */}
+              {(() => {
+                const ownerItems = storeLedger.ledger?.filter(i => i.transaction_type === 'COLLECTION') || []
+                const ownerAccount = ownerItems.filter(i => i.account_type === 'ACCOUNT').reduce((s, i) => s + i.income, 0)
+                const ownerCash = ownerItems.filter(i => i.account_type === 'CASH').reduce((s, i) => s + i.income, 0)
+                const incentiveTotal = storeLedger.ledger?.filter(i => i.transaction_type === 'INCENTIVE').reduce((s, i) => s + i.expense, 0) || 0
+                const equityTotal = storeLedger.ledger?.filter(i => i.transaction_type === 'PROFIT').reduce((s, i) => s + i.expense, 0) || 0
+                return (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="bg-green-50 rounded-2xl p-4 border border-green-100">
+                      <div className="text-xs text-gray-500 mb-1">Owner Profit</div>
+                      <div className="text-lg font-bold text-green-600">{fmt(storeLedger.total_collection)}</div>
+                      {(ownerAccount > 0 || ownerCash > 0) && (
+                        <div className="mt-2 pt-2 border-t border-green-200 space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-gray-500">Account</span>
+                            <span className="font-medium text-green-700">{fmt(ownerAccount)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-gray-500">Cash</span>
+                            <span className="font-medium text-green-700">{fmt(ownerCash)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100">
+                      <div className="text-xs text-gray-500 mb-1">Incentive</div>
+                      <div className="text-lg font-bold text-purple-600">{fmt(incentiveTotal)}</div>
+                    </div>
+                    <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
+                      <div className="text-xs text-gray-500 mb-1">Equity Share</div>
+                      <div className="text-lg font-bold text-blue-600">{fmt(equityTotal)}</div>
+                    </div>
+                    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
+                      <div className="text-xs text-gray-500 mb-1">Net Profit</div>
+                      <div className="text-lg font-bold text-gray-800">
+                        {fmt(storeLedger.total_collection + (storeLedger.total_distributed || 0))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                )
+              })()}
               <Card>
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-800 mb-3">{selectedStore} Ledger</h3>

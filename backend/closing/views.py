@@ -1362,6 +1362,62 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
             'balance': float(balance),
         })
 
+    @action(detail=False, methods=['get'], url_path='history')
+    def history(self, request):
+        """Period-based history for year-over-year comparison.
+        Returns data grouped by year and H1/H2 period with per-store breakdown."""
+        qs = self.get_queryset()
+
+        # Collect all unique periods from the data
+        periods = list(qs.exclude(period='').values_list('period', flat=True).distinct().order_by('period'))
+
+        # Build period data
+        history_data = []
+        for period_label in periods:
+            period_qs = qs.filter(period=period_label)
+
+            collection = period_qs.filter(transaction_type='COLLECTION').aggregate(total=Sum('amount'))['total'] or 0
+            collection_account = period_qs.filter(transaction_type='COLLECTION', account_type='ACCOUNT').aggregate(total=Sum('amount'))['total'] or 0
+            collection_cash = period_qs.filter(transaction_type='COLLECTION', account_type='CASH').aggregate(total=Sum('amount'))['total'] or 0
+            incentive = period_qs.filter(transaction_type='INCENTIVE').aggregate(total=Sum('amount'))['total'] or 0
+            equity = period_qs.filter(transaction_type='PROFIT').aggregate(total=Sum('amount'))['total'] or 0
+            total = float(collection) + float(incentive) + float(equity)
+
+            # Per-store breakdown for this period
+            stores = []
+            store_names = period_qs.values_list('store_name', flat=True).distinct()
+            for sn in store_names:
+                if not sn:
+                    continue
+                s_qs = period_qs.filter(store_name=sn)
+                s_collection = s_qs.filter(transaction_type='COLLECTION').aggregate(total=Sum('amount'))['total'] or 0
+                s_collection_account = s_qs.filter(transaction_type='COLLECTION', account_type='ACCOUNT').aggregate(total=Sum('amount'))['total'] or 0
+                s_collection_cash = s_qs.filter(transaction_type='COLLECTION', account_type='CASH').aggregate(total=Sum('amount'))['total'] or 0
+                s_incentive = s_qs.filter(transaction_type='INCENTIVE').aggregate(total=Sum('amount'))['total'] or 0
+                s_equity = s_qs.filter(transaction_type='PROFIT').aggregate(total=Sum('amount'))['total'] or 0
+                stores.append({
+                    'store_name': sn,
+                    'collection': float(s_collection),
+                    'collection_account': float(s_collection_account),
+                    'collection_cash': float(s_collection_cash),
+                    'incentive': float(s_incentive),
+                    'equity': float(s_equity),
+                    'total': float(s_collection) + float(s_incentive) + float(s_equity),
+                })
+
+            history_data.append({
+                'period': period_label,
+                'collection': float(collection),
+                'collection_account': float(collection_account),
+                'collection_cash': float(collection_cash),
+                'incentive': float(incentive),
+                'equity': float(equity),
+                'total': total,
+                'stores': stores,
+            })
+
+        return Response(history_data)
+
     @action(detail=False, methods=['get'], url_path='stores-list')
     def stores_list(self, request):
         """등록된 매장명 목록"""
