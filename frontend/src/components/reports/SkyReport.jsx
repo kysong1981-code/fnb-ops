@@ -595,24 +595,10 @@ function OverviewDashboard({ reports, lastYearReports, twoYearsAgoReports, year 
       </Card>
 
       {/* B. YTD Summary Cards - with 2-year comparison */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card className="p-4 text-center">
           <div className="text-xs text-gray-500 mb-1">Total Sales YTD</div>
           <div className="text-lg font-bold text-gray-900">${totalSalesYTD.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
-          {yoyChange !== null && (
-            <div className={`text-xs font-medium mt-1 ${parseFloat(yoyChange) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {parseFloat(yoyChange) >= 0 ? '▲' : '▼'} {Math.abs(parseFloat(yoyChange))}% vs LY
-            </div>
-          )}
-          {yoy2Change !== null && (
-            <div className={`text-xs font-medium mt-0.5 ${parseFloat(yoy2Change) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {parseFloat(yoy2Change) >= 0 ? '▲' : '▼'} {Math.abs(parseFloat(yoy2Change))}% vs 2Y ago
-            </div>
-          )}
-        </Card>
-        <Card className="p-4 text-center">
-          <div className="text-xs text-gray-500 mb-1">Avg Monthly Sales</div>
-          <div className="text-lg font-bold text-gray-900">${avgMonthlySales.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
           <div className="text-xs text-gray-400 mt-1">{monthsWithData.length} months</div>
         </Card>
         <Card className="p-4 text-center">
@@ -621,18 +607,47 @@ function OverviewDashboard({ reports, lastYearReports, twoYearsAgoReports, year 
           <div className="text-xs text-gray-400 mt-1">${bestSales.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
         </Card>
         <Card className="p-4 text-center">
+          <div className="text-xs text-gray-500 mb-1">Avg Monthly Sales</div>
+          <div className="text-lg font-bold text-gray-900">${avgMonthlySales.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+        </Card>
+        <Card className="p-4 text-center">
           <div className="text-xs text-gray-500 mb-1">Profit Margin</div>
           <div className={`text-lg font-bold ${parseFloat(avgMargin) >= 0 ? 'text-gray-900' : 'text-red-600'}`}>{avgMargin}%</div>
           <div className="text-xs text-gray-400 mt-1">avg operating</div>
         </Card>
-        <Card className="p-4 text-center">
-          <div className="text-xs text-gray-500 mb-1">vs 2 Years Ago</div>
-          <div className="text-lg font-bold text-gray-900">
-            ${twoYearsAgoTotalSales.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-          </div>
-          <div className="text-xs text-gray-400 mt-1">{year - 2} YTD</div>
-        </Card>
       </div>
+
+      {/* Year-over-Year Comparison */}
+      <Card className="p-5">
+        <h3 className="text-sm font-bold text-gray-900 mb-3">Year-over-Year Comparison</h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="text-center p-3 bg-blue-50 rounded-xl">
+            <div className="text-xs text-gray-500 mb-1">{year}</div>
+            <div className="text-lg font-bold text-blue-700">${totalSalesYTD.toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</div>
+            <div className="text-xs text-gray-400">{monthsWithData.length} months</div>
+          </div>
+          <div className="text-center p-3 bg-gray-50 rounded-xl">
+            <div className="text-xs text-gray-500 mb-1">{year - 1}</div>
+            <div className="text-lg font-bold text-gray-700">${lastYearTotalSales.toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</div>
+            {yoyChange !== null && (
+              <div className={`text-xs font-medium mt-1 ${parseFloat(yoyChange) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {parseFloat(yoyChange) >= 0 ? '▲' : '▼'} {Math.abs(parseFloat(yoyChange))}%
+              </div>
+            )}
+            {!yoyChange && <div className="text-xs text-gray-400 mt-1">No data</div>}
+          </div>
+          <div className="text-center p-3 bg-gray-50 rounded-xl">
+            <div className="text-xs text-gray-500 mb-1">{year - 2}</div>
+            <div className="text-lg font-bold text-gray-700">${twoYearsAgoTotalSales.toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</div>
+            {yoy2Change !== null && (
+              <div className={`text-xs font-medium mt-1 ${parseFloat(yoy2Change) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {parseFloat(yoy2Change) >= 0 ? '▲' : '▼'} {Math.abs(parseFloat(yoy2Change))}%
+              </div>
+            )}
+            {!yoy2Change && <div className="text-xs text-gray-400 mt-1">No data</div>}
+          </div>
+        </div>
+      </Card>
 
       {/* Goal Progress Section */}
       {(salesGoal > 0 || goalCogsTarget > 0 || goalWageTarget > 0) && (
