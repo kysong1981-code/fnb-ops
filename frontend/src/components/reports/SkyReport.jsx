@@ -304,6 +304,18 @@ export default function SkyReport() {
               Custom
             </button>
           </div>
+          {tab === 'monthly' && !editing && !currentReport && (
+            <button onClick={startEditing}
+              className="px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition whitespace-nowrap">
+              + Create
+            </button>
+          )}
+          {tab === 'monthly' && !editing && currentReport && (
+            <button onClick={startEditing}
+              className="px-4 py-2.5 text-sm font-semibold text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition whitespace-nowrap">
+              Edit
+            </button>
+          )}
         </div>
       </Card>
 
