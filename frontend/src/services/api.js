@@ -707,7 +707,7 @@ export const evaluationAPI = {
   update: (id, data) => api.put(`/reports/store-evaluations/${id}/`, data),
   delete: (id) => api.delete(`/reports/store-evaluations/${id}/`),
   autoFill: (year, period, storeId) => api.get('/reports/store-evaluations/auto-fill/', { params: { year, period_type: period, store_id: storeId } }),
-  toggleLock: (id) => api.post(`/reports/store-evaluations/${id}/toggle-lock/`),
+  toggleLock: (id) => api.post(`/reports/store-evaluations/${id}/toggle_lock/`),
   history: (storeId) => api.get('/reports/store-evaluations/history/', { params: { store_id: storeId } }),
 }
 
@@ -718,7 +718,7 @@ export const profitShareAPI = {
   create: (data) => api.post('/reports/profit-shares/', data),
   update: (id, data) => api.put(`/reports/profit-shares/${id}/`, data),
   delete: (id) => api.delete(`/reports/profit-shares/${id}/`),
-  toggleLock: (id) => api.post(`/reports/profit-shares/${id}/toggle-lock/`),
+  toggleLock: (id) => api.post(`/reports/profit-shares/${id}/toggle_lock/`),
   autoCalculate: (id) => api.post(`/reports/profit-shares/${id}/auto_calculate/`),
   history: (storeId) => api.get('/reports/profit-shares/history/', { params: { store_id: storeId } }),
   pullScore: (year, periodType, storeId) => api.get('/reports/profit-shares/pull-score/', { params: { year, period_type: periodType, store_id: storeId } }),
