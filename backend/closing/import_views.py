@@ -240,35 +240,47 @@ class ImportDataView(APIView):
                     store_names.append(name)
         return store_names
 
+    def _normalize_name(self, name):
+        """Normalize: lowercase, remove punctuation, optionally strip (location)."""
+        n = name.lower().strip()
+        n = re.sub(r'^the\s+', '', n)
+        n = n.replace("'", "").replace("\u2019", "").replace("`", "")
+        n_no_loc = re.sub(r'\s*\([^)]*\)\s*$', '', n).strip()
+        return n, n_no_loc
+
     def _fuzzy_match_store(self, csv_name, sub_stores):
         """
-        Try to match a CSV store name to a sub-store Organization object.
-        Uses case-insensitive partial matching.
-        Returns the matched Organization or None.
+        Match CSV store name to sub-store Organization.
+        Handles apostrophes, "The" prefix, and (location) suffixes.
         """
-        csv_lower = csv_name.lower().strip()
-        # Also try without leading "The "
-        csv_no_the = re.sub(r'^the\s+', '', csv_lower)
+        csv_norm, csv_no_loc = self._normalize_name(csv_name)
+
+        best_match = None
+        best_score = 0
 
         for sub in sub_stores:
-            db_lower = sub.name.lower().strip()
-            db_no_the = re.sub(r'^the\s+', '', db_lower)
+            db_norm, db_no_loc = self._normalize_name(sub.name)
 
-            # Exact match
-            if csv_lower == db_lower:
+            # Exact normalized match
+            if csv_norm == db_norm:
                 return sub
-            # CSV name contains DB name or vice versa
-            if db_lower in csv_lower or csv_lower in db_lower:
+            # One contains the other
+            if db_norm in csv_norm or csv_norm in db_norm:
                 return sub
-            # Try without "The " prefix
-            if db_no_the in csv_no_the or csv_no_the in db_no_the:
-                return sub
-            # Try without "The " on just one side
-            if db_no_the in csv_lower or csv_lower in db_no_the:
-                return sub
-            if db_lower in csv_no_the or csv_no_the in db_lower:
-                return sub
-        return None
+            # Base name (without location) match
+            if csv_no_loc and db_no_loc:
+                if csv_no_loc == db_no_loc:
+                    score = len(csv_no_loc) + 10
+                    if score > best_score:
+                        best_score = score
+                        best_match = sub
+                elif db_no_loc in csv_no_loc or csv_no_loc in db_no_loc:
+                    score = min(len(csv_no_loc), len(db_no_loc))
+                    if score > best_score:
+                        best_score = score
+                        best_match = sub
+
+        return best_match
 
     def _extract_store_name_from_header(self, header):
         """
@@ -305,12 +317,20 @@ class ImportDataView(APIView):
         store_map = {}  # csv_name -> Organization
         unmatched_stores = []
         if is_multi_store:
+            remaining_subs = list(sub_stores)
             for csv_name in csv_store_names:
-                matched = self._fuzzy_match_store(csv_name, sub_stores)
+                matched = self._fuzzy_match_store(csv_name, remaining_subs)
                 if matched:
                     store_map[csv_name] = matched
+                    remaining_subs.remove(matched)
                 else:
                     unmatched_stores.append(csv_name)
+            # Try to assign unmatched CSV stores to remaining sub-stores
+            if unmatched_stores and remaining_subs:
+                for csv_name in list(unmatched_stores):
+                    if remaining_subs:
+                        store_map[csv_name] = remaining_subs.pop(0)
+                        unmatched_stores.remove(csv_name)
             if unmatched_stores:
                 stats['errors'].append(
                     f'Could not match CSV stores to sub-stores: {", ".join(unmatched_stores)}'
