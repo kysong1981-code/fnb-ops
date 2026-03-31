@@ -2583,21 +2583,38 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
                         created_by=profile,
                     )
 
-                # 3) Owner remainder — OWNER's bank portion (after all distributions)
-                if partner.partner_type == 'OWNER' and bank_total and bank_total != Decimal('0'):
-                    CQTransaction.objects.create(
-                        organization=instance.organization,
-                        date=period_end_date,
-                        store_name=store_name,
-                        transaction_type='COLLECTION',
-                        person=partner.name,
-                        amount=bank_total,
-                        account_type='ACCOUNT',
-                        note=f"Owner Profit {instance.year} {instance.get_period_type_display()} - {partner.name}",
-                        period=period_label,
-                        profit_share=instance,
-                        created_by=profile,
-                    )
+                # 3) Owner remainder — OWNER's bank portion, split Account/Cash
+                if partner.partner_type == 'OWNER':
+                    owner_account = partner.bank_account or Decimal('0')
+                    owner_cash = partner.bank_cash or Decimal('0')
+                    if owner_account != Decimal('0'):
+                        CQTransaction.objects.create(
+                            organization=instance.organization,
+                            date=period_end_date,
+                            store_name=store_name,
+                            transaction_type='COLLECTION',
+                            person=partner.name,
+                            amount=owner_account,
+                            account_type='ACCOUNT',
+                            note=f"Owner Profit (Account) {instance.year} {instance.get_period_type_display()}",
+                            period=period_label,
+                            profit_share=instance,
+                            created_by=profile,
+                        )
+                    if owner_cash != Decimal('0'):
+                        CQTransaction.objects.create(
+                            organization=instance.organization,
+                            date=period_end_date,
+                            store_name=store_name,
+                            transaction_type='COLLECTION',
+                            person=partner.name,
+                            amount=owner_cash,
+                            account_type='CASH',
+                            note=f"Owner Profit (Cash) {instance.year} {instance.get_period_type_display()}",
+                            period=period_label,
+                            profit_share=instance,
+                            created_by=profile,
+                        )
         else:
             # Unlocking: delete auto-created CQ records for this profit share
             CQTransaction.objects.filter(profit_share=instance).delete()

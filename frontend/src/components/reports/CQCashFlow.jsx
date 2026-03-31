@@ -353,14 +353,28 @@ export default function CQCashFlow() {
                   <div className="bg-green-50 rounded-2xl p-4 border border-green-100">
                     <div className="text-xs text-gray-500 mb-1">Owner Profit</div>
                     <div className="text-xl font-bold text-green-600">{fmt(summary.totals.collection)}</div>
+                    {(summary.totals.collection_account > 0 || summary.totals.collection_cash > 0) && (
+                      <div className="mt-2 pt-2 border-t border-green-200 space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-500">Account</span>
+                          <span className="font-medium text-green-700">{fmt(summary.totals.collection_account)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-500">Cash</span>
+                          <span className="font-medium text-green-700">{fmt(summary.totals.collection_cash)}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100">
                     <div className="text-xs text-gray-500 mb-1">Incentive</div>
                     <div className="text-xl font-bold text-purple-600">{fmt(summary.totals.incentive)}</div>
+                    <div className="text-xs text-gray-400 mt-1">All partners</div>
                   </div>
                   <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
                     <div className="text-xs text-gray-500 mb-1">Equity Share</div>
                     <div className="text-xl font-bold text-blue-600">{fmt(summary.totals.profit)}</div>
+                    <div className="text-xs text-gray-400 mt-1">Equity partners</div>
                   </div>
                   <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
                     <div className="text-xs text-gray-500 mb-1">Total (Net Profit)</div>

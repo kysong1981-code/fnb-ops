@@ -1241,9 +1241,17 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
             })
         person_summary.sort(key=lambda x: float(x['total_received']), reverse=True)
 
+        # Account/Cash breakdown for Collection (Owner Profit)
+        collection_account = qs.filter(transaction_type='COLLECTION', account_type='ACCOUNT').aggregate(
+            total=Sum('amount'))['total'] or 0
+        collection_cash = qs.filter(transaction_type='COLLECTION', account_type='CASH').aggregate(
+            total=Sum('amount'))['total'] or 0
+
         return Response({
             'totals': {
                 'collection': collections,
+                'collection_account': collection_account,
+                'collection_cash': collection_cash,
                 'incentive': incentives,
                 'profit': profits,
                 'expense': expenses,
