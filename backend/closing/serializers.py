@@ -386,6 +386,7 @@ class CQTransactionSerializer(serializers.ModelSerializer):
             'person', 'amount',
             'account_type', 'account_type_display',
             'note', 'period', 'incentive_rate',
+            'profit_share',
             'created_by', 'created_by_name',
             'created_at', 'updated_at',
         ]

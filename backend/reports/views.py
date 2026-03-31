@@ -2520,12 +2520,68 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def toggle_lock(self, request, pk=None):
-        """Toggle lock status. CEO/HQ only."""
+        """Toggle lock status. CEO/HQ only.
+        When locking: auto-create CQ transaction records for each partner's distribution.
+        When unlocking: delete auto-created CQ records for this profit share.
+        """
         if not self._check_ceo_hq(request):
             return Response({'error': 'Only CEO/HQ can lock/unlock profit shares.'}, status=status.HTTP_403_FORBIDDEN)
         instance = self.get_object()
         instance.is_locked = not instance.is_locked
         instance.save()
+
+        from closing.models import CQTransaction
+
+        if instance.is_locked:
+            # Locking: create CQ transaction records for each partner
+            # Determine period end date and period label
+            if instance.period_type == 'H1':
+                # H1 = Apr-Sep, end date = Sep 30
+                period_end_date = date(instance.year, 9, 30)
+                period_label = f"{instance.year}-Oct"
+            else:
+                # H2 = Oct-Mar, end date = Mar 31 of next year
+                period_end_date = date(instance.year + 1, 3, 31)
+                period_label = f"{instance.year + 1}-Apr"
+
+            store_name = instance.organization.name if instance.organization else ''
+            profile = request.user.profile
+
+            for partner in instance.partners.all():
+                # Create Account record if amount is non-zero
+                if partner.total_account and partner.total_account != Decimal('0'):
+                    CQTransaction.objects.create(
+                        organization=instance.organization,
+                        date=period_end_date,
+                        store_name=store_name,
+                        transaction_type='PROFIT',
+                        person=partner.name,
+                        amount=partner.total_account,
+                        account_type='ACCOUNT',
+                        note=f"Profit Share {instance.year} {instance.get_period_type_display()} - {partner.name} (Account)",
+                        period=period_label,
+                        profit_share=instance,
+                        created_by=profile,
+                    )
+                # Create Cash record if amount is non-zero
+                if partner.total_cash and partner.total_cash != Decimal('0'):
+                    CQTransaction.objects.create(
+                        organization=instance.organization,
+                        date=period_end_date,
+                        store_name=store_name,
+                        transaction_type='PROFIT',
+                        person=partner.name,
+                        amount=partner.total_cash,
+                        account_type='CASH',
+                        note=f"Profit Share {instance.year} {instance.get_period_type_display()} - {partner.name} (Cash)",
+                        period=period_label,
+                        profit_share=instance,
+                        created_by=profile,
+                    )
+        else:
+            # Unlocking: delete auto-created CQ records for this profit share
+            CQTransaction.objects.filter(profit_share=instance).delete()
+
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 

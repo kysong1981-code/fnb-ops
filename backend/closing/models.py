@@ -498,6 +498,11 @@ class CQTransaction(models.Model):
         max_digits=5, decimal_places=2, null=True, blank=True,
         help_text='인센티브 비율 (0.1 = 10%)'
     )
+    profit_share = models.ForeignKey(
+        'reports.ProfitShare', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='cq_transactions',
+        help_text='Auto-created from ProfitShare lock'
+    )
     created_by = models.ForeignKey(
         UserProfile, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='cq_transactions_created'
