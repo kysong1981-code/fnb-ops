@@ -1680,8 +1680,42 @@ class SkyReportViewSet(viewsets.ModelViewSet):
         self._auto_calculate(instance)
 
     def perform_update(self, serializer):
+        instance = serializer.instance
+        if instance.is_locked:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('This report is locked and cannot be modified.')
         instance = serializer.save()
         self._auto_calculate(instance)
+
+    def perform_destroy(self, instance):
+        if instance.is_locked:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('This report is locked and cannot be deleted.')
+        instance.delete()
+
+    @action(detail=True, methods=['post'], url_path='toggle-lock')
+    def toggle_lock(self, request, pk=None):
+        """Toggle lock. Only the person who locked can unlock."""
+        instance = self.get_object()
+        profile = request.user.profile
+
+        if instance.is_locked:
+            # Unlocking: only the person who locked (or CEO) can unlock
+            if instance.locked_by and instance.locked_by != profile and profile.role != 'CEO':
+                return Response(
+                    {'error': f'Only {instance.locked_by.user.get_full_name() or instance.locked_by.user.username} can unlock this report.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            instance.is_locked = False
+            instance.locked_by = None
+        else:
+            # Locking
+            instance.is_locked = True
+            instance.locked_by = profile
+
+        instance.save()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
     def summary(self, request):

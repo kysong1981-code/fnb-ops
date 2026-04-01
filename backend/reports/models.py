@@ -116,6 +116,10 @@ class SkyReport(models.Model):
     wage_notes = models.TextField(blank=True, default='')
     next_month_notes = models.TextField(blank=True, default='')
 
+    # Lock (only the person who locked can unlock)
+    is_locked = models.BooleanField(default=False)
+    locked_by = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='locked_sky_reports')
+
     # Meta
     created_by = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, related_name='sky_reports')
     created_at = models.DateTimeField(auto_now_add=True)

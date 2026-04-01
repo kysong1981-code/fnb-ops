@@ -732,6 +732,7 @@ export const skyReportAPI = {
   update: (id, data) => api.put(`/reports/sky-reports/${id}/`, data),
   patch: (id, data) => api.patch(`/reports/sky-reports/${id}/`, data),
   delete: (id) => api.delete(`/reports/sky-reports/${id}/`),
+  toggleLock: (id) => api.post(`/reports/sky-reports/${id}/toggle-lock/`),
   summary: (year) => api.get('/reports/sky-reports/summary/', { params: { year } }),
   autoFill: (year, month) => api.get('/reports/sky-reports/auto-fill/', { params: { year, month } }),
   rangeSummary: (fromYear, fromMonth, toYear, toMonth) =>

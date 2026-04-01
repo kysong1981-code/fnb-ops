@@ -203,7 +203,19 @@ export default function SkyReport() {
       await skyReportAPI.delete(currentReport.id)
       loadReports()
       loadSummary()
-    } catch {}
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to delete')
+    }
+  }
+
+  const handleToggleLock = async () => {
+    if (!currentReport) return
+    try {
+      await skyReportAPI.toggleLock(currentReport.id)
+      loadReports()
+    } catch (err) {
+      setError(err.response?.data?.error || err.response?.data?.detail || 'Failed to toggle lock')
+    }
   }
 
   const updateField = (key, value) => {
@@ -316,6 +328,7 @@ export default function SkyReport() {
           cancelEditing={cancelEditing}
           handleSave={handleSave}
           handleDelete={handleDelete}
+          handleToggleLock={handleToggleLock}
           saving={saving}
           editingReport={editingReport}
           monthLabel={monthLabel}
@@ -917,14 +930,17 @@ function TrendMini({ label, data, format = '', invertColor = false }) {
 function MonthlyView({
   year, selectedMonth, setSelectedMonth, currentReport, reports,
   editing, form, updateField, startEditing, cancelEditing, handleSave, handleDelete,
-  saving, editingReport, monthLabel,
+  handleToggleLock, saving, editingReport, monthLabel,
 }) {
+  const isLocked = currentReport?.is_locked
   return (
     <>
       {/* Month Selector */}
       <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-2">
         {MONTHS.map(m => {
-          const hasData = reports.some(r => r.month === m.value)
+          const report = reports.find(r => r.month === m.value)
+          const hasData = !!report
+          const locked = report?.is_locked
           const active = selectedMonth === m.value
           return (
             <button
@@ -939,7 +955,10 @@ function MonthlyView({
               }`}
             >
               <p className="text-sm font-bold">{m.label}</p>
-              {hasData && !active && <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mx-auto mt-1" />}
+              <div className="flex justify-center gap-1 mt-1">
+                {hasData && !active && <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />}
+                {locked && <span className="text-[10px]">{active ? '🔒' : '🔒'}</span>}
+              </div>
             </button>
           )
         })}
@@ -947,9 +966,26 @@ function MonthlyView({
 
       {/* Month Title + Actions */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900">{monthLabel} {year}</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-bold text-gray-900">{monthLabel} {year}</h2>
+          {isLocked && (
+            <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+              🔒 Locked{currentReport.locked_by_name ? ` by ${currentReport.locked_by_name}` : ''}
+            </span>
+          )}
+        </div>
         <div className="flex gap-2">
-          {!editing && (
+          {!editing && currentReport && (
+            <button onClick={handleToggleLock}
+              className={`px-3 py-2 text-sm font-medium rounded-xl transition ${
+                isLocked
+                  ? 'text-orange-600 bg-orange-50 hover:bg-orange-100'
+                  : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
+              }`}>
+              {isLocked ? '🔓 Unlock' : '🔒 Lock'}
+            </button>
+          )}
+          {!editing && !isLocked && (
             <button
               onClick={startEditing}
               className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"
@@ -957,7 +993,7 @@ function MonthlyView({
               {currentReport ? 'Edit' : '+ New Report'}
             </button>
           )}
-          {!editing && currentReport && (
+          {!editing && currentReport && !isLocked && (
             <button onClick={handleDelete}
               className="px-3 py-2 text-sm font-medium text-red-500 bg-red-50 rounded-xl hover:bg-red-100 transition">
               Delete

@@ -473,9 +473,10 @@ export default function CQCashFlow() {
                     <thead>
                       <tr className="text-left text-gray-500 border-b">
                         <th className="pb-2 pr-4">Name</th>
+                        <th className="pb-2 pr-4 text-right">Owner Profit</th>
                         <th className="pb-2 pr-4 text-right">Incentive</th>
-                        <th className="pb-2 pr-4 text-right">Profit Share</th>
-                        <th className="pb-2 text-right">Total Received</th>
+                        <th className="pb-2 pr-4 text-right">Equity Share</th>
+                        <th className="pb-2 text-right">Total</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -483,8 +484,9 @@ export default function CQCashFlow() {
                         <tr key={p.person} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
                           onClick={() => { setSelectedPerson(p.person); setView('persons') }}>
                           <td className="py-2.5 pr-4 font-medium text-gray-800">{p.person}</td>
-                          <td className="py-2.5 pr-4 text-right text-purple-600">{fmt(p.by_type.incentive)}</td>
-                          <td className="py-2.5 pr-4 text-right text-blue-600">{fmt(p.by_type.profit)}</td>
+                          <td className="py-2.5 pr-4 text-right text-green-600">{fmt(p.by_type?.collection)}</td>
+                          <td className="py-2.5 pr-4 text-right text-purple-600">{fmt(p.by_type?.incentive)}</td>
+                          <td className="py-2.5 pr-4 text-right text-blue-600">{fmt(p.by_type?.profit)}</td>
                           <td className="py-2.5 text-right font-semibold text-gray-800">{fmt(p.total_received)}</td>
                         </tr>
                       ))}

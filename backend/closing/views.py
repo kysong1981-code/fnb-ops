@@ -1187,76 +1187,79 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='summary')
     def summary(self, request):
-        """거래 요약 - 수금/배분/비용 총합"""
+        """Transaction summary - collection/distribution/expense totals"""
+        from django.db.models import Q
+
         qs = self.get_queryset()
 
-        collections = qs.filter(transaction_type='COLLECTION').aggregate(
-            total=Sum('amount'))['total'] or 0
-        incentives = qs.filter(transaction_type='INCENTIVE').aggregate(
-            total=Sum('amount'))['total'] or 0
-        profits = qs.filter(transaction_type='PROFIT').aggregate(
-            total=Sum('amount'))['total'] or 0
-        expenses = qs.filter(transaction_type='EXPENSE').aggregate(
-            total=Sum('amount'))['total'] or 0
-        exchanges = qs.filter(transaction_type='EXCHANGE').aggregate(
-            total=Sum('amount'))['total'] or 0
+        # Overall totals
+        totals = qs.aggregate(
+            collection=Sum('amount', filter=Q(transaction_type='COLLECTION')),
+            collection_account=Sum('amount', filter=Q(transaction_type='COLLECTION', account_type='ACCOUNT')),
+            collection_cash=Sum('amount', filter=Q(transaction_type='COLLECTION', account_type='CASH')),
+            incentive=Sum('amount', filter=Q(transaction_type='INCENTIVE')),
+            profit=Sum('amount', filter=Q(transaction_type='PROFIT')),
+            expense=Sum('amount', filter=Q(transaction_type='EXPENSE')),
+            exchange=Sum('amount', filter=Q(transaction_type='EXCHANGE')),
+        )
+        for k in totals:
+            totals[k] = totals[k] or 0
 
-        # Per-store summary
+        # Per-store summary (grouped by store_name using annotate - guaranteed no duplicates)
+        store_rows = qs.exclude(store_name='').values('store_name').annotate(
+            collection=Sum('amount', filter=Q(transaction_type='COLLECTION')),
+            collection_account=Sum('amount', filter=Q(transaction_type='COLLECTION', account_type='ACCOUNT')),
+            collection_cash=Sum('amount', filter=Q(transaction_type='COLLECTION', account_type='CASH')),
+            incentive=Sum('amount', filter=Q(transaction_type='INCENTIVE')),
+            profit=Sum('amount', filter=Q(transaction_type='PROFIT')),
+        ).order_by('store_name')
+
         store_summary = []
-        stores = qs.values_list('store_name', flat=True).distinct()
-        for store_name in stores:
-            if not store_name:
-                continue
-            store_qs = qs.filter(store_name=store_name)
+        for row in store_rows:
+            c = row['collection'] or 0
+            i = row['incentive'] or 0
+            p = row['profit'] or 0
             store_summary.append({
-                'store_name': store_name,
-                'collection': store_qs.filter(transaction_type='COLLECTION').aggregate(
-                    total=Sum('amount'))['total'] or 0,
-                'incentive': store_qs.filter(transaction_type='INCENTIVE').aggregate(
-                    total=Sum('amount'))['total'] or 0,
-                'profit': store_qs.filter(transaction_type='PROFIT').aggregate(
-                    total=Sum('amount'))['total'] or 0,
+                'store_name': row['store_name'],
+                'collection': c,
+                'collection_account': row['collection_account'] or 0,
+                'collection_cash': row['collection_cash'] or 0,
+                'incentive': i,
+                'profit': p,
+                'total': float(c) + float(i) + float(p),
             })
-        store_summary.sort(key=lambda x: float(x['collection']) + float(x['profit']) + float(x['incentive']), reverse=True)
+        store_summary.sort(key=lambda x: x['total'], reverse=True)
 
-        # Per-person summary
+        # Per-person summary (grouped by person using annotate - guaranteed no duplicates)
+        person_rows = qs.exclude(person='').values('person').annotate(
+            incentive=Sum('amount', filter=Q(transaction_type='INCENTIVE')),
+            profit=Sum('amount', filter=Q(transaction_type='PROFIT')),
+            collection=Sum('amount', filter=Q(transaction_type='COLLECTION')),
+            expense=Sum('amount', filter=Q(transaction_type='EXPENSE')),
+        ).order_by('person')
+
         person_summary = []
-        persons = qs.exclude(person='').values_list('person', flat=True).distinct()
-        for person_name in persons:
-            p_qs = qs.filter(person=person_name)
+        for row in person_rows:
+            inc = row['incentive'] or 0
+            prf = row['profit'] or 0
+            col = row['collection'] or 0
+            exp = row['expense'] or 0
             person_summary.append({
-                'person': person_name,
-                'total_received': p_qs.filter(
-                    transaction_type__in=['INCENTIVE', 'PROFIT', 'COLLECTION']
-                ).aggregate(total=Sum('amount'))['total'] or 0,
-                'total_expense': p_qs.filter(
-                    transaction_type='EXPENSE'
-                ).aggregate(total=Sum('amount'))['total'] or 0,
+                'person': row['person'],
+                'total_received': float(inc) + float(prf) + float(col),
+                'total_expense': exp,
                 'by_type': {
-                    'incentive': p_qs.filter(transaction_type='INCENTIVE').aggregate(
-                        total=Sum('amount'))['total'] or 0,
-                    'profit': p_qs.filter(transaction_type='PROFIT').aggregate(
-                        total=Sum('amount'))['total'] or 0,
+                    'incentive': inc,
+                    'profit': prf,
+                    'collection': col,
                 }
             })
-        person_summary.sort(key=lambda x: float(x['total_received']), reverse=True)
-
-        # Account/Cash breakdown for Collection (Owner Profit)
-        collection_account = qs.filter(transaction_type='COLLECTION', account_type='ACCOUNT').aggregate(
-            total=Sum('amount'))['total'] or 0
-        collection_cash = qs.filter(transaction_type='COLLECTION', account_type='CASH').aggregate(
-            total=Sum('amount'))['total'] or 0
+        person_summary.sort(key=lambda x: x['total_received'], reverse=True)
 
         return Response({
             'totals': {
-                'collection': collections,
-                'collection_account': collection_account,
-                'collection_cash': collection_cash,
-                'incentive': incentives,
-                'profit': profits,
-                'expense': expenses,
-                'exchange': exchanges,
-                'net': collections - incentives - profits - expenses - exchanges,
+                **totals,
+                'net': float(totals['collection']) - float(totals['incentive']) - float(totals['profit']) - float(totals['expense']) - float(totals['exchange']),
             },
             'stores': store_summary,
             'persons': person_summary,

@@ -46,6 +46,7 @@ class SkyReportSerializer(serializers.ModelSerializer):
     cogs_ratio = serializers.DecimalField(max_digits=5, decimal_places=1, read_only=True)
     wage_ratio = serializers.DecimalField(max_digits=5, decimal_places=1, read_only=True)
     created_by_name = serializers.SerializerMethodField()
+    locked_by_name = serializers.SerializerMethodField()
     yoy = serializers.SerializerMethodField()
     kpis = serializers.SerializerMethodField()
     opening_hours_per_day = serializers.SerializerMethodField()
@@ -73,16 +74,23 @@ class SkyReportSerializer(serializers.ModelSerializer):
             'hygiene_grade',
             # Notes
             'sales_notes', 'cogs_notes', 'wage_notes', 'next_month_notes',
+            # Lock
+            'is_locked', 'locked_by_name',
             # Meta
             'created_by_name', 'created_at', 'updated_at',
             # Extra computed
             'yoy', 'kpis', 'opening_hours_per_day',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by_name']
+        read_only_fields = ['id', 'is_locked', 'locked_by_name', 'created_at', 'updated_at', 'created_by_name']
 
     def get_created_by_name(self, obj):
         if obj.created_by:
             return obj.created_by.user.get_full_name() or obj.created_by.user.username
+        return None
+
+    def get_locked_by_name(self, obj):
+        if obj.locked_by:
+            return obj.locked_by.user.get_full_name() or obj.locked_by.user.username
         return None
 
     def get_yoy(self, obj):
