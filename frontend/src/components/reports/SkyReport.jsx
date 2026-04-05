@@ -79,10 +79,14 @@ export default function SkyReport() {
   const { selectedStore } = useStore()
   const [aggregationInfo, setAggregationInfo] = useState(null)
 
+  const storeId = selectedStore?.id
+
   const loadReports = async () => {
     setLoading(true)
     try {
-      const res = await skyReportAPI.list({ year })
+      const params = { year }
+      if (storeId) params.store_id = storeId
+      const res = await skyReportAPI.list(params)
       const data = Array.isArray(res.data) ? res.data : res.data.results || []
       setReports(data)
     } catch { setReports([]) }
@@ -98,14 +102,18 @@ export default function SkyReport() {
 
   const loadLastYear = async () => {
     try {
-      const res = await skyReportAPI.list({ year: year - 1 })
+      const params = { year: year - 1 }
+      if (storeId) params.store_id = storeId
+      const res = await skyReportAPI.list(params)
       setLastYearReports(Array.isArray(res.data) ? res.data : res.data.results || [])
     } catch { setLastYearReports([]) }
   }
 
   const loadTwoYearsAgo = async () => {
     try {
-      const res = await skyReportAPI.list({ year: year - 2 })
+      const params = { year: year - 2 }
+      if (storeId) params.store_id = storeId
+      const res = await skyReportAPI.list(params)
       setTwoYearsAgoReports(Array.isArray(res.data) ? res.data : res.data.results || [])
     } catch { setTwoYearsAgoReports([]) }
   }
@@ -115,7 +123,7 @@ export default function SkyReport() {
     loadSummary()
     loadLastYear()
     loadTwoYearsAgo()
-  }, [year])
+  }, [year, storeId])
 
   const currentReport = reports.find(r => r.month === selectedMonth)
 
