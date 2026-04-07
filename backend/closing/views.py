@@ -390,24 +390,30 @@ class ClosingHRCashViewSet(mixins.CreateModelMixin,
 
     @action(detail=False, methods=['get'])
     def balance(self, request):
-        """전체 HR Cash 누적 합계 반환 (explicit entries + implicit from closings without entries)"""
+        """전체 HR Cash 누적 합계 반환 (initial balance + explicit entries + implicit from closings)"""
         from users.filters import get_target_org
         from decimal import Decimal
         org = get_target_org(request)
 
-        # 1. Explicit HR Cash entries
-        explicit_total = ClosingHRCash.objects.filter(
-            daily_closing__organization=org
-        ).aggregate(total=Coalesce(Sum('amount'), Decimal('0')))['total']
+        # 0. Initial cash balance from Store Settings
+        initial_balance = org.initial_cash_balance or Decimal('0')
+        initial_date = org.initial_balance_date
+
+        # Build date filter for entries after initial balance date
+        date_filter = {}
+        if initial_date:
+            date_filter['daily_closing__date__gt'] = initial_date
+
+        # 1. Explicit HR Cash entries (after initial balance date)
+        explicit_qs = ClosingHRCash.objects.filter(daily_closing__organization=org, **date_filter)
+        explicit_total = explicit_qs.aggregate(total=Coalesce(Sum('amount'), Decimal('0')))['total']
 
         # 2. Implicit: closings without HR Cash entries where actual_cash > bank_deposit
-        closings_with_hr = ClosingHRCash.objects.filter(
-            daily_closing__organization=org
-        ).values_list('daily_closing_id', flat=True)
-
-        implicit_total = DailyClosing.objects.filter(
-            organization=org,
-        ).exclude(
+        closings_with_hr = explicit_qs.values_list('daily_closing_id', flat=True)
+        implicit_qs = DailyClosing.objects.filter(organization=org)
+        if initial_date:
+            implicit_qs = implicit_qs.filter(date__gt=initial_date)
+        implicit_total = implicit_qs.exclude(
             id__in=closings_with_hr
         ).annotate(
             remaining=F('actual_cash') - F('bank_deposit')
@@ -415,16 +421,19 @@ class ClosingHRCashViewSet(mixins.CreateModelMixin,
             remaining__gt=0
         ).aggregate(total=Coalesce(Sum('remaining'), Decimal('0')))['total']
 
-        total = explicit_total + implicit_total
+        total = initial_balance + explicit_total + implicit_total
 
-        # 3. Cumulative cash expenses
+        # 3. Cumulative cash expenses (after initial balance date)
         from closing.models import ClosingCashExpense
-        total_expenses = ClosingCashExpense.objects.filter(
-            daily_closing__organization=org
-        ).aggregate(total=Coalesce(Sum('amount'), Decimal('0')))['total']
+        expense_qs = ClosingCashExpense.objects.filter(daily_closing__organization=org)
+        if initial_date:
+            expense_qs = expense_qs.filter(daily_closing__date__gt=initial_date)
+        total_expenses = expense_qs.aggregate(total=Coalesce(Sum('amount'), Decimal('0')))['total']
 
         net_balance = total - total_expenses
         return Response({
+            'initial_balance': str(initial_balance),
+            'initial_date': str(initial_date) if initial_date else None,
             'balance': str(total),
             'expenses': str(total_expenses),
             'net_balance': str(net_balance),

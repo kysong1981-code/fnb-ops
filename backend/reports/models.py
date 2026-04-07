@@ -270,6 +270,10 @@ class ProfitShare(models.Model):
     # Evaluation Score (pulled from StoreEvaluation)
     evaluation_score = models.IntegerField(default=0)
 
+    # HR Cash tracking
+    hr_cash_total = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Total HR Cash collected during this period")
+    carry_over_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Carry-over from previous period (HR Cash - distributions)")
+
     # Lock & Notes
     is_locked = models.BooleanField(default=False)
     notes = models.TextField(blank=True, default='')

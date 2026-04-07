@@ -256,6 +256,8 @@ class ProfitShareSerializer(serializers.ModelSerializer):
             'incentive_account', 'incentive_cash', 'incentive_total', 'incentive_pct',
             # Evaluation Score
             'evaluation_score',
+            # HR Cash tracking
+            'hr_cash_total', 'carry_over_balance',
             # Lock & Notes
             'is_locked', 'notes',
             # Partners

@@ -550,6 +550,26 @@ export default function ProfitShare() {
                 <div className="text-sm font-semibold text-gray-700">{fmt(skyData.total_operating_expenses)}</div>
               </div>
             </div>
+            {/* HR Cash Summary */}
+            {(skyData.hr_cash_total > 0 || skyData.prev_carry_over > 0) && (
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-2">Cash Reconciliation</div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-2 bg-violet-50 rounded-lg border border-violet-100">
+                    <div className="text-[10px] text-gray-400">Prev Balance</div>
+                    <div className="text-sm font-bold text-violet-700">{fmt(skyData.prev_carry_over)}</div>
+                  </div>
+                  <div className="p-2 bg-green-50 rounded-lg border border-green-100">
+                    <div className="text-[10px] text-gray-400">HR Cash (6mo)</div>
+                    <div className="text-sm font-bold text-green-700">{fmt(skyData.hr_cash_total)}</div>
+                  </div>
+                  <div className="p-2 bg-blue-50 rounded-lg border border-blue-100">
+                    <div className="text-[10px] text-gray-400">Available</div>
+                    <div className="text-sm font-bold text-blue-700">{fmt(skyData.available_cash)}</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </Card>
       )}
