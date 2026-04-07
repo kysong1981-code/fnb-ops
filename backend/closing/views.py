@@ -1634,14 +1634,21 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         # Reverse ledger so most recent appears first
         ledger.reverse()
 
-        # Monthly summary
+        # Registered store names for filtering
+        from users.models import Organization
+        registered_stores = set(
+            Organization.objects.values_list('name', flat=True)
+        )
+
+        # Monthly summary — only registered stores
         from collections import defaultdict
         monthly = defaultdict(lambda: {'total': Decimal('0'), 'stores': defaultdict(Decimal)})
         for tx in qs:
-            month_key = tx.date.strftime('%Y-%m')
-            amt = tx.amount if tx.transaction_type in INFLOW_TYPES else -tx.amount
-            monthly[month_key]['total'] += amt
-            monthly[month_key]['stores'][tx.store_name] += amt
+            if tx.store_name and tx.store_name in registered_stores:
+                month_key = tx.date.strftime('%Y-%m')
+                amt = tx.amount if tx.transaction_type in INFLOW_TYPES else -tx.amount
+                monthly[month_key]['total'] += amt
+                monthly[month_key]['stores'][tx.store_name] += amt
 
         monthly_summary = []
         for month_key in sorted(monthly.keys()):
@@ -1653,11 +1660,12 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                 'stores': stores,
             })
 
-        # Per-store summary
+        # Per-store summary — only registered stores
         store_totals = defaultdict(Decimal)
         for tx in qs:
-            amt = tx.amount if tx.transaction_type in INFLOW_TYPES else -tx.amount
-            store_totals[tx.store_name] += amt
+            if tx.store_name and tx.store_name in registered_stores:
+                amt = tx.amount if tx.transaction_type in INFLOW_TYPES else -tx.amount
+                store_totals[tx.store_name] += amt
         store_summary = [{'store_name': s, 'total': float(t)} for s, t in sorted(store_totals.items(), key=lambda x: -x[1])]
 
         return Response({
