@@ -332,6 +332,8 @@ class PartnerShare(models.Model):
 
     # Fixed amount (bypasses percentage calculation)
     fixed_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    fixed_account = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    fixed_cash = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     # Notes & order
     notes = models.TextField(blank=True, default='')
@@ -361,15 +363,26 @@ class PartnerShare(models.Model):
         actual_incentive_account = (parent.incentive_account * score_pct).quantize(Decimal('0.01'))
         actual_incentive_cash = (parent.incentive_cash * score_pct).quantize(Decimal('0.01'))
 
-        if self.fixed_amount > 0:
-            # Fixed amount partner: split evenly between account and cash
+        # Calculate effective fixed amount from account + cash (or legacy single field)
+        eff_fixed = (self.fixed_account or Decimal('0')) + (self.fixed_cash or Decimal('0'))
+        if eff_fixed == 0 and self.fixed_amount > 0:
+            eff_fixed = self.fixed_amount  # backward compat
+
+        if eff_fixed > 0:
+            # Fixed amount partner: use explicit account/cash split
             self.incentive_account = Decimal('0')
             self.incentive_cash = Decimal('0')
             self.bank_account = Decimal('0')
             self.bank_cash = Decimal('0')
-            self.total_account = (self.fixed_amount / 2).quantize(Decimal('0.01'))
-            self.total_cash = self.fixed_amount - self.total_account
-            self.total = self.fixed_amount
+            if (self.fixed_account or Decimal('0')) > 0 or (self.fixed_cash or Decimal('0')) > 0:
+                self.total_account = self.fixed_account or Decimal('0')
+                self.total_cash = self.fixed_cash or Decimal('0')
+            else:
+                # Legacy: split evenly
+                self.total_account = (eff_fixed / 2).quantize(Decimal('0.01'))
+                self.total_cash = eff_fixed - self.total_account
+            self.total = self.total_account + self.total_cash
+            self.fixed_amount = eff_fixed  # keep in sync
         elif self.partner_type == 'OWNER':
             # Owner gets remainder after all other partners
             other_partners = parent.partners.exclude(id=self.id)

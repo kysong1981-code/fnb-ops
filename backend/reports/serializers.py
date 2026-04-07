@@ -222,7 +222,7 @@ class PartnerShareSerializer(serializers.ModelSerializer):
             'incentive_account', 'incentive_cash',
             'bank_account', 'bank_cash',
             'total_account', 'total_cash', 'total',
-            'fixed_amount', 'notes', 'order',
+            'fixed_amount', 'fixed_account', 'fixed_cash', 'notes', 'order',
         ]
         read_only_fields = [
             'id', 'partner_type_display',

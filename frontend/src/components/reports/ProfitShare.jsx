@@ -49,6 +49,8 @@ const EMPTY_PARTNER = {
   incentive_pct: '',
   equity_pct: '',
   fixed_amount: '',
+  fixed_account: '',
+  fixed_cash: '',
   notes: '',
   order: 0,
 }
@@ -134,6 +136,8 @@ export default function ProfitShare() {
           incentive_pct: p.incentive_pct || '',
           equity_pct: p.equity_pct || '',
           fixed_amount: p.fixed_amount || '',
+          fixed_account: p.fixed_account || '',
+          fixed_cash: p.fixed_cash || '',
           notes: p.notes || '',
           order: p.order || 0,
           // Read-only calculated fields (prefixed with _ to distinguish)
@@ -201,6 +205,8 @@ export default function ProfitShare() {
           incentive_pct: p.incentive_pct || '',
           equity_pct: p.equity_pct || '',
           fixed_amount: p.fixed_amount || '',
+          fixed_account: p.fixed_account || '',
+          fixed_cash: p.fixed_cash || '',
           notes: '',
           order: i,
         })))
@@ -248,7 +254,9 @@ export default function ProfitShare() {
         partner_type: p.partner_type,
         incentive_pct: n(p.incentive_pct),
         equity_pct: n(p.equity_pct),
-        fixed_amount: n(p.fixed_amount),
+        fixed_amount: n(p.fixed_account) + n(p.fixed_cash) || n(p.fixed_amount),
+        fixed_account: n(p.fixed_account),
+        fixed_cash: n(p.fixed_cash),
         notes: p.notes || '',
         order: i,
       })),
@@ -856,11 +864,22 @@ export default function ProfitShare() {
                     </div>
                   </div>
                   <div>
-                    <label className={labelCls}>Fixed Amount</label>
+                    <label className={labelCls}>Fixed Account</label>
                     <input
                       type="number" step="0.01"
-                      value={partner.fixed_amount}
-                      onChange={(e) => handlePartnerChange(index, { fixed_amount: e.target.value })}
+                      value={partner.fixed_account}
+                      onChange={(e) => handlePartnerChange(index, { fixed_account: e.target.value })}
+                      className={disabled ? readOnlyCls : inputCls}
+                      disabled={disabled}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Fixed Cash</label>
+                    <input
+                      type="number" step="0.01"
+                      value={partner.fixed_cash}
+                      onChange={(e) => handlePartnerChange(index, { fixed_cash: e.target.value })}
                       className={disabled ? readOnlyCls : inputCls}
                       disabled={disabled}
                       placeholder="0"
