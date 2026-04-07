@@ -1593,6 +1593,20 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         # Optional date range filter
         date_start = request.query_params.get('date_start')
         date_end = request.query_params.get('date_end')
+
+        # For account statement: COLLECTION, BALANCE, TRANSFER are all inflows
+        INFLOW_TYPES = ('COLLECTION', 'BALANCE', 'TRANSFER')
+
+        # Calculate carry-over balance from all transactions before date_start
+        opening_balance = Decimal('0')
+        if date_start:
+            prev_qs = qs.filter(date__lt=date_start).order_by('date', 'created_at')
+            for tx in prev_qs:
+                if tx.transaction_type in INFLOW_TYPES:
+                    opening_balance += tx.amount
+                else:
+                    opening_balance -= tx.amount
+
         if date_start:
             qs = qs.filter(date__gte=date_start)
         if date_end:
@@ -1601,10 +1615,8 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         qs = qs.order_by('date', 'created_at')
 
         # Running balance ledger (calculated in chronological order)
-        # For account statement: COLLECTION, BALANCE, TRANSFER are all inflows
-        INFLOW_TYPES = ('COLLECTION', 'BALANCE', 'TRANSFER')
         ledger = []
-        balance = Decimal('0')
+        balance = opening_balance
         for tx in qs:
             if tx.transaction_type in INFLOW_TYPES:
                 balance += tx.amount
@@ -1670,6 +1682,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
 
         return Response({
             'account': account,
+            'opening_balance': float(opening_balance),
             'total_balance': float(balance),
             'transaction_count': len(ledger),
             'ledger': ledger,

@@ -719,14 +719,26 @@ export default function CQCashFlow() {
             const f = selectedAccount === 'KRW' ? fmtKRW : fmt
             return (
             <>
-              {/* Total Balance */}
+              {/* Balance Cards */}
               <Card>
-                <div className="p-5 text-center">
-                  <div className="text-xs text-gray-500 mb-1">{selectedAccount} Total Balance</div>
-                  <div className={`text-3xl font-bold ${accountData.total_balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {f(accountData.total_balance)}
+                <div className="p-5">
+                  <div className="text-center mb-3">
+                    <div className="text-xs text-gray-500 mb-1">{selectedAccount} Current Balance</div>
+                    <div className={`text-3xl font-bold ${accountData.total_balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {f(accountData.total_balance)}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-400 mt-1">{accountData.transaction_count} transactions</div>
+                  {accountData.opening_balance != null && accountData.opening_balance !== 0 && (
+                    <div className="flex justify-between items-center pt-3 border-t border-gray-100">
+                      <span className="text-xs text-gray-500">이월 잔액</span>
+                      <span className={`text-sm font-semibold ${accountData.opening_balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                        {f(accountData.opening_balance)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center pt-1">
+                    <span className="text-xs text-gray-400">{accountData.transaction_count} transactions this period</span>
+                  </div>
                 </div>
               </Card>
 
