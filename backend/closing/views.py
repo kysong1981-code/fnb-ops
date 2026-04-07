@@ -1588,7 +1588,17 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         if not account:
             return Response({'error': 'account parameter required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        qs = self.get_queryset().filter(person__iexact=account).order_by('date', 'created_at')
+        qs = self.get_queryset().filter(person__iexact=account)
+
+        # Optional date range filter
+        date_start = request.query_params.get('date_start')
+        date_end = request.query_params.get('date_end')
+        if date_start:
+            qs = qs.filter(date__gte=date_start)
+        if date_end:
+            qs = qs.filter(date__lte=date_end)
+
+        qs = qs.order_by('date', 'created_at')
 
         # Running balance ledger (calculated in chronological order)
         # For account statement: COLLECTION, BALANCE, TRANSFER are all inflows

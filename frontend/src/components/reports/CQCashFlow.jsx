@@ -183,7 +183,11 @@ export default function CQCashFlow() {
   const loadAccountStatement = async () => {
     if (!selectedAccount) return
     try {
-      const res = await cqTransactionAPI.accountStatement({ account: selectedAccount })
+      const res = await cqTransactionAPI.accountStatement({
+        account: selectedAccount,
+        date_start: dateRange.start,
+        date_end: dateRange.end,
+      })
       setAccountData(res.data)
     } catch (e) {
       setError('Failed to load account statement')
@@ -192,7 +196,7 @@ export default function CQCashFlow() {
 
   useEffect(() => {
     if (view === 'accounts' && selectedAccount) loadAccountStatement()
-  }, [view, selectedAccount])
+  }, [view, selectedAccount, year, period])
 
   const handleToggleLock = async () => {
     try {
