@@ -47,8 +47,7 @@ const menuSections = [
     roles: MANAGER_ROLES,
     items: [
       { label: 'Daily Closing', path: '/closing', icon: ClipboardIcon, module: 'CLOSING' },
-      { label: 'Cash Management', path: '/cashup', icon: MoneyIcon, module: 'CASHUP' },
-      { label: 'Cash Flow', path: '/cq-report', icon: MoneyIcon },
+      { label: 'Cash Management', path: '/cashup', icon: MoneyIcon },
       { label: 'Reports', path: '/reports', icon: ChartIcon, module: 'REPORTS' },
       { label: 'Sales Analysis', path: '/sales', icon: ChartIcon, module: 'SALES' },
       { label: 'HR Management', path: '/hr', icon: TeamIcon },
