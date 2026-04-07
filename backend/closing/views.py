@@ -1351,10 +1351,17 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
 
         qs = self.get_queryset().filter(person__icontains=person).order_by('date', 'created_at')
 
+        # QT/ChCh/KRW are cash accounts — inflow = COLLECTION/BALANCE/TRANSFER, outflow = rest
+        is_cash_account = person.upper() in ('QT', 'CHCH', 'KRW')
+        if is_cash_account:
+            inflow_types = ('COLLECTION', 'BALANCE', 'TRANSFER')
+        else:
+            inflow_types = ('COLLECTION', 'INCENTIVE', 'PROFIT')
+
         ledger = []
         balance = Decimal('0')
         for tx in qs:
-            if tx.transaction_type in ['COLLECTION', 'INCENTIVE', 'PROFIT']:
+            if tx.transaction_type in inflow_types:
                 balance += tx.amount
                 ledger.append({
                     'id': tx.id,
