@@ -90,7 +90,15 @@ export default function ProfitShare() {
     if (!selectedStore?.id) return
     try {
       const res = await profitShareAPI.pullSkyData(year, periodType, selectedStore.id)
-      setSkyData(res.data)
+      const data = res.data
+      setSkyData(data)
+      // Auto-fill cash into summary if not yet set
+      if (data && data.available_cash > 0) {
+        setSummary(prev => ({
+          ...prev,
+          net_profit_cash: prev.net_profit_cash || data.available_cash,
+        }))
+      }
     } catch {
       setSkyData(null)
     }

@@ -235,9 +235,19 @@ export default function StoreEvaluation() {
       // Backend returns decimals (e.g. 0.335), convert to percentage (33.5)
       const cogsVal = data.cogs_percent ? (parseFloat(data.cogs_percent) * 100).toFixed(1) : null
       const wageVal = data.wage_percent ? (parseFloat(data.wage_percent) * 100).toFixed(1) : null
+      // Targets from Sky Report goals
+      const salesTarget = data.sales_goal_total || null
+      const cogsTarget = data.cogs_goal_avg || null
+      const wageTarget = data.wage_goal_avg || null
+
       setForm(prev => {
         const updated = {
           ...prev,
+          // Targets (from Sky Report goals)
+          sales_target: salesTarget || prev.sales_target,
+          cogs_target: cogsTarget || prev.cogs_target,
+          wage_target: wageTarget || prev.wage_target,
+          // Achievements (from Sky Report actuals)
           sales_achievement: data.total_sales || prev.sales_achievement,
           cogs_achievement: cogsVal || prev.cogs_achievement,
           wage_achievement: wageVal || prev.wage_achievement,

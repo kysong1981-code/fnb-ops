@@ -2363,12 +2363,23 @@ class StoreEvaluationViewSet(viewsets.ModelViewSet):
         latest_report = sky_reports.order_by('-year', '-month').first()
         service_rating = float(latest_report.review_rating) if latest_report and latest_report.review_rating > 0 else 0
 
+        # Goals/targets from Sky Report
+        sales_goal_total = sum(float(r.sales_goal or 0) for r in sky_reports)
+        cogs_goals = [float(r.cogs_goal or 0) for r in sky_reports if r.cogs_goal and r.cogs_goal > 0]
+        wage_goals = [float(r.wage_goal or 0) for r in sky_reports if r.wage_goal and r.wage_goal > 0]
+        cogs_goal_avg = sum(cogs_goals) / len(cogs_goals) if cogs_goals else 0
+        wage_goal_avg = sum(wage_goals) / len(wage_goals) if wage_goals else 0
+
         return Response({
             'total_sales': float(total_sales),
             'cogs_percent': float(cogs_pct),
             'wage_percent': float(wage_pct),
             'service_rating': service_rating,
             'months_found': sky_reports.count(),
+            # Targets from Sky Report goals
+            'sales_goal_total': sales_goal_total,
+            'cogs_goal_avg': round(cogs_goal_avg, 1),
+            'wage_goal_avg': round(wage_goal_avg, 1),
         })
 
     @action(detail=True, methods=['post'])
