@@ -2568,6 +2568,37 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
             if recent_transfer:
                 cash_account = recent_transfer.person
 
+            # 0) Create TRANSFER record — cash pickup from store to QT/ChCh
+            #    Total cash = sum of all partner cash portions (incentive_cash + bank_cash) + owner remainder cash
+            total_cash_pickup = Decimal('0')
+            for p in instance.partners.all():
+                total_cash_pickup += (p.incentive_cash or Decimal('0'))
+                total_cash_pickup += (p.bank_cash or Decimal('0'))
+            # If no OWNER partner, add owner remainder cash
+            has_owner = instance.partners.filter(partner_type='OWNER').exists()
+            if not has_owner:
+                total_partner_cash = sum(
+                    (p.total_cash or Decimal('0')) for p in instance.partners.all()
+                )
+                owner_remainder_cash = (instance.net_profit_cash or Decimal('0')) - total_partner_cash
+                if owner_remainder_cash > Decimal('0'):
+                    total_cash_pickup += owner_remainder_cash
+
+            if total_cash_pickup > Decimal('0'):
+                CQTransaction.objects.create(
+                    organization=instance.organization,
+                    date=period_end_date,
+                    store_name=store_name,
+                    transaction_type='TRANSFER',
+                    person=cash_account,
+                    amount=total_cash_pickup,
+                    account_type='CASH',
+                    note=f"{store_name} Cash Pickup {instance.year} {instance.get_period_type_display()}",
+                    period=period_label,
+                    profit_share=instance,
+                    created_by=profile,
+                )
+
             for partner in instance.partners.all():
                 incentive_account = partner.incentive_account or Decimal('0')
                 incentive_cash = partner.incentive_cash or Decimal('0')
