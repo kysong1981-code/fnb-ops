@@ -11,14 +11,13 @@ import {
 } from '../icons'
 
 const TABS = [
-  { key: 'cashup', label: 'Cash Up' },
   { key: 'hrcash', label: 'HR Cash Management' },
 ]
 
 export default function CashUpPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('cashup')
+  const [activeTab, setActiveTab] = useState('hrcash')
 
   const [selectedDate, setSelectedDate] = useState(getTodayNZ())
   const [closing, setClosing] = useState(null)
@@ -735,17 +734,6 @@ export default function CashUpPage() {
                     className={inputCls}
                   />
                 </div>
-                <div>
-                  <label className="flex items-center gap-2 px-3 py-2.5 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-blue-300 transition">
-                    <CameraIcon size={18} className="text-gray-400" />
-                    <span className="text-sm text-gray-500">
-                      {hrForm.photo ? hrForm.photo.name : 'Attach receipt photo'}
-                    </span>
-                    <input type="file" accept=".jpg,.jpeg,.png,.pdf"
-                      onChange={(e) => setHrForm(p => ({ ...p, photo: e.target.files[0] }))}
-                      className="hidden" />
-                  </label>
-                </div>
                 <button type="submit" disabled={saving || !hrForm.amount}
                   className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition">
                   {saving ? 'Saving...' : 'Add Distribution'}
@@ -795,7 +783,6 @@ export default function CashUpPage() {
                     <option value="">Select</option>
                     <option value="ChCh">ChCh</option>
                     <option value="QT">QT</option>
-                    <option value="Manager">Manager</option>
                   </select>
                 </div>
                 <div>
@@ -818,20 +805,6 @@ export default function CashUpPage() {
                   placeholder="Optional notes"
                   className={inputCls}
                 />
-              </div>
-              <div>
-                <label className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition">
-                  <CameraIcon size={18} className="text-gray-400" />
-                  <span className="text-sm text-gray-500">
-                    {expForm.attachment ? expForm.attachment.name : 'Attach receipt photo'}
-                  </span>
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.pdf"
-                    onChange={(e) => setExpForm(p => ({ ...p, attachment: e.target.files[0] }))}
-                    className="hidden"
-                  />
-                </label>
               </div>
             </form>
           </Card>
