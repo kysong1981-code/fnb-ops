@@ -2627,7 +2627,7 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
                             date=period_end_date,
                             store_name=store_name,
                             transaction_type='COLLECTION',
-                            person=partner.name,
+                            person='Owner',
                             amount=owner_account,
                             account_type='ACCOUNT',
                             note=f"Owner Profit (Account) {instance.year} {instance.get_period_type_display()}",
@@ -2641,7 +2641,7 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
                             date=period_end_date,
                             store_name=store_name,
                             transaction_type='COLLECTION',
-                            person=partner.name,
+                            person='Owner',
                             amount=owner_cash,
                             account_type='CASH',
                             note=f"Owner Profit (Cash) {instance.year} {instance.get_period_type_display()}",
@@ -2649,6 +2649,47 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
                             profit_share=instance,
                             created_by=profile,
                         )
+
+            # 4) Auto-calculate Owner remainder if no OWNER partner exists
+            has_owner = instance.partners.filter(partner_type='OWNER').exists()
+            if not has_owner:
+                total_partner_account = sum(
+                    (p.total_account or Decimal('0')) for p in instance.partners.all()
+                )
+                total_partner_cash = sum(
+                    (p.total_cash or Decimal('0')) for p in instance.partners.all()
+                )
+                owner_remainder_account = (instance.net_profit_account or Decimal('0')) - total_partner_account
+                owner_remainder_cash = (instance.net_profit_cash or Decimal('0')) - total_partner_cash
+
+                if owner_remainder_account != Decimal('0'):
+                    CQTransaction.objects.create(
+                        organization=instance.organization,
+                        date=period_end_date,
+                        store_name=store_name,
+                        transaction_type='COLLECTION',
+                        person='Owner',
+                        amount=owner_remainder_account,
+                        account_type='ACCOUNT',
+                        note=f"Owner Profit (Account) {instance.year} {instance.get_period_type_display()}",
+                        period=period_label,
+                        profit_share=instance,
+                        created_by=profile,
+                    )
+                if owner_remainder_cash != Decimal('0'):
+                    CQTransaction.objects.create(
+                        organization=instance.organization,
+                        date=period_end_date,
+                        store_name=store_name,
+                        transaction_type='COLLECTION',
+                        person='Owner',
+                        amount=owner_remainder_cash,
+                        account_type='CASH',
+                        note=f"Owner Profit (Cash) {instance.year} {instance.get_period_type_display()}",
+                        period=period_label,
+                        profit_share=instance,
+                        created_by=profile,
+                    )
         else:
             # Unlocking: delete auto-created CQ records for this profit share
             CQTransaction.objects.filter(profit_share=instance).delete()
