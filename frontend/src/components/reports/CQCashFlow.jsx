@@ -48,6 +48,7 @@ const tooltipStyle = {
 }
 
 const fmt = (v) => `$${parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+const fmtKRW = (v) => `₩${parseFloat(v || 0).toLocaleString('ko-KR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 
 function localDateStr(d) {
   const y = d.getFullYear()
@@ -710,14 +711,16 @@ export default function CQCashFlow() {
             ))}
           </div>
 
-          {accountData && (
+          {accountData && (() => {
+            const f = selectedAccount === 'KRW' ? fmtKRW : fmt
+            return (
             <>
               {/* Total Balance */}
               <Card>
                 <div className="p-5 text-center">
                   <div className="text-xs text-gray-500 mb-1">{selectedAccount} Total Balance</div>
                   <div className={`text-3xl font-bold ${accountData.total_balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {fmt(accountData.total_balance)}
+                    {f(accountData.total_balance)}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">{accountData.transaction_count} transactions</div>
                 </div>
@@ -732,7 +735,7 @@ export default function CQCashFlow() {
                       {accountData.store_summary.map(s => (
                         <div key={s.store_name} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
                           <span className="text-sm font-medium text-gray-700">{s.store_name}</span>
-                          <span className="text-sm font-bold text-green-600">{fmt(s.total)}</span>
+                          <span className="text-sm font-bold text-green-600">{f(s.total)}</span>
                         </div>
                       ))}
                     </div>
@@ -766,10 +769,10 @@ export default function CQCashFlow() {
                                 </td>
                                 {accountData.store_summary?.map(s => (
                                   <td key={s.store_name} className="py-2 pr-3 text-right text-gray-700">
-                                    {storeMap[s.store_name] ? fmt(storeMap[s.store_name]) : '-'}
+                                    {storeMap[s.store_name] ? f(storeMap[s.store_name]) : '-'}
                                   </td>
                                 ))}
-                                <td className="py-2 text-right font-semibold text-gray-900">{fmt(m.total)}</td>
+                                <td className="py-2 text-right font-semibold text-gray-900">{f(m.total)}</td>
                               </tr>
                             )
                           })}
@@ -802,9 +805,9 @@ export default function CQCashFlow() {
                             <td className="py-2 pr-3 text-gray-800">{item.store_name}</td>
                             <td className="py-2 pr-3 text-gray-500 text-xs">{item.note}</td>
                             <td className={`py-2 pr-3 text-right font-medium ${item.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {item.amount >= 0 ? '+' : ''}{fmt(item.amount)}
+                              {item.amount >= 0 ? '+' : ''}{f(item.amount)}
                             </td>
-                            <td className="py-2 text-right font-medium text-gray-800">{fmt(item.balance)}</td>
+                            <td className="py-2 text-right font-medium text-gray-800">{f(item.balance)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -813,7 +816,7 @@ export default function CQCashFlow() {
                 </div>
               </Card>
             </>
-          )}
+          )})()}
 
           {!accountData && (
             <div className="text-center py-12 text-gray-400">Loading...</div>
