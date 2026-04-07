@@ -30,7 +30,7 @@ const VIEWS = [
   { key: 'import', label: 'CSV Import' },
 ]
 
-const ACCOUNTS = ['QT', 'ChCh']
+const ACCOUNTS = ['QT', 'ChCh', 'KRW']
 
 const CHART_COLORS = {
   collection: '#10b981',  // green
