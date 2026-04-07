@@ -517,7 +517,7 @@ class ClosingCashExpenseViewSet(mixins.CreateModelMixin,
                 organization=org,
                 date=closing.date,
                 store_name=org.name,
-                transaction_type='COLLECTION',
+                transaction_type='TRANSFER',
                 person=expense.reason or expense.category,  # ChCh, QT, Manager
                 amount=expense.amount,
                 account_type='CASH',
@@ -535,7 +535,7 @@ class ClosingCashExpenseViewSet(mixins.CreateModelMixin,
             cq = CQTransaction.objects.filter(
                 organization=closing.organization,
                 date=closing.date,
-                transaction_type='COLLECTION',
+                transaction_type='TRANSFER',
                 person=instance.reason or instance.category,
                 amount=instance.amount,
             ).first()
@@ -1578,10 +1578,12 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         qs = self.get_queryset().filter(person__iexact=account).order_by('date', 'created_at')
 
         # Running balance ledger
+        # For account statement: COLLECTION, BALANCE, TRANSFER are all inflows
+        INFLOW_TYPES = ('COLLECTION', 'BALANCE', 'TRANSFER')
         ledger = []
         balance = Decimal('0')
         for tx in qs:
-            if tx.transaction_type in ('COLLECTION', 'BALANCE'):
+            if tx.transaction_type in INFLOW_TYPES:
                 balance += tx.amount
                 ledger.append({
                     'id': tx.id, 'date': str(tx.date),
@@ -1611,7 +1613,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         monthly = defaultdict(lambda: {'total': Decimal('0'), 'stores': defaultdict(Decimal)})
         for tx in qs:
             month_key = tx.date.strftime('%Y-%m')
-            amt = tx.amount if tx.transaction_type in ('COLLECTION', 'BALANCE') else -tx.amount
+            amt = tx.amount if tx.transaction_type in INFLOW_TYPES else -tx.amount
             monthly[month_key]['total'] += amt
             monthly[month_key]['stores'][tx.store_name] += amt
 
@@ -1628,7 +1630,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         # Per-store summary
         store_totals = defaultdict(Decimal)
         for tx in qs:
-            amt = tx.amount if tx.transaction_type in ('COLLECTION', 'BALANCE') else -tx.amount
+            amt = tx.amount if tx.transaction_type in INFLOW_TYPES else -tx.amount
             store_totals[tx.store_name] += amt
         store_summary = [{'store_name': s, 'total': float(t)} for s, t in sorted(store_totals.items(), key=lambda x: -x[1])]
 
