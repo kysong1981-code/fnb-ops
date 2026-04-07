@@ -665,6 +665,8 @@ export const cqTransactionAPI = {
   }),
   bulkDelete: (params) => api.delete('/closing/cq-transactions/bulk-delete/', { params }),
   history: () => api.get('/closing/cq-transactions/history/'),
+  toggleLock: (data) => api.post('/closing/cq-transactions/toggle-lock/', data),
+  lockStatus: (params) => api.get('/closing/cq-transactions/lock-status/', { params }),
 }
 
 // Sales Analysis API (역할별 매출 분석)

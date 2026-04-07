@@ -382,6 +382,15 @@ class ClosingHRCashViewSet(mixins.CreateModelMixin,
         if closing_id:
             queryset = queryset.filter(daily_closing_id=closing_id)
 
+        # 월별 필터 (year, month 파라미터)
+        year = self.request.query_params.get('year')
+        month = self.request.query_params.get('month')
+        if year and month:
+            queryset = queryset.filter(
+                daily_closing__date__year=int(year),
+                daily_closing__date__month=int(month)
+            )
+
         return queryset.select_related('daily_closing', 'created_by')
 
     def perform_create(self, serializer):
@@ -473,6 +482,15 @@ class ClosingCashExpenseViewSet(mixins.CreateModelMixin,
         category = self.request.query_params.get('category')
         if category:
             queryset = queryset.filter(category=category)
+
+        # 월별 필터 (year, month 파라미터)
+        year = self.request.query_params.get('year')
+        month = self.request.query_params.get('month')
+        if year and month:
+            queryset = queryset.filter(
+                daily_closing__date__year=int(year),
+                daily_closing__date__month=int(month)
+            )
 
         return queryset.select_related('daily_closing', 'created_by')
 
@@ -1339,7 +1357,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         ledger = []
         balance = Decimal('0')
         for tx in qs:
-            if tx.transaction_type == 'COLLECTION':
+            if tx.transaction_type in ('COLLECTION', 'BALANCE'):
                 balance += tx.amount
                 ledger.append({
                     'id': tx.id,
@@ -1347,9 +1365,10 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                     'income': float(tx.amount),
                     'expense': 0,
                     'person': tx.person,
-                    'note': tx.note,
+                    'note': tx.note or tx.get_transaction_type_display(),
                     'transaction_type': tx.transaction_type,
                     'account_type': tx.account_type,
+                    'is_locked': tx.is_locked,
                     'balance': float(balance),
                 })
             else:
@@ -1363,6 +1382,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                     'note': tx.note or tx.get_transaction_type_display(),
                     'transaction_type': tx.transaction_type,
                     'account_type': tx.account_type,
+                    'is_locked': tx.is_locked,
                     'balance': float(balance),
                 })
 
@@ -1429,6 +1449,77 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
             })
 
         return Response(history_data)
+
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        if instance.is_locked:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('This transaction is locked and cannot be edited.')
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if instance.is_locked:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('This transaction is locked and cannot be deleted.')
+        instance.delete()
+
+    @action(detail=False, methods=['post'], url_path='toggle-lock')
+    def toggle_lock(self, request):
+        """Lock/unlock CQ transactions for a store+period.
+        Body: { store_name, period }
+        Only the person who locked can unlock (or CEO)."""
+        store_name = request.data.get('store_name')
+        period = request.data.get('period')
+        if not store_name:
+            return Response({'error': 'store_name is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        qs = self.get_queryset().filter(store_name=store_name)
+        if period:
+            qs = qs.filter(period=period)
+
+        profile = request.user.profile
+        first_locked = qs.filter(is_locked=True).first()
+
+        if first_locked:
+            # Unlock - only the person who locked or CEO
+            if first_locked.locked_by != profile and profile.role != 'CEO':
+                return Response(
+                    {'error': f'Only {first_locked.locked_by.user.get_full_name()} or CEO can unlock.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            count = qs.update(is_locked=False, locked_by=None)
+            return Response({'status': 'unlocked', 'count': count})
+        else:
+            # Lock
+            count = qs.update(is_locked=True, locked_by=profile)
+            return Response({
+                'status': 'locked',
+                'count': count,
+                'locked_by': profile.user.get_full_name(),
+            })
+
+    @action(detail=False, methods=['get'], url_path='lock-status')
+    def lock_status(self, request):
+        """Check lock status for a store+period."""
+        store_name = request.query_params.get('store_name')
+        period = request.query_params.get('period')
+        if not store_name:
+            return Response({'is_locked': False})
+
+        qs = self.get_queryset().filter(store_name=store_name)
+        if period:
+            qs = qs.filter(period=period)
+
+        locked_tx = qs.filter(is_locked=True).first()
+        if locked_tx:
+            locked_by_name = ''
+            if locked_tx.locked_by and locked_tx.locked_by.user:
+                locked_by_name = locked_tx.locked_by.user.get_full_name()
+            return Response({
+                'is_locked': True,
+                'locked_by_name': locked_by_name,
+            })
+        return Response({'is_locked': False})
 
     @action(detail=False, methods=['get'], url_path='stores-list')
     def stores_list(self, request):

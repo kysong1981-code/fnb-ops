@@ -52,6 +52,13 @@ export default function CashUpPage() {
   // Missing days
   const [missingDays, setMissingDays] = useState([])
 
+  // HR Cash monthly
+  const today = new Date()
+  const [hrMonth, setHrMonth] = useState(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`)
+  const [hrMonthEntries, setHrMonthEntries] = useState([])
+  const [hrMonthExpenses, setHrMonthExpenses] = useState([])
+  const [missingMonths, setMissingMonths] = useState([])
+
   const fmt = (v) => `$${parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
@@ -60,6 +67,44 @@ export default function CashUpPage() {
     setSuccess(msg)
     setTimeout(() => setSuccess(''), 3000)
   }
+
+  // Generate month options from Oct 2025 to current month
+  const getMonthOptions = () => {
+    const months = []
+    const now = new Date()
+    let y = 2025, m = 10
+    while (y < now.getFullYear() || (y === now.getFullYear() && m <= now.getMonth() + 1)) {
+      const val = `${y}-${String(m).padStart(2, '0')}`
+      const label = new Date(y, m - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+      months.push({ value: val, label })
+      m++
+      if (m > 12) { m = 1; y++ }
+    }
+    return months.reverse()
+  }
+
+  // Load HR Cash entries for selected month
+  const loadHrMonthData = async () => {
+    const [y, m] = hrMonth.split('-')
+    try {
+      const [entriesRes, expensesRes] = await Promise.all([
+        hrCashAPI.list({ year: y, month: m }),
+        cashExpenseAPI.list({ year: y, month: m }),
+      ])
+      setHrMonthEntries(entriesRes.data.results || entriesRes.data || [])
+      setHrMonthExpenses(expensesRes.data.results || expensesRes.data || [])
+    } catch {
+      setHrMonthEntries([])
+      setHrMonthExpenses([])
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'hrcash') {
+      loadHrMonthData()
+      loadHrCashBalance()
+    }
+  }, [hrMonth, activeTab])
 
   // Check for missing (uncompleted) days in the last 7 days
   useEffect(() => {
@@ -191,15 +236,41 @@ export default function CashUpPage() {
     }
   }
 
+  // Ensure closing exists for a specific date (used by HR Cash monthly tab)
+  const ensureClosingForDate = async (dateStr) => {
+    try {
+      const res = await closingAPI.getByDate(dateStr)
+      const data = res.data.results || res.data || []
+      if (data.length > 0) return data[0]
+      // Create new closing for that date
+      const createRes = await closingAPI.create({
+        organization: user?.organization,
+        closing_date: dateStr,
+        pos_card: 0, pos_cash: 0, actual_card: 0, actual_cash: 0, tab_count: 0,
+      })
+      return createRes.data
+    } catch {
+      return null
+    }
+  }
+
   // Add HR Cash
   const handleAddHrCash = async (e) => {
     e.preventDefault()
     if (!hrForm.amount) return
-    const c = await ensureClosing()
-    if (!c) return
     setSaving(true)
     setError('')
     try {
+      // For HR Cash tab (monthly), use today's date or first day of selected month
+      let c
+      if (activeTab === 'hrcash') {
+        const todayStr = getTodayNZ()
+        c = await ensureClosingForDate(todayStr)
+      } else {
+        c = await ensureClosing()
+      }
+      if (!c) { setError('Failed to find/create closing'); setSaving(false); return }
+
       const fd = new FormData()
       fd.append('daily_closing', c.id)
       fd.append('amount', hrForm.amount)
@@ -210,7 +281,12 @@ export default function CashUpPage() {
       await hrCashAPI.create(fd)
       setHrForm({ recipient_name: '', amount: '', notes: '', photo: null })
       setShowHrForm(false)
-      loadHrCash(c.id)
+      if (activeTab === 'hrcash') {
+        loadHrMonthData()
+      } else {
+        loadHrCash(c.id)
+      }
+      loadHrCashBalance()
       showMsg('HR cash added')
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to add HR cash')
@@ -223,6 +299,8 @@ export default function CashUpPage() {
     try {
       await hrCashAPI.delete(id)
       setHrCashEntries(prev => prev.filter(e => e.id !== id))
+      setHrMonthEntries(prev => prev.filter(e => e.id !== id))
+      loadHrCashBalance()
     } catch { setError('Failed to delete') }
   }
 
@@ -419,8 +497,8 @@ export default function CashUpPage() {
         ))}
       </div>
 
-      {/* Missing days alert */}
-      {missingDays.length > 0 && (
+      {/* Missing days alert (Cash Up tab only) */}
+      {activeTab === 'cashup' && missingDays.length > 0 && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
           <p className="text-sm font-semibold text-red-700 mb-2">
             {missingDays.length} day{missingDays.length > 1 ? 's' : ''} not approved
@@ -558,6 +636,20 @@ export default function CashUpPage() {
       ) : (
         /* ============ HR CASH TAB ============ */
         <>
+          {/* Month Selector */}
+          <Card className="p-5">
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Month</label>
+            <select
+              value={hrMonth}
+              onChange={(e) => setHrMonth(e.target.value)}
+              className={`${inputCls} mt-2`}
+            >
+              {getMonthOptions().map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </Card>
+
           {/* Balance Summary */}
           <Card className="p-5">
             <div className="grid grid-cols-3 gap-3">
@@ -575,6 +667,31 @@ export default function CashUpPage() {
               </div>
             </div>
           </Card>
+
+          {/* Monthly HR Cash Summary */}
+          {(() => {
+            const monthDistTotal = hrMonthEntries.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
+            const monthExpTotal = hrMonthExpenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
+            const [y, m] = hrMonth.split('-')
+            const monthLabel = new Date(parseInt(y), parseInt(m) - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
+            return (
+              <Card className="p-5">
+                <SectionLabel>{monthLabel} Summary</SectionLabel>
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <div className="p-3 bg-blue-50 rounded-xl text-center">
+                    <span className="text-xs text-blue-600 block">Distributions</span>
+                    <span className="text-lg font-bold text-blue-700">{fmt(monthDistTotal)}</span>
+                    <span className="text-xs text-gray-400 block">{hrMonthEntries.length} records</span>
+                  </div>
+                  <div className="p-3 bg-red-50 rounded-xl text-center">
+                    <span className="text-xs text-red-600 block">Expenses</span>
+                    <span className="text-lg font-bold text-red-700">{fmt(monthExpTotal)}</span>
+                    <span className="text-xs text-gray-400 block">{hrMonthExpenses.length} records</span>
+                  </div>
+                </div>
+              </Card>
+            )
+          })()}
 
           {/* HR Cash Distribution (who received cash) */}
           <Card className="p-5">
@@ -637,9 +754,9 @@ export default function CashUpPage() {
             )}
 
             {/* Distribution List */}
-            {hrCashEntries.length > 0 ? (
+            {hrMonthEntries.length > 0 ? (
               <div className="space-y-2">
-                {hrCashEntries.map(entry => (
+                {hrMonthEntries.map(entry => (
                   <div key={entry.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
@@ -720,14 +837,15 @@ export default function CashUpPage() {
           </Card>
 
           {/* Expense List */}
-          {expenses.length > 0 && (
+          {hrMonthExpenses.length > 0 && (
             <Card className="p-5">
               <SectionLabel>Expense History</SectionLabel>
               <div className="space-y-2">
-                {expenses.map(exp => (
+                {hrMonthExpenses.map(exp => (
                   <div key={exp.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                     <div>
                       <span className="text-sm font-medium text-gray-800">{exp.reason || exp.category}</span>
+                      <span className="text-xs text-gray-400 ml-2">{exp.created_at?.split('T')[0]}</span>
                       {exp.notes && <p className="text-xs text-gray-500 mt-0.5">{exp.notes}</p>}
                     </div>
                     <span className="text-sm font-bold text-red-600">-{fmt(exp.amount)}</span>

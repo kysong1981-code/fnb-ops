@@ -404,6 +404,7 @@ CQ_TRANSACTION_TYPE_CHOICES = (
     ('EXPENSE', 'Expense'),            # 비용 지출
     ('TRANSFER', 'Transfer'),          # 계좌 이체
     ('EXCHANGE', 'Exchange'),          # 환전
+    ('BALANCE', 'Opening Balance'),    # 시작 잔액
 )
 
 CQ_ACCOUNT_TYPE_CHOICES = (
@@ -502,6 +503,11 @@ class CQTransaction(models.Model):
         'reports.ProfitShare', on_delete=models.CASCADE,
         null=True, blank=True, related_name='cq_transactions',
         help_text='Auto-created from ProfitShare lock'
+    )
+    is_locked = models.BooleanField(default=False)
+    locked_by = models.ForeignKey(
+        UserProfile, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='cq_transactions_locked'
     )
     created_by = models.ForeignKey(
         UserProfile, on_delete=models.SET_NULL, null=True, blank=True,

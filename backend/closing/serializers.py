@@ -377,6 +377,7 @@ class CQTransactionSerializer(serializers.ModelSerializer):
     transaction_type_display = serializers.CharField(source='get_transaction_type_display', read_only=True)
     account_type_display = serializers.CharField(source='get_account_type_display', read_only=True)
     created_by_name = serializers.SerializerMethodField()
+    locked_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = CQTransaction
@@ -387,10 +388,11 @@ class CQTransactionSerializer(serializers.ModelSerializer):
             'account_type', 'account_type_display',
             'note', 'period', 'incentive_rate',
             'profit_share',
+            'is_locked', 'locked_by', 'locked_by_name',
             'created_by', 'created_by_name',
             'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_by', 'is_locked', 'locked_by', 'created_at', 'updated_at']
         extra_kwargs = {
             'organization': {'required': False},
         }
@@ -398,4 +400,9 @@ class CQTransactionSerializer(serializers.ModelSerializer):
     def get_created_by_name(self, obj):
         if obj.created_by and obj.created_by.user:
             return obj.created_by.user.get_full_name() or obj.created_by.user.username
+        return None
+
+    def get_locked_by_name(self, obj):
+        if obj.locked_by and obj.locked_by.user:
+            return obj.locked_by.user.get_full_name() or obj.locked_by.user.username
         return None

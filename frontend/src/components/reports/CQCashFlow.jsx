@@ -11,6 +11,7 @@ const TX_TYPES = [
   { key: 'EXPENSE', label: 'Expense', color: 'text-red-600', bg: 'bg-red-50' },
   { key: 'TRANSFER', label: 'Transfer', color: 'text-orange-600', bg: 'bg-orange-50' },
   { key: 'EXCHANGE', label: 'Exchange', color: 'text-teal-600', bg: 'bg-teal-50' },
+  { key: 'BALANCE', label: 'Opening Balance', color: 'text-amber-600', bg: 'bg-amber-50' },
 ]
 
 const ACCOUNT_TYPES = [
@@ -103,6 +104,12 @@ export default function CQCashFlow() {
     person: '', amount: '', account_type: 'CASH', note: '',
   })
 
+  // Store lock status
+  const [storeLockStatus, setStoreLockStatus] = useState({ is_locked: false, locked_by_name: '' })
+  // Opening balance form
+  const [showBalanceForm, setShowBalanceForm] = useState(false)
+  const [balanceForm, setBalanceForm] = useState({ date: localDateStr(new Date()), amount: '' })
+
   // CSV import
   const [importFile, setImportFile] = useState(null)
   const [importResult, setImportResult] = useState(null)
@@ -152,12 +159,53 @@ export default function CQCashFlow() {
   const loadStoreLedger = async () => {
     if (!selectedStore) return
     try {
-      const res = await cqTransactionAPI.storeLedger({
-        store_name: selectedStore, date_start: dateRange.start, date_end: dateRange.end,
-      })
+      const [res, lockRes] = await Promise.all([
+        cqTransactionAPI.storeLedger({
+          store_name: selectedStore, date_start: dateRange.start, date_end: dateRange.end,
+        }),
+        cqTransactionAPI.lockStatus({ store_name: selectedStore }),
+      ])
       setStoreLedger(res.data)
+      setStoreLockStatus(lockRes.data)
     } catch (e) {
       setError('Failed to load store ledger')
+    }
+  }
+
+  const handleToggleLock = async () => {
+    try {
+      const periodLabel = period === 'H2'
+        ? `${year}-Oct` : period === 'H1' ? `${year}-Apr` : ''
+      await cqTransactionAPI.toggleLock({
+        store_name: selectedStore,
+        period: periodLabel || undefined,
+      })
+      loadStoreLedger()
+      showMsg(storeLockStatus.is_locked ? 'Unlocked' : 'Locked')
+    } catch (e) {
+      setError(e.response?.data?.error || 'Failed to toggle lock')
+    }
+  }
+
+  const handleAddBalance = async () => {
+    if (!balanceForm.amount || !selectedStore) return
+    try {
+      await cqTransactionAPI.create({
+        date: balanceForm.date,
+        store_name: selectedStore,
+        transaction_type: 'BALANCE',
+        person: 'Opening Balance',
+        amount: balanceForm.amount,
+        account_type: 'CASH',
+        note: 'Opening Balance',
+      })
+      setBalanceForm({ date: localDateStr(new Date()), amount: '' })
+      setShowBalanceForm(false)
+      loadStoreLedger()
+      loadData()
+      showMsg('Opening balance added')
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Failed to add balance')
     }
   }
 
@@ -633,7 +681,70 @@ export default function CQCashFlow() {
               <option value="">Select store...</option>
               {storesList.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+            {selectedStore && (
+              <button onClick={handleToggleLock}
+                className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition ${
+                  storeLockStatus.is_locked
+                    ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                    : 'bg-green-100 text-green-700 hover:bg-green-200'
+                }`}>
+                {storeLockStatus.is_locked ? 'Unlock' : 'Lock'}
+              </button>
+            )}
           </div>
+
+          {/* Lock status badge */}
+          {storeLockStatus.is_locked && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl">
+              <span className="text-amber-600 text-sm font-medium">
+                Locked by {storeLockStatus.locked_by_name}
+              </span>
+            </div>
+          )}
+
+          {/* Opening Balance */}
+          {selectedStore && !storeLockStatus.is_locked && (
+            <div>
+              {!showBalanceForm ? (
+                <button onClick={() => setShowBalanceForm(true)}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                  + Add Opening Balance
+                </button>
+              ) : (
+                <Card>
+                  <div className="p-4 space-y-3">
+                    <h3 className="text-sm font-semibold text-gray-800">Opening Balance</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">Date</label>
+                        <input type="date" value={balanceForm.date}
+                          onChange={e => setBalanceForm(p => ({ ...p, date: e.target.value }))}
+                          className={inputCls + ' w-full'} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">Amount ($)</label>
+                        <input type="number" step="0.01" value={balanceForm.amount}
+                          onChange={e => setBalanceForm(p => ({ ...p, amount: e.target.value }))}
+                          placeholder="0.00" className={inputCls + ' w-full'} />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={handleAddBalance}
+                        disabled={!balanceForm.amount}
+                        className="px-4 py-2 bg-blue-600 text-white text-sm rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50 transition">
+                        Save
+                      </button>
+                      <button onClick={() => setShowBalanceForm(false)}
+                        className="px-4 py-2 bg-gray-100 text-gray-600 text-sm rounded-xl font-semibold hover:bg-gray-200 transition">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </div>
+          )}
+
           {storeLedger && selectedStore && (
             <>
               {/* Owner Account/Cash + Summary */}
@@ -714,10 +825,14 @@ export default function CQCashFlow() {
                               </td>
                               <td className="py-2 text-right font-medium text-gray-800">{fmt(item.balance)}</td>
                               <td className="py-2 pl-2">
-                                <button onClick={() => handleDelete(item.id)}
-                                  className="text-gray-300 hover:text-red-500">
-                                  <TrashIcon className="w-4 h-4" />
-                                </button>
+                                {!storeLockStatus.is_locked && !item.is_locked ? (
+                                  <button onClick={() => handleDelete(item.id)}
+                                    className="text-gray-300 hover:text-red-500">
+                                    <TrashIcon className="w-4 h-4" />
+                                  </button>
+                                ) : (
+                                  <span className="text-gray-300 text-xs">🔒</span>
+                                )}
                               </td>
                             </tr>
                           )
