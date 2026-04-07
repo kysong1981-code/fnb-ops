@@ -495,8 +495,55 @@ class ClosingCashExpenseViewSet(mixins.CreateModelMixin,
         return queryset.select_related('daily_closing', 'created_by')
 
     def perform_create(self, serializer):
-        """created_by를 현재 사용자로 설정"""
-        serializer.save(created_by=self.request.user)
+        """created_by를 현재 사용자로 설정, CQ Transaction 자동 생성"""
+        expense = serializer.save(created_by=self.request.user)
+
+        # Auto-create CQ Transaction for this expense
+        try:
+            closing = expense.daily_closing
+            org = closing.organization
+            profile = self.request.user.profile if hasattr(self.request.user, 'profile') else None
+
+            # Determine period (H1=Apr-Sep, H2=Oct-Mar)
+            m = closing.date.month
+            if 4 <= m <= 9:
+                period_label = f"{closing.date.year}-Apr"
+            elif m >= 10:
+                period_label = f"{closing.date.year}-Oct"
+            else:
+                period_label = f"{closing.date.year - 1}-Oct"
+
+            CQTransaction.objects.create(
+                organization=org,
+                date=closing.date,
+                store_name=org.name,
+                transaction_type='EXPENSE',
+                person=expense.reason or expense.category,  # ChCh, QT, Manager
+                amount=expense.amount,
+                account_type='CASH',
+                note=expense.notes or f"HR Cash - {expense.reason or expense.category}",
+                period=period_label,
+                created_by=profile,
+            )
+        except Exception:
+            pass  # CQ auto-create is best-effort
+
+    def perform_destroy(self, instance):
+        """삭제 시 연결된 CQ Transaction도 삭제"""
+        try:
+            closing = instance.daily_closing
+            cq = CQTransaction.objects.filter(
+                organization=closing.organization,
+                date=closing.date,
+                transaction_type='EXPENSE',
+                person=instance.reason or instance.category,
+                amount=instance.amount,
+            ).first()
+            if cq:
+                cq.delete()
+        except Exception:
+            pass
+        instance.delete()
 
 
 class SupplierViewSet(viewsets.ModelViewSet):
