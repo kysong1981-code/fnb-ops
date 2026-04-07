@@ -2759,26 +2759,26 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
         months = [{'month': r.month, 'year': r.year, 'sales': float(r.total_sales_inc_gst),
                     'op_profit': float(r.operating_profit), 'hq_cash': float(r.hq_cash)} for r in reports.order_by('year', 'month')]
 
-        # HR Cash: sum of hq_cash from daily closings for the period
-        from closing.models import DailyClosing
+        # Cash from CQ Report — sum of inflow transactions for this store in the period
+        from closing.models import CQTransaction
         from django.db.models import Q as DQ
+        INFLOW_TYPES = ('COLLECTION', 'BALANCE', 'TRANSFER')
+        OUTFLOW_TYPES = ('EXPENSE', 'INCENTIVE', 'PROFIT')
         if period_type == 'H1':
-            hr_closings = DailyClosing.objects.filter(
-                organization=org, date__year=year, date__month__gte=4, date__month__lte=9
+            cq_qs = CQTransaction.objects.filter(
+                store_name=org.name, date__year=year, date__month__gte=4, date__month__lte=9
             )
         else:
-            hr_closings = DailyClosing.objects.filter(organization=org).filter(
+            cq_qs = CQTransaction.objects.filter(store_name=org.name).filter(
                 DQ(date__year=year, date__month__gte=10) | DQ(date__year=year + 1, date__month__lte=3)
             )
-        hr_cash_total = hr_closings.aggregate(
-            total=Coalesce(Sum(F('actual_cash') - F('bank_deposit')), Decimal('0'))
+        cq_inflow = cq_qs.filter(transaction_type__in=INFLOW_TYPES).aggregate(
+            total=Coalesce(Sum('amount'), Decimal('0'))
         )['total']
-        # Only count positive (cash kept, not deposited)
-        hr_cash_positive = hr_closings.annotate(
-            kept=F('actual_cash') - F('bank_deposit')
-        ).filter(kept__gt=0).aggregate(
-            total=Coalesce(Sum('kept'), Decimal('0'))
+        cq_outflow = cq_qs.filter(transaction_type__in=OUTFLOW_TYPES).aggregate(
+            total=Coalesce(Sum('amount'), Decimal('0'))
         )['total']
+        cq_cash_balance = float(cq_inflow - cq_outflow)
 
         # Previous period carry-over balance
         if period_type == 'H1':
@@ -2789,7 +2789,6 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
             organization=org, year=prev_year, period_type=prev_period
         ).first()
         prev_carry_over = float(prev_ps.carry_over_balance) if prev_ps else 0
-        # If no carry_over stored, use initial_cash_balance from org
         if prev_carry_over == 0 and not prev_ps:
             prev_carry_over = float(org.initial_cash_balance or 0)
 
@@ -2806,8 +2805,11 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
             'total_payable_gst': float(total_gst),
             'cogs_ratio': round(float(total_cogs / total_excl_gst * 100), 1) if total_excl_gst else 0,
             'wage_ratio': round(float(total_wages / total_excl_gst * 100), 1) if total_excl_gst else 0,
-            'hr_cash_total': float(hr_cash_positive),
+            'cq_cash_inflow': float(cq_inflow),
+            'cq_cash_outflow': float(cq_outflow),
+            'cq_cash_balance': cq_cash_balance,
+            'hr_cash_total': cq_cash_balance,
             'prev_carry_over': prev_carry_over,
-            'available_cash': prev_carry_over + float(hr_cash_positive),
+            'available_cash': prev_carry_over + cq_cash_balance,
             'months': months,
         })
