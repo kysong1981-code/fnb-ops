@@ -6,7 +6,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('users', '0018_alter_organization_parent'),
-        ('closing', '0018_add_profit_share_to_cqtransaction'),
+        ('closing', '0019_merge_20260401_0637'),
     ]
 
     operations = [
