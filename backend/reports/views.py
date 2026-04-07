@@ -2640,35 +2640,19 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
                             created_by=profile,
                         )
 
-                # 3) Owner remainder — OWNER's bank portion, split Account/Cash
+                # 3) Owner — tracked under 'Owner' person (NOT in QT/ChCh account)
                 if partner.partner_type == 'OWNER':
-                    owner_account = partner.bank_account or Decimal('0')
-                    owner_cash = partner.bank_cash or Decimal('0')
-                    if owner_account != Decimal('0'):
+                    owner_total = (partner.bank_account or Decimal('0')) + (partner.bank_cash or Decimal('0'))
+                    if owner_total != Decimal('0'):
                         CQTransaction.objects.create(
                             organization=instance.organization,
                             date=period_end_date,
                             store_name=store_name,
                             transaction_type='COLLECTION',
-                            person=partner.name,
-                            amount=owner_account,
+                            person='Owner',
+                            amount=owner_total,
                             account_type='ACCOUNT',
-                            note=f"Owner Profit (Account) {instance.year} {instance.get_period_type_display()}",
-                            period=period_label,
-                            profit_share=instance,
-                            created_by=profile,
-                        )
-                    # Cash portion — outflow from QT/ChCh
-                    if owner_cash != Decimal('0'):
-                        CQTransaction.objects.create(
-                            organization=instance.organization,
-                            date=period_end_date,
-                            store_name=store_name,
-                            transaction_type='PROFIT',
-                            person=cash_account,
-                            amount=owner_cash,
-                            account_type='CASH',
-                            note=f"Owner Profit (Cash) {instance.year} {instance.get_period_type_display()}",
+                            note=f"Owner Profit {instance.year} {instance.get_period_type_display()}",
                             period=period_label,
                             profit_share=instance,
                             created_by=profile,
@@ -2686,30 +2670,17 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
                 owner_remainder_account = (instance.net_profit_account or Decimal('0')) - total_partner_account
                 owner_remainder_cash = (instance.net_profit_cash or Decimal('0')) - total_partner_cash
 
-                if owner_remainder_account != Decimal('0'):
+                owner_remainder_total = owner_remainder_account + owner_remainder_cash
+                if owner_remainder_total != Decimal('0'):
                     CQTransaction.objects.create(
                         organization=instance.organization,
                         date=period_end_date,
                         store_name=store_name,
                         transaction_type='COLLECTION',
                         person='Owner',
-                        amount=owner_remainder_account,
+                        amount=owner_remainder_total,
                         account_type='ACCOUNT',
-                        note=f"Owner Profit (Account) {instance.year} {instance.get_period_type_display()}",
-                        period=period_label,
-                        profit_share=instance,
-                        created_by=profile,
-                    )
-                if owner_remainder_cash != Decimal('0'):
-                    CQTransaction.objects.create(
-                        organization=instance.organization,
-                        date=period_end_date,
-                        store_name=store_name,
-                        transaction_type='PROFIT',
-                        person=cash_account,
-                        amount=owner_remainder_cash,
-                        account_type='CASH',
-                        note=f"Owner Profit (Cash) {instance.year} {instance.get_period_type_display()}",
+                        note=f"Owner Profit {instance.year} {instance.get_period_type_display()}",
                         period=period_label,
                         profit_share=instance,
                         created_by=profile,
