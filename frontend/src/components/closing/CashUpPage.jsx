@@ -558,12 +558,109 @@ export default function CashUpPage() {
       ) : (
         /* ============ HR CASH TAB ============ */
         <>
-          {/* Current Balance */}
+          {/* Balance Summary */}
           <Card className="p-5">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-500">Current Balance</span>
-              <span className={`text-xl font-bold ${hrNetBalance >= 0 ? 'text-gray-900' : 'text-red-600'}`}>{fmt(hrNetBalance)}</span>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <span className="text-xs text-gray-500 block">Total HR Cash</span>
+                <span className="text-lg font-bold text-gray-900">{fmt(hrCashBalance)}</span>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 block">Expenses</span>
+                <span className="text-lg font-bold text-red-600">{fmt(hrTotalExpenses)}</span>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 block">Balance</span>
+                <span className={`text-lg font-bold ${hrNetBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>{fmt(hrNetBalance)}</span>
+              </div>
             </div>
+          </Card>
+
+          {/* HR Cash Distribution (who received cash) */}
+          <Card className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <SectionLabel>Cash Distribution</SectionLabel>
+              <button onClick={() => setShowHrForm(!showHrForm)}
+                className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                + Add
+              </button>
+            </div>
+
+            {showHrForm && (
+              <form onSubmit={handleAddHrCash} className="mb-4 p-3 bg-blue-50 rounded-xl space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Recipient</label>
+                    <input
+                      value={hrForm.recipient_name}
+                      onChange={(e) => setHrForm(p => ({ ...p, recipient_name: e.target.value }))}
+                      placeholder="Name"
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Amount</label>
+                    <input
+                      type="number" step="0.01"
+                      value={hrForm.amount}
+                      onChange={(e) => setHrForm(p => ({ ...p, amount: e.target.value }))}
+                      placeholder="0.00"
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Notes</label>
+                  <input
+                    value={hrForm.notes}
+                    onChange={(e) => setHrForm(p => ({ ...p, notes: e.target.value }))}
+                    placeholder="Optional notes"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-2 px-3 py-2.5 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-blue-300 transition">
+                    <CameraIcon size={18} className="text-gray-400" />
+                    <span className="text-sm text-gray-500">
+                      {hrForm.photo ? hrForm.photo.name : 'Attach receipt photo'}
+                    </span>
+                    <input type="file" accept=".jpg,.jpeg,.png,.pdf"
+                      onChange={(e) => setHrForm(p => ({ ...p, photo: e.target.files[0] }))}
+                      className="hidden" />
+                  </label>
+                </div>
+                <button type="submit" disabled={saving || !hrForm.amount}
+                  className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition">
+                  {saving ? 'Saving...' : 'Add Distribution'}
+                </button>
+              </form>
+            )}
+
+            {/* Distribution List */}
+            {hrCashEntries.length > 0 ? (
+              <div className="space-y-2">
+                {hrCashEntries.map(entry => (
+                  <div key={entry.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-800">{entry.recipient_name || 'Unknown'}</span>
+                        <span className="text-xs text-gray-400">{entry.date || entry.created_at?.split('T')[0]}</span>
+                      </div>
+                      {entry.notes && <p className="text-xs text-gray-500 mt-0.5">{entry.notes}</p>}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-bold text-gray-900">{fmt(entry.amount)}</span>
+                      <button onClick={() => handleDeleteHrCash(entry.id)}
+                        className="p-1 text-gray-400 hover:text-red-500 transition">
+                        <TrashIcon size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 text-center py-4">No distributions recorded</p>
+            )}
           </Card>
 
           {/* Expense */}
@@ -609,7 +706,7 @@ export default function CashUpPage() {
                 <label className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition">
                   <CameraIcon size={18} className="text-gray-400" />
                   <span className="text-sm text-gray-500">
-                    {expForm.attachment ? expForm.attachment.name : 'Tap to attach photo'}
+                    {expForm.attachment ? expForm.attachment.name : 'Attach receipt photo'}
                   </span>
                   <input
                     type="file"
@@ -622,15 +719,23 @@ export default function CashUpPage() {
             </form>
           </Card>
 
-          {/* Net Balance */}
-          <Card className="p-5">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-semibold text-gray-700">Net Balance</span>
-              <span className={`text-xl font-bold ${hrNetBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {fmt(hrNetBalance)}
-              </span>
-            </div>
-          </Card>
+          {/* Expense List */}
+          {expenses.length > 0 && (
+            <Card className="p-5">
+              <SectionLabel>Expense History</SectionLabel>
+              <div className="space-y-2">
+                {expenses.map(exp => (
+                  <div key={exp.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                    <div>
+                      <span className="text-sm font-medium text-gray-800">{exp.reason || exp.category}</span>
+                      {exp.notes && <p className="text-xs text-gray-500 mt-0.5">{exp.notes}</p>}
+                    </div>
+                    <span className="text-sm font-bold text-red-600">-{fmt(exp.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* Save & Approve */}
           <button
