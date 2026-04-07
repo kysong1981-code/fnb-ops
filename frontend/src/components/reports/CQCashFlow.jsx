@@ -22,12 +22,15 @@ const ACCOUNT_TYPES = [
 
 const VIEWS = [
   { key: 'summary', label: 'Summary' },
+  { key: 'accounts', label: 'Accounts' },
   { key: 'history', label: 'History' },
   { key: 'stores', label: 'By Store' },
   { key: 'persons', label: 'By Person' },
   { key: 'all', label: 'All Transactions' },
   { key: 'import', label: 'CSV Import' },
 ]
+
+const ACCOUNTS = ['QT', 'ChCh']
 
 const CHART_COLORS = {
   collection: '#10b981',  // green
@@ -104,6 +107,10 @@ export default function CQCashFlow() {
     person: '', amount: '', account_type: 'CASH', note: '',
   })
 
+  // Accounts
+  const [selectedAccount, setSelectedAccount] = useState('QT')
+  const [accountData, setAccountData] = useState(null)
+
   // Store lock status
   const [storeLockStatus, setStoreLockStatus] = useState({ is_locked: false, locked_by_name: '' })
   // Opening balance form
@@ -171,6 +178,20 @@ export default function CQCashFlow() {
       setError('Failed to load store ledger')
     }
   }
+
+  const loadAccountStatement = async () => {
+    if (!selectedAccount) return
+    try {
+      const res = await cqTransactionAPI.accountStatement({ account: selectedAccount })
+      setAccountData(res.data)
+    } catch (e) {
+      setError('Failed to load account statement')
+    }
+  }
+
+  useEffect(() => {
+    if (view === 'accounts' && selectedAccount) loadAccountStatement()
+  }, [view, selectedAccount])
 
   const handleToggleLock = async () => {
     try {
@@ -668,6 +689,134 @@ export default function CQCashFlow() {
                 })
               })()}
             </>
+          )}
+        </div>
+      )}
+
+      {/* ===== ACCOUNTS VIEW ===== */}
+      {view === 'accounts' && (
+        <div className="space-y-4">
+          {/* Account selector */}
+          <div className="flex gap-2">
+            {ACCOUNTS.map(acc => (
+              <button key={acc} onClick={() => setSelectedAccount(acc)}
+                className={`flex-1 py-3 rounded-xl text-sm font-semibold transition ${
+                  selectedAccount === acc
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}>
+                {acc}
+              </button>
+            ))}
+          </div>
+
+          {accountData && (
+            <>
+              {/* Total Balance */}
+              <Card>
+                <div className="p-5 text-center">
+                  <div className="text-xs text-gray-500 mb-1">{selectedAccount} Total Balance</div>
+                  <div className={`text-3xl font-bold ${accountData.total_balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {fmt(accountData.total_balance)}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">{accountData.transaction_count} transactions</div>
+                </div>
+              </Card>
+
+              {/* Per-store breakdown */}
+              {accountData.store_summary?.length > 0 && (
+                <Card>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-gray-800 mb-3">By Store</h3>
+                    <div className="space-y-2">
+                      {accountData.store_summary.map(s => (
+                        <div key={s.store_name} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                          <span className="text-sm font-medium text-gray-700">{s.store_name}</span>
+                          <span className="text-sm font-bold text-green-600">{fmt(s.total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Monthly summary */}
+              {accountData.monthly_summary?.length > 0 && (
+                <Card>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-gray-800 mb-3">Monthly Summary</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-gray-500 border-b">
+                            <th className="pb-2 pr-3">Month</th>
+                            {accountData.store_summary?.map(s => (
+                              <th key={s.store_name} className="pb-2 pr-3 text-right">{s.store_name}</th>
+                            ))}
+                            <th className="pb-2 text-right font-semibold">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {accountData.monthly_summary.map(m => {
+                            const storeMap = Object.fromEntries(m.stores.map(s => [s.store_name, s.amount]))
+                            return (
+                              <tr key={m.month} className="border-b border-gray-50">
+                                <td className="py-2 pr-3 text-gray-600">
+                                  {new Date(m.month + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
+                                </td>
+                                {accountData.store_summary?.map(s => (
+                                  <td key={s.store_name} className="py-2 pr-3 text-right text-gray-700">
+                                    {storeMap[s.store_name] ? fmt(storeMap[s.store_name]) : '-'}
+                                  </td>
+                                ))}
+                                <td className="py-2 text-right font-semibold text-gray-900">{fmt(m.total)}</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Ledger (statement) */}
+              <Card>
+                <div className="p-4">
+                  <h3 className="font-semibold text-gray-800 mb-3">Statement</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-gray-500 border-b">
+                          <th className="pb-2 pr-3">Date</th>
+                          <th className="pb-2 pr-3">Store</th>
+                          <th className="pb-2 pr-3">Note</th>
+                          <th className="pb-2 pr-3 text-right">Amount</th>
+                          <th className="pb-2 text-right">Balance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {accountData.ledger?.map(item => (
+                          <tr key={item.id} className="border-b border-gray-50">
+                            <td className="py-2 pr-3 text-gray-600">{item.date}</td>
+                            <td className="py-2 pr-3 text-gray-800">{item.store_name}</td>
+                            <td className="py-2 pr-3 text-gray-500 text-xs">{item.note}</td>
+                            <td className={`py-2 pr-3 text-right font-medium ${item.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {item.amount >= 0 ? '+' : ''}{fmt(item.amount)}
+                            </td>
+                            <td className="py-2 text-right font-medium text-gray-800">{fmt(item.balance)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Card>
+            </>
+          )}
+
+          {!accountData && (
+            <div className="text-center py-12 text-gray-400">Loading...</div>
           )}
         </div>
       )}

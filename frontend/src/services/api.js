@@ -667,6 +667,7 @@ export const cqTransactionAPI = {
   history: () => api.get('/closing/cq-transactions/history/'),
   toggleLock: (data) => api.post('/closing/cq-transactions/toggle-lock/', data),
   lockStatus: (params) => api.get('/closing/cq-transactions/lock-status/', { params }),
+  accountStatement: (params) => api.get('/closing/cq-transactions/account-statement/', { params }),
 }
 
 // Sales Analysis API (역할별 매출 분석)

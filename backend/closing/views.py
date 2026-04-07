@@ -517,11 +517,11 @@ class ClosingCashExpenseViewSet(mixins.CreateModelMixin,
                 organization=org,
                 date=closing.date,
                 store_name=org.name,
-                transaction_type='EXPENSE',
+                transaction_type='COLLECTION',
                 person=expense.reason or expense.category,  # ChCh, QT, Manager
                 amount=expense.amount,
                 account_type='CASH',
-                note=expense.notes or f"HR Cash - {expense.reason or expense.category}",
+                note=expense.notes or f"HR Cash from {org.name}",
                 period=period_label,
                 created_by=profile,
             )
@@ -535,7 +535,7 @@ class ClosingCashExpenseViewSet(mixins.CreateModelMixin,
             cq = CQTransaction.objects.filter(
                 organization=closing.organization,
                 date=closing.date,
-                transaction_type='EXPENSE',
+                transaction_type='COLLECTION',
                 person=instance.reason or instance.category,
                 amount=instance.amount,
             ).first()
@@ -1567,6 +1567,79 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                 'locked_by_name': locked_by_name,
             })
         return Response({'is_locked': False})
+
+    @action(detail=False, methods=['get'], url_path='account-statement')
+    def account_statement(self, request):
+        """Account statement for QT/ChCh - shows all incoming money by store and month."""
+        account = request.query_params.get('account')  # QT, ChCh, Manager
+        if not account:
+            return Response({'error': 'account parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        qs = self.get_queryset().filter(person__iexact=account).order_by('date', 'created_at')
+
+        # Running balance ledger
+        ledger = []
+        balance = Decimal('0')
+        for tx in qs:
+            if tx.transaction_type in ('COLLECTION', 'BALANCE'):
+                balance += tx.amount
+                ledger.append({
+                    'id': tx.id, 'date': str(tx.date),
+                    'store_name': tx.store_name,
+                    'amount': float(tx.amount),
+                    'note': tx.note,
+                    'transaction_type': tx.transaction_type,
+                    'period': tx.period,
+                    'is_locked': tx.is_locked,
+                    'balance': float(balance),
+                })
+            else:
+                balance -= tx.amount
+                ledger.append({
+                    'id': tx.id, 'date': str(tx.date),
+                    'store_name': tx.store_name,
+                    'amount': -float(tx.amount),
+                    'note': tx.note,
+                    'transaction_type': tx.transaction_type,
+                    'period': tx.period,
+                    'is_locked': tx.is_locked,
+                    'balance': float(balance),
+                })
+
+        # Monthly summary
+        from collections import defaultdict
+        monthly = defaultdict(lambda: {'total': Decimal('0'), 'stores': defaultdict(Decimal)})
+        for tx in qs:
+            month_key = tx.date.strftime('%Y-%m')
+            amt = tx.amount if tx.transaction_type in ('COLLECTION', 'BALANCE') else -tx.amount
+            monthly[month_key]['total'] += amt
+            monthly[month_key]['stores'][tx.store_name] += amt
+
+        monthly_summary = []
+        for month_key in sorted(monthly.keys()):
+            data = monthly[month_key]
+            stores = [{'store_name': s, 'amount': float(a)} for s, a in sorted(data['stores'].items())]
+            monthly_summary.append({
+                'month': month_key,
+                'total': float(data['total']),
+                'stores': stores,
+            })
+
+        # Per-store summary
+        store_totals = defaultdict(Decimal)
+        for tx in qs:
+            amt = tx.amount if tx.transaction_type in ('COLLECTION', 'BALANCE') else -tx.amount
+            store_totals[tx.store_name] += amt
+        store_summary = [{'store_name': s, 'total': float(t)} for s, t in sorted(store_totals.items(), key=lambda x: -x[1])]
+
+        return Response({
+            'account': account,
+            'total_balance': float(balance),
+            'transaction_count': len(ledger),
+            'ledger': ledger,
+            'monthly_summary': monthly_summary,
+            'store_summary': store_summary,
+        })
 
     @action(detail=False, methods=['get'], url_path='stores-list')
     def stores_list(self, request):
