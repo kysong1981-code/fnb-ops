@@ -73,16 +73,28 @@ export default function ProfitShare() {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [pullingScore, setPullingScore] = useState(false)
   const [scoreData, setScoreData] = useState(null)
+  const [skyData, setSkyData] = useState(null)
 
   const isCEO = user?.role === 'CEO' || user?.role === 'HQ'
 
   useEffect(() => {
     loadProfitShare()
+    loadSkyData()
   }, [selectedStore?.id, year, periodType])
 
   useEffect(() => {
     loadHistory()
   }, [selectedStore?.id])
+
+  const loadSkyData = async () => {
+    if (!selectedStore?.id) return
+    try {
+      const res = await profitShareAPI.pullSkyData(year, periodType, selectedStore.id)
+      setSkyData(res.data)
+    } catch {
+      setSkyData(null)
+    }
+  }
 
   const loadHistory = async () => {
     if (!selectedStore?.id) return
@@ -495,6 +507,50 @@ export default function ProfitShare() {
               </table>
             </div>
           </CardBody>
+        </Card>
+      )}
+
+      {/* Sky Report Reference */}
+      {skyData && (
+        <Card className="mb-6">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-gray-500">📊 Sky Report — {skyData.period}</h2>
+              <span className="text-xs text-gray-400">{skyData.report_count} months</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                <div className="text-[10px] text-gray-500 uppercase tracking-wide">Sales (inc GST)</div>
+                <div className="text-base font-bold text-blue-700">{fmt(skyData.total_sales_inc_gst)}</div>
+              </div>
+              <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+                <div className="text-[10px] text-gray-500 uppercase tracking-wide">Operating Profit</div>
+                <div className="text-base font-bold text-emerald-700">{fmt(skyData.total_operating_profit)}</div>
+              </div>
+              <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                <div className="text-[10px] text-gray-500 uppercase tracking-wide">HQ Cash</div>
+                <div className="text-base font-bold text-amber-700">{fmt(skyData.total_hq_cash)}</div>
+              </div>
+              <div className="bg-red-50 rounded-xl p-3 border border-red-100">
+                <div className="text-[10px] text-gray-500 uppercase tracking-wide">Payable GST</div>
+                <div className="text-base font-bold text-red-600">{fmt(skyData.total_payable_gst)}</div>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-3">
+              <div className="text-center p-2 bg-gray-50 rounded-lg">
+                <div className="text-[10px] text-gray-400">COGS</div>
+                <div className="text-sm font-semibold text-gray-700">{fmt(skyData.total_cogs)} <span className="text-xs text-gray-400">({skyData.cogs_ratio}%)</span></div>
+              </div>
+              <div className="text-center p-2 bg-gray-50 rounded-lg">
+                <div className="text-[10px] text-gray-400">Wages</div>
+                <div className="text-sm font-semibold text-gray-700">{fmt(skyData.total_wages)} <span className="text-xs text-gray-400">({skyData.wage_ratio}%)</span></div>
+              </div>
+              <div className="text-center p-2 bg-gray-50 rounded-lg">
+                <div className="text-[10px] text-gray-400">Op Expenses</div>
+                <div className="text-sm font-semibold text-gray-700">{fmt(skyData.total_operating_expenses)}</div>
+              </div>
+            </div>
+          </div>
         </Card>
       )}
 

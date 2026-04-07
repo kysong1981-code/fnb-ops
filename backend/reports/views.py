@@ -2726,3 +2726,57 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
             'hygiene_score': evaluation.hygiene_score,
             'leadership_score_points': evaluation.leadership_score_points,
         })
+
+    @action(detail=False, methods=['get'], url_path='pull-sky-data')
+    def pull_sky_data(self, request):
+        """Pull Sky Report totals for H1/H2 period to show in ProfitShare."""
+        from users.filters import get_target_org
+        org = get_target_org(request)
+        year = request.query_params.get('year')
+        period_type = request.query_params.get('period_type')
+
+        if not year or not period_type:
+            return Response({'error': 'year and period_type required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        year = int(year)
+        # H1 = Apr-Sep (months 4-9), H2 = Oct-Mar (Oct-Dec of year, Jan-Mar of year+1)
+        if period_type == 'H1':
+            reports = SkyReport.objects.filter(organization=org, year=year, month__gte=4, month__lte=9)
+        else:
+            # H2: Oct-Dec of year + Jan-Mar of year+1
+            from django.db.models import Q
+            reports = SkyReport.objects.filter(organization=org).filter(
+                Q(year=year, month__gte=10) | Q(year=year + 1, month__lte=3)
+            )
+
+        if not reports.exists():
+            return Response({'error': 'No Sky Reports found for this period.'}, status=status.HTTP_404_NOT_FOUND)
+
+        d = Decimal
+        total_sales = sum(r.total_sales_inc_gst for r in reports)
+        total_excl_gst = sum(r.excl_gst_sales for r in reports)
+        total_cogs = sum(r.cogs for r in reports)
+        total_wages = sum(r.wages for r in reports)
+        total_op_exp = sum(r.operating_expenses for r in reports)
+        total_op_profit = sum(r.operating_profit for r in reports)
+        total_hq_cash = sum(r.hq_cash for r in reports)
+        total_gst = sum(r.payable_gst for r in reports)
+
+        months = [{'month': r.month, 'year': r.year, 'sales': float(r.total_sales_inc_gst),
+                    'op_profit': float(r.operating_profit), 'hq_cash': float(r.hq_cash)} for r in reports.order_by('year', 'month')]
+
+        return Response({
+            'period': f"{year} {'H1 (Apr-Sep)' if period_type == 'H1' else 'H2 (Oct-Mar)'}",
+            'report_count': reports.count(),
+            'total_sales_inc_gst': float(total_sales),
+            'total_excl_gst': float(total_excl_gst),
+            'total_cogs': float(total_cogs),
+            'total_wages': float(total_wages),
+            'total_operating_expenses': float(total_op_exp),
+            'total_operating_profit': float(total_op_profit),
+            'total_hq_cash': float(total_hq_cash),
+            'total_payable_gst': float(total_gst),
+            'cogs_ratio': round(float(total_cogs / total_excl_gst * 100), 1) if total_excl_gst else 0,
+            'wage_ratio': round(float(total_wages / total_excl_gst * 100), 1) if total_excl_gst else 0,
+            'months': months,
+        })

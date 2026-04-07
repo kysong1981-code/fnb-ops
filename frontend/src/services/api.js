@@ -723,6 +723,7 @@ export const profitShareAPI = {
   autoCalculate: (id) => api.post(`/reports/profit-shares/${id}/auto_calculate/`),
   history: (storeId) => api.get('/reports/profit-shares/history/', { params: { store_id: storeId } }),
   pullScore: (year, periodType, storeId) => api.get('/reports/profit-shares/pull-score/', { params: { year, period_type: periodType, store_id: storeId } }),
+  pullSkyData: (year, periodType, storeId) => api.get('/reports/profit-shares/pull-sky-data/', { params: { year, period_type: periodType, store_id: storeId } }),
 }
 
 export const skyReportAPI = {
