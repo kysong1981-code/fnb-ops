@@ -2759,11 +2759,9 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
         months = [{'month': r.month, 'year': r.year, 'sales': float(r.total_sales_inc_gst),
                     'op_profit': float(r.operating_profit), 'hq_cash': float(r.hq_cash)} for r in reports.order_by('year', 'month')]
 
-        # Cash from CQ Report — sum of inflow transactions for this store in the period
+        # Cash from CQ Report — breakdown by type for this store in the period
         from closing.models import CQTransaction
         from django.db.models import Q as DQ
-        INFLOW_TYPES = ('COLLECTION', 'BALANCE', 'TRANSFER')
-        OUTFLOW_TYPES = ('EXPENSE', 'INCENTIVE', 'PROFIT')
         if period_type == 'H1':
             cq_qs = CQTransaction.objects.filter(
                 store_name=org.name, date__year=year, date__month__gte=4, date__month__lte=9
@@ -2772,25 +2770,20 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
             cq_qs = CQTransaction.objects.filter(store_name=org.name).filter(
                 DQ(date__year=year, date__month__gte=10) | DQ(date__year=year + 1, date__month__lte=3)
             )
-        cq_inflow = cq_qs.filter(transaction_type__in=INFLOW_TYPES).aggregate(
+        # Cash received from store (HR Cash sent to QT/ChCh)
+        cash_collected = float(cq_qs.filter(transaction_type='TRANSFER').aggregate(
             total=Coalesce(Sum('amount'), Decimal('0'))
-        )['total']
-        cq_outflow = cq_qs.filter(transaction_type__in=OUTFLOW_TYPES).aggregate(
+        )['total'])
+        # Manager incentive already paid (cash portion)
+        cash_incentive = float(cq_qs.filter(transaction_type='INCENTIVE').aggregate(
             total=Coalesce(Sum('amount'), Decimal('0'))
-        )['total']
-        cq_cash_balance = float(cq_inflow - cq_outflow)
-
-        # Previous period carry-over balance
-        if period_type == 'H1':
-            prev_year, prev_period = year - 1, 'H2'
-        else:
-            prev_year, prev_period = year, 'H1'
-        prev_ps = ProfitShare.objects.filter(
-            organization=org, year=prev_year, period_type=prev_period
-        ).first()
-        prev_carry_over = float(prev_ps.carry_over_balance) if prev_ps else 0
-        if prev_carry_over == 0 and not prev_ps:
-            prev_carry_over = float(org.initial_cash_balance or 0)
+        )['total'])
+        # Other distributions already paid
+        cash_distributed = float(cq_qs.filter(transaction_type__in=('PROFIT', 'EXPENSE')).aggregate(
+            total=Coalesce(Sum('amount'), Decimal('0'))
+        )['total'])
+        # Net cash profit = collected - incentive - other distributions
+        cash_net = cash_collected - cash_incentive - cash_distributed
 
         return Response({
             'period': f"{year} {'H1 (Apr-Sep)' if period_type == 'H1' else 'H2 (Oct-Mar)'}",
@@ -2805,11 +2798,9 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
             'total_payable_gst': float(total_gst),
             'cogs_ratio': round(float(total_cogs / total_excl_gst * 100), 1) if total_excl_gst else 0,
             'wage_ratio': round(float(total_wages / total_excl_gst * 100), 1) if total_excl_gst else 0,
-            'cq_cash_inflow': float(cq_inflow),
-            'cq_cash_outflow': float(cq_outflow),
-            'cq_cash_balance': cq_cash_balance,
-            'hr_cash_total': cq_cash_balance,
-            'prev_carry_over': prev_carry_over,
-            'available_cash': prev_carry_over + cq_cash_balance,
+            'cash_collected': cash_collected,
+            'cash_incentive': cash_incentive,
+            'cash_distributed': cash_distributed,
+            'cash_net': cash_net,
             'months': months,
         })

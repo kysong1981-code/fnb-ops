@@ -92,11 +92,11 @@ export default function ProfitShare() {
       const res = await profitShareAPI.pullSkyData(year, periodType, selectedStore.id)
       const data = res.data
       setSkyData(data)
-      // Auto-fill cash into summary if not yet set
-      if (data && data.available_cash > 0) {
+      // Auto-fill net_profit_cash from CQ (collected - incentive - distributed)
+      if (data && data.cash_net > 0) {
         setSummary(prev => ({
           ...prev,
-          net_profit_cash: prev.net_profit_cash || data.available_cash,
+          net_profit_cash: prev.net_profit_cash || data.cash_net,
         }))
       }
     } catch {
@@ -559,25 +559,25 @@ export default function ProfitShare() {
               </div>
             </div>
             {/* CQ Cash Summary */}
-            {(skyData.cq_cash_balance > 0 || skyData.prev_carry_over > 0) && (
+            {(skyData.cash_collected > 0) && (
               <div className="mt-3 pt-3 border-t border-gray-200">
                 <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-2">Cash (from CQ Report)</div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-2 bg-violet-50 rounded-lg border border-violet-100">
-                    <div className="text-[10px] text-gray-400">Prev Balance</div>
-                    <div className="text-sm font-bold text-violet-700">{fmt(skyData.prev_carry_over)}</div>
-                  </div>
                   <div className="p-2 bg-green-50 rounded-lg border border-green-100">
-                    <div className="text-[10px] text-gray-400">CQ Inflow</div>
-                    <div className="text-sm font-bold text-green-700">{fmt(skyData.cq_cash_inflow)}</div>
+                    <div className="text-[10px] text-gray-400">HR Cash 수금</div>
+                    <div className="text-sm font-bold text-green-700">{fmt(skyData.cash_collected)}</div>
+                  </div>
+                  <div className="p-2 bg-orange-50 rounded-lg border border-orange-100">
+                    <div className="text-[10px] text-gray-400">매니저 인센티브</div>
+                    <div className="text-sm font-bold text-orange-600">{fmt(skyData.cash_incentive)}</div>
                   </div>
                   <div className="p-2 bg-red-50 rounded-lg border border-red-100">
-                    <div className="text-[10px] text-gray-400">CQ Outflow</div>
-                    <div className="text-sm font-bold text-red-600">{fmt(skyData.cq_cash_outflow)}</div>
+                    <div className="text-[10px] text-gray-400">기타 지출</div>
+                    <div className="text-sm font-bold text-red-600">{fmt(skyData.cash_distributed)}</div>
                   </div>
                   <div className="p-2 bg-blue-50 rounded-lg border border-blue-100">
-                    <div className="text-[10px] text-gray-400">Available</div>
-                    <div className="text-sm font-bold text-blue-700">{fmt(skyData.available_cash)}</div>
+                    <div className="text-[10px] text-gray-400">오너 Cash</div>
+                    <div className="text-sm font-bold text-blue-700">{fmt(skyData.cash_net)}</div>
                   </div>
                 </div>
               </div>
