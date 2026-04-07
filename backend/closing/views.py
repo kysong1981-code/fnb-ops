@@ -1388,6 +1388,9 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                     'balance': float(balance),
                 })
 
+        # Reverse ledger so most recent appears first
+        ledger.reverse()
+
         return Response({
             'person': person,
             'ledger': ledger,
@@ -1439,6 +1442,9 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                     'is_locked': tx.is_locked,
                     'balance': float(balance),
                 })
+
+        # Reverse ledger so most recent appears first
+        ledger.reverse()
 
         return Response({
             'store_name': store,
@@ -1584,7 +1590,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
 
         qs = self.get_queryset().filter(person__iexact=account).order_by('date', 'created_at')
 
-        # Running balance ledger
+        # Running balance ledger (calculated in chronological order)
         # For account statement: COLLECTION, BALANCE, TRANSFER are all inflows
         INFLOW_TYPES = ('COLLECTION', 'BALANCE', 'TRANSFER')
         ledger = []
@@ -1614,6 +1620,9 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                     'is_locked': tx.is_locked,
                     'balance': float(balance),
                 })
+
+        # Reverse ledger so most recent appears first
+        ledger.reverse()
 
         # Monthly summary
         from collections import defaultdict

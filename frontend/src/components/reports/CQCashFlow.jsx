@@ -726,8 +726,8 @@ export default function CQCashFlow() {
                 </div>
               </Card>
 
-              {/* Per-store breakdown */}
-              {accountData.store_summary?.length > 0 && (
+              {/* Per-store breakdown (hide for KRW) */}
+              {selectedAccount !== 'KRW' && accountData.store_summary?.length > 0 && (
                 <Card>
                   <div className="p-4">
                     <h3 className="font-semibold text-gray-800 mb-3">By Store</h3>
@@ -743,8 +743,8 @@ export default function CQCashFlow() {
                 </Card>
               )}
 
-              {/* Monthly summary */}
-              {accountData.monthly_summary?.length > 0 && (
+              {/* Monthly summary (hide for KRW) */}
+              {selectedAccount !== 'KRW' && accountData.monthly_summary?.length > 0 && (
                 <Card>
                   <div className="p-4">
                     <h3 className="font-semibold text-gray-800 mb-3">Monthly Summary</h3>
