@@ -365,7 +365,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             closings = DailyClosing.objects.filter(
                 organization=org,
                 closing_date__range=[start, end]
-            ).prefetch_related('hr_cash_entries', 'cash_expenses').order_by('closing_date')
+            ).prefetch_related('hr_cash_entries').order_by('closing_date')
 
             # 클로징을 날짜별 딕셔너리로
             closing_map = {c.closing_date: c for c in closings}
@@ -430,21 +430,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                             'photo': None,
                         })
 
-                # Cash Expense 항목
-                expense_entries = []
-                expenses_total = Decimal('0')
-                for expense in closing.cash_expenses.all():
-                    expenses_total += expense.amount
-                    expense_entries.append({
-                        'id': expense.id,
-                        'category': expense.category,
-                        'category_display': expense.get_category_display(),
-                        'reason': expense.reason,
-                        'amount': float(expense.amount),
-                        'attachment': request.build_absolute_uri(expense.attachment.url) if expense.attachment else None,
-                    })
-
-                balance = closing.actual_cash - closing.bank_deposit - hr_total - expenses_total
+                balance = closing.actual_cash - closing.bank_deposit - hr_total
 
                 day_data = {
                     'date': str(current),
@@ -452,8 +438,8 @@ class ReportViewSet(viewsets.ModelViewSet):
                     'bank_deposit': float(closing.bank_deposit),
                     'hr_cash_total': float(hr_total),
                     'hr_cash_entries': hr_entries,
-                    'cash_expenses_total': float(expenses_total),
-                    'cash_expenses': expense_entries,
+                    'cash_expenses_total': 0,
+                    'cash_expenses': [],
                     'balance': float(balance),
                     'has_data': True,
                     'status': closing.status,
@@ -463,7 +449,6 @@ class ReportViewSet(viewsets.ModelViewSet):
                 totals['cash_sales'] += closing.actual_cash
                 totals['bank_deposit'] += closing.bank_deposit
                 totals['hr_cash_total'] += hr_total
-                totals['cash_expenses_total'] += expenses_total
                 totals['balance'] += balance
 
                 current += timedelta(days=1)
@@ -478,7 +463,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             prev_closings = DailyClosing.objects.filter(
                 organization=org,
                 closing_date__lt=start,
-            ).prefetch_related('hr_cash_entries', 'cash_expenses')
+            ).prefetch_related('hr_cash_entries')
 
             for pc in prev_closings:
                 pc_hr = sum(e.amount for e in pc.hr_cash_entries.all())
@@ -486,8 +471,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                     implicit = pc.actual_cash - pc.bank_deposit
                     if implicit > 0:
                         pc_hr = implicit
-                pc_exp = sum(e.amount for e in pc.cash_expenses.all())
-                previous_hr_balance += pc_hr - pc_exp
+                previous_hr_balance += pc_hr
 
             return Response({
                 'period': {
@@ -544,7 +528,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             closings = DailyClosing.objects.filter(
                 organization=org,
                 closing_date__range=[start, end]
-            ).prefetch_related('hr_cash_entries', 'cash_expenses').order_by('closing_date')
+            ).prefetch_related('hr_cash_entries').order_by('closing_date')
 
             # 집계용
             hr_cash_total = Decimal('0')
@@ -588,34 +572,15 @@ class ReportViewSet(viewsets.ModelViewSet):
                             'photo': None,
                         })
 
-                exp_total_day = Decimal('0')
-                expense_entries = []
-                for expense in closing.cash_expenses.all():
-                    exp_total_day += expense.amount
-                    entry_count += 1
-                    cat = expense.category
-                    category_agg[cat]['total_amount'] += expense.amount
-                    category_agg[cat]['count'] += 1
-                    category_agg[cat]['category_display'] = expense.get_category_display()
-                    expense_entries.append({
-                        'id': expense.id,
-                        'category': expense.category,
-                        'category_display': expense.get_category_display(),
-                        'reason': expense.reason,
-                        'amount': float(expense.amount),
-                        'attachment': request.build_absolute_uri(expense.attachment.url) if expense.attachment else None,
-                    })
-
-                if hr_entries or expense_entries:
+                if hr_entries:
                     days_with_data += 1
                     hr_cash_total += hr_total_day
-                    expenses_total += exp_total_day
                     daily_reports.append({
                         'date': str(closing.closing_date),
                         'hr_cash_total': float(hr_total_day),
                         'hr_cash_entries': hr_entries,
-                        'cash_expenses_total': float(exp_total_day),
-                        'cash_expenses': expense_entries,
+                        'cash_expenses_total': 0,
+                        'cash_expenses': [],
                     })
 
             grand_total = hr_cash_total + expenses_total
