@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react'
+import { useState, useEffect } from 'react'
 import { cqTransactionAPI } from '../../services/api'
 import Card from '../ui/Card'
 import { PlusIcon, TrashIcon } from '../icons'
@@ -22,7 +22,7 @@ const ACCOUNT_TYPES = [
 
 const VIEWS = [
   { key: 'summary', label: 'Summary' },
-  { key: 'store_overview', label: 'Store Overview' },
+  { key: 'quarter', label: 'Quarter Report' },
   { key: 'accounts', label: 'Accounts' },
   { key: 'stores', label: 'By Store' },
   { key: 'persons', label: 'By Person' },
@@ -123,9 +123,15 @@ export default function CQCashFlow() {
   const showMsg = (msg) => { setSuccess(msg); setTimeout(() => setSuccess(''), 3000) }
   const inputCls = 'px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 
+  // Load history on mount (for Summary - all time)
+  useEffect(() => {
+    loadHistoryData()
+  }, [])
+
+  // Load period data when period changes (for Quarter Report, Accounts, etc.)
   useEffect(() => {
     if (period === 'CUSTOM' && (!customStart || !customEnd)) return
-    loadData()
+    loadPeriodData()
   }, [year, period, customStart, customEnd])
 
   useEffect(() => {
@@ -133,27 +139,37 @@ export default function CQCashFlow() {
     if (view === 'persons' && selectedPerson) loadPersonalLedger()
   }, [selectedStore, selectedPerson, year, period, customStart, customEnd])
 
-  const loadData = async () => {
+  const loadHistoryData = async () => {
+    try {
+      const [histRes, storesRes, personsRes] = await Promise.all([
+        cqTransactionAPI.history(),
+        cqTransactionAPI.storesList(),
+        cqTransactionAPI.personsList(),
+      ])
+      setHistoryData(histRes.data || [])
+      setStoresList(storesRes.data.stores || [])
+      setPersonsList(personsRes.data.persons || [])
+    } catch (e) {
+      setError('Failed to load data')
+    }
+  }
+
+  const loadPeriodData = async () => {
     setLoading(true)
     setError('')
     try {
       const params = { date_start: dateRange.start, date_end: dateRange.end }
-      const [sumRes, storesRes, personsRes, histRes] = await Promise.all([
-        cqTransactionAPI.summary(params),
-        cqTransactionAPI.storesList(),
-        cqTransactionAPI.personsList(),
-        cqTransactionAPI.history(),
-      ])
-      setSummary(sumRes.data)
-      setStoresList(storesRes.data.stores || [])
-      setPersonsList(personsRes.data.persons || [])
-      setHistoryData(histRes.data || [])
+      const res = await cqTransactionAPI.summary(params)
+      setSummary(res.data)
     } catch (e) {
       setError('Failed to load data')
     } finally {
       setLoading(false)
     }
   }
+
+  // Alias for backward compat in create/delete handlers
+  const loadData = () => { loadPeriodData(); loadHistoryData() }
 
   const loadStoreLedger = async () => {
     if (!selectedStore) return
@@ -279,62 +295,8 @@ export default function CQCashFlow() {
 
   return (
     <div className="space-y-4">
-      {/* Header: Year/Period selector */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-bold text-gray-800">💰 Cash Flow</h2>
-          {/* Year */}
-          <div className="flex items-center gap-1">
-            <button onClick={() => setYear(y => y - 1)}
-              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-            <span className="text-lg font-bold text-gray-900 min-w-[3.5rem] text-center">{year}</span>
-            <button onClick={() => setYear(y => y + 1)}
-              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-          </div>
-          {/* Period toggle */}
-          <div className="flex bg-gray-100 rounded-xl p-1">
-            {[
-              { key: 'H1', label: 'H1' },
-              { key: 'H2', label: 'H2' },
-              { key: 'CUSTOM', label: 'Custom' },
-            ].map(p => (
-              <button key={p.key}
-                onClick={() => setPeriod(p.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  period === p.key
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}>
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <button onClick={() => setShowForm(true)}
-          className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 flex items-center gap-1">
-          <PlusIcon className="w-4 h-4" /> Add
-        </button>
-      </div>
-
-      {/* Custom date range picker */}
-      {period === 'CUSTOM' && (
-        <div className="flex items-center gap-2">
-          <input type="date" value={customStart}
-            onChange={e => setCustomStart(e.target.value)}
-            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          <span className="text-gray-400 text-sm">~</span>
-          <input type="date" value={customEnd}
-            onChange={e => setCustomEnd(e.target.value)}
-            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        </div>
-      )}
-
-      {/* Period label */}
-      {period !== 'CUSTOM' && <div className="text-sm text-gray-500">{periodLabel}</div>}
+      {/* Header */}
+      <h2 className="text-lg font-bold text-gray-800">📊 CQ Report</h2>
 
       {/* Messages */}
       {error && <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm">{error}</div>}
@@ -353,114 +315,127 @@ export default function CQCashFlow() {
         ))}
       </div>
 
-      {/* New Transaction Form */}
-      {showForm && (
-        <Card>
-          <div className="p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-gray-800">Add Transaction</h3>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})}
-                className={inputCls} />
-              <select value={form.transaction_type} onChange={e => setForm({...form, transaction_type: e.target.value})}
-                className={inputCls}>
-                {TX_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
-              </select>
-              <select value={form.account_type} onChange={e => setForm({...form, account_type: e.target.value})}
-                className={inputCls}>
-                {ACCOUNT_TYPES.map(a => <option key={a.key} value={a.key}>{a.label}</option>)}
-              </select>
-              <input placeholder="Store name" value={form.store_name} onChange={e => setForm({...form, store_name: e.target.value})}
-                className={inputCls} list="store-suggestions" />
-              <datalist id="store-suggestions">
-                {storesList.map(s => <option key={s} value={s} />)}
-              </datalist>
-              <input placeholder="Person" value={form.person} onChange={e => setForm({...form, person: e.target.value})}
-                className={inputCls} list="person-suggestions" />
-              <datalist id="person-suggestions">
-                {personsList.map(p => <option key={p} value={p} />)}
-              </datalist>
-              <input type="number" placeholder="Amount" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})}
-                className={inputCls} />
-            </div>
-            <input placeholder="Note" value={form.note} onChange={e => setForm({...form, note: e.target.value})}
-              className={inputCls + ' w-full'} />
-            <button onClick={handleCreate}
-              className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">
-              Save
-            </button>
-          </div>
-        </Card>
-      )}
-
       {loading && <div className="text-center py-8 text-gray-400">Loading...</div>}
 
       {/* ===== SUMMARY VIEW ===== */}
-      {view === 'summary' && summary && !loading && (
+      {view === 'summary' && !loading && (
         <div className="space-y-4">
-          {/* Owner Profit by Quarter Chart */}
-          {historyData.length > 0 && (
-            <Card>
-              <div className="p-4">
-                <h3 className="font-semibold text-gray-800 mb-3">Owner Profit by Quarter</h3>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={historyData
-                    .filter(h => (h.owner_profit || 0) > 0)
-                    .map(h => {
-                      const [yr, mon] = h.period.split('-')
-                      let label = h.period
-                      if (mon === 'Oct') label = `${yr} H1`
-                      else if (mon === 'Apr') label = `${parseInt(yr)-1} H2`
-                      return {
-                        period: label,
-                        owner_profit: h.owner_profit || 0,
-                        owner_account: h.owner_account || 0,
-                        owner_cash: h.owner_cash || 0,
-                      }
-                    })}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="period" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null
-                        const d = payload[0].payload
-                        return (
-                          <div style={{ ...tooltipStyle, padding: '10px 14px', background: '#fff' }}>
-                            <div className="text-xs font-bold text-gray-800 mb-2">{d.period}</div>
-                            <div className="flex justify-between gap-6 text-xs">
-                              <span className="text-gray-500">Total</span>
-                              <span className="font-bold text-green-600">{fmt(d.owner_profit)}</span>
-                            </div>
-                            <div className="flex justify-between gap-6 text-xs mt-1">
-                              <span className="text-gray-500">Account</span>
-                              <span className="font-medium text-gray-700">{fmt(d.owner_account)}</span>
-                            </div>
-                            <div className="flex justify-between gap-6 text-xs mt-1">
-                              <span className="text-gray-500">Cash</span>
-                              <span className="font-medium text-orange-600">{fmt(d.owner_cash)}</span>
-                            </div>
-                          </div>
-                        )
-                      }}
-                    />
-                    <Bar dataKey="owner_profit" fill="#10b981" radius={[6, 6, 0, 0]} name="Owner Profit" />
-                  </BarChart>
-                </ResponsiveContainer>
-                {/* Grand total */}
-                <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
-                  <span className="text-sm text-gray-500">Total Owner Profit (All Time)</span>
-                  <span className="text-lg font-bold text-green-600">
-                    {fmt(historyData.reduce((s, h) => s + (h.owner_profit || 0), 0))}
-                  </span>
-                </div>
-              </div>
-            </Card>
-          )}
+          {historyData.length > 0 ? (() => {
+            // Build chart data
+            const chartData = historyData
+              .filter(h => (h.owner_profit || 0) > 0)
+              .map(h => {
+                const [yr, mon] = h.period.split('-')
+                let label = h.period
+                if (mon === 'Oct') label = `${yr} H1`
+                else if (mon === 'Apr') label = `${parseInt(yr)-1} H2`
+                return {
+                  period: label,
+                  owner_profit: h.owner_profit || 0,
+                  owner_account: h.owner_account || 0,
+                  owner_cash: h.owner_cash || 0,
+                }
+              })
+            // Build store ranking from all periods
+            const storeMap = {}
+            historyData.forEach(h => {
+              (h.stores || []).forEach(s => {
+                if (!storeMap[s.store_name]) storeMap[s.store_name] = { owner_profit: 0, owner_account: 0, owner_cash: 0 }
+                storeMap[s.store_name].owner_profit += s.owner_profit || s.collection || 0
+                storeMap[s.store_name].owner_account += s.owner_account || s.collection_account || 0
+                storeMap[s.store_name].owner_cash += s.owner_cash || s.collection_cash || 0
+              })
+            })
+            const ranked = Object.entries(storeMap)
+              .filter(([, v]) => v.owner_profit > 0)
+              .sort((a, b) => b[1].owner_profit - a[1].owner_profit)
+            const grandTotal = historyData.reduce((s, h) => s + (h.owner_profit || 0), 0)
+            const maxProfit = ranked.length > 0 ? ranked[0][1].owner_profit : 0
 
-          {!historyData.length && (
+            return (
+              <>
+                {/* Owner Profit by Quarter Chart */}
+                <Card>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-gray-800 mb-3">Owner Profit by Quarter</h3>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="period" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null
+                            const d = payload[0].payload
+                            return (
+                              <div style={{ ...tooltipStyle, padding: '10px 14px', background: '#fff' }}>
+                                <div className="text-xs font-bold text-gray-800 mb-2">{d.period}</div>
+                                <div className="flex justify-between gap-6 text-xs">
+                                  <span className="text-gray-500">Total</span>
+                                  <span className="font-bold text-green-600">{fmt(d.owner_profit)}</span>
+                                </div>
+                                <div className="flex justify-between gap-6 text-xs mt-1">
+                                  <span className="text-gray-500">Account</span>
+                                  <span className="font-medium text-gray-700">{fmt(d.owner_account)}</span>
+                                </div>
+                                <div className="flex justify-between gap-6 text-xs mt-1">
+                                  <span className="text-gray-500">Cash</span>
+                                  <span className="font-medium text-orange-600">{fmt(d.owner_cash)}</span>
+                                </div>
+                              </div>
+                            )
+                          }}
+                        />
+                        <Bar dataKey="owner_profit" fill="#10b981" radius={[6, 6, 0, 0]} name="Owner Profit" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
+                      <span className="text-sm text-gray-500">Total Owner Profit</span>
+                      <span className="text-lg font-bold text-green-600">{fmt(grandTotal)}</span>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Store Ranking */}
+                {ranked.length > 0 && (
+                  <Card>
+                    <div className="p-4">
+                      <h3 className="font-semibold text-gray-800 mb-3">Store Ranking</h3>
+                      <div className="space-y-2">
+                        {ranked.map(([name, data], idx) => {
+                          const pct = maxProfit > 0 ? (data.owner_profit / maxProfit) * 100 : 0
+                          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`
+                          return (
+                            <div key={name}
+                              className="cursor-pointer hover:bg-gray-50 rounded-xl p-3 transition"
+                              onClick={() => { setSelectedStore(name); setView('stores') }}>
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="text-sm font-medium text-gray-800">
+                                  <span className="mr-2">{medal}</span>{name}
+                                </span>
+                                <span className="text-sm font-bold text-green-600">{fmt(data.owner_profit)}</span>
+                              </div>
+                              <div className="w-full bg-gray-100 rounded-full h-2">
+                                <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                              </div>
+                              <div className="flex gap-4 mt-1 text-xs text-gray-400">
+                                <span>Account: {fmt(data.owner_account)}</span>
+                                <span>Cash: {fmt(data.owner_cash)}</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        <div className="pt-3 mt-1 border-t-2 border-gray-200 flex justify-between items-center">
+                          <span className="font-bold text-gray-900">Total</span>
+                          <span className="font-bold text-green-600 text-lg">{fmt(grandTotal)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+              </>
+            )
+          })() : (
             <div className="text-center py-12 text-gray-400">
               <div className="text-4xl mb-3">📭</div>
               <div>No data yet</div>
@@ -469,145 +444,209 @@ export default function CQCashFlow() {
         </div>
       )}
 
-      {/* ===== STORE OVERVIEW VIEW ===== */}
-      {view === 'store_overview' && (
+      {/* ===== QUARTER REPORT VIEW ===== */}
+      {view === 'quarter' && (
         <div className="space-y-4">
-          {historyData.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">No data yet</div>
-          ) : (() => {
-            // Aggregate per-store totals across all periods
-            const storeMap = {}
-            historyData.forEach(h => {
-              (h.stores || []).forEach(s => {
-                if (!storeMap[s.store_name]) {
-                  storeMap[s.store_name] = { owner_profit: 0, owner_account: 0, owner_cash: 0, incentive: 0, equity: 0, total: 0, periods: [] }
-                }
-                const profit = s.owner_profit || s.collection || 0
-                storeMap[s.store_name].owner_profit += profit
-                storeMap[s.store_name].owner_account += s.owner_account || s.collection_account || 0
-                storeMap[s.store_name].owner_cash += s.owner_cash || s.collection_cash || 0
-                storeMap[s.store_name].incentive += s.incentive || 0
-                storeMap[s.store_name].equity += s.equity || 0
-                storeMap[s.store_name].total += s.total || 0
-                if (profit > 0 || (s.incentive || 0) > 0 || (s.equity || 0) > 0) {
-                  storeMap[s.store_name].periods.push({
-                    period: h.period,
-                    owner_profit: profit,
-                    incentive: s.incentive || 0,
-                    equity: s.equity || 0,
-                    total: s.total || 0,
-                  })
-                }
-              })
-            })
-            const ranked = Object.entries(storeMap)
-              .filter(([, v]) => v.owner_profit > 0)
-              .sort((a, b) => b[1].owner_profit - a[1].owner_profit)
-            const grandTotal = ranked.reduce((s, [, v]) => s + v.owner_profit, 0)
-            const maxProfit = ranked.length > 0 ? ranked[0][1].owner_profit : 0
+          {/* Period Selector */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1">
+              <button onClick={() => setYear(y => y - 1)}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <span className="text-lg font-bold text-gray-900 min-w-[3.5rem] text-center">{year}</span>
+              <button onClick={() => setYear(y => y + 1)}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+            </div>
+            <div className="flex bg-gray-100 rounded-xl p-1">
+              {[
+                { key: 'H1', label: 'H1' },
+                { key: 'H2', label: 'H2' },
+                { key: 'CUSTOM', label: 'Custom' },
+              ].map(p => (
+                <button key={p.key}
+                  onClick={() => setPeriod(p.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    period === p.key
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            {period === 'CUSTOM' ? (
+              <div className="flex items-center gap-2">
+                <input type="date" value={customStart}
+                  onChange={e => setCustomStart(e.target.value)}
+                  className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <span className="text-gray-400 text-sm">~</span>
+                <input type="date" value={customEnd}
+                  onChange={e => setCustomEnd(e.target.value)}
+                  className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+            ) : (
+              <span className="text-sm text-gray-500">{periodLabel}</span>
+            )}
+          </div>
 
-            return (
+          {summary ? (() => {
+            // Per-store data for this period
+            const stores = (summary.stores || [])
+              .filter(s => parseFloat(s.owner_profit) > 0)
+              .sort((a, b) => parseFloat(b.owner_profit) - parseFloat(a.owner_profit))
+            const grandTotal = stores.reduce((s, r) => s + (parseFloat(r.owner_profit) || 0), 0)
+            const maxP = stores.length > 0 ? parseFloat(stores[0].owner_profit) : 0
+            const totalIncentive = stores.reduce((s, r) => s + (parseFloat(r.incentive) || 0), 0)
+            const totalEquity = stores.reduce((s, r) => s + (parseFloat(r.equity) || 0), 0)
+
+            return stores.length > 0 ? (
               <>
-                {/* Ranked Store List */}
-                <Card>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-gray-800 mb-3">Owner Profit by Store</h3>
-                    <div className="space-y-2">
-                      {ranked.map(([name, data], idx) => {
-                        const pct = maxProfit > 0 ? (data.owner_profit / maxProfit) * 100 : 0
-                        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`
-                        return (
-                          <div key={name}
-                            className="cursor-pointer hover:bg-gray-50 rounded-xl p-3 transition"
-                            onClick={() => { setSelectedStore(name); setView('stores') }}>
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="text-sm font-medium text-gray-800">
-                                <span className="mr-2">{medal}</span>{name}
-                              </span>
-                              <span className="text-sm font-bold text-green-600">{fmt(data.owner_profit)}</span>
-                            </div>
-                            <div className="w-full bg-gray-100 rounded-full h-2">
-                              <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                            </div>
-                            <div className="flex gap-4 mt-1 text-xs text-gray-400">
-                              <span>Account: {fmt(data.owner_account)}</span>
-                              <span>Cash: {fmt(data.owner_cash)}</span>
-                            </div>
-                          </div>
-                        )
-                      })}
-                      <div className="pt-3 mt-1 border-t-2 border-gray-200 flex justify-between items-center">
-                        <span className="font-bold text-gray-900">Total</span>
-                        <span className="font-bold text-green-600 text-lg">{fmt(grandTotal)}</span>
-                      </div>
-                    </div>
+                {/* KPI Cards */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-green-50 rounded-2xl p-4 border border-green-100">
+                    <div className="text-xs text-gray-500 mb-1">Owner Profit</div>
+                    <div className="text-xl font-bold text-green-600">{fmt(grandTotal)}</div>
                   </div>
-                </Card>
+                  <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100">
+                    <div className="text-xs text-gray-500 mb-1">Incentive</div>
+                    <div className="text-xl font-bold text-purple-600">{fmt(totalIncentive)}</div>
+                  </div>
+                  <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
+                    <div className="text-xs text-gray-500 mb-1">Equity Share</div>
+                    <div className="text-xl font-bold text-blue-600">{fmt(totalEquity)}</div>
+                  </div>
+                </div>
 
-                {/* Period Detail Table */}
+                {/* Store Ranking for Period */}
                 <Card>
                   <div className="p-4">
-                    <h3 className="font-semibold text-gray-800 mb-3">Period Detail</h3>
+                    <h3 className="font-semibold text-gray-800 mb-3">Store Breakdown</h3>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="text-left text-gray-500 border-b">
-                            <th className="pb-2 pr-3">Period</th>
+                            <th className="pb-2 pr-3">#</th>
+                            <th className="pb-2 pr-3">Store</th>
                             <th className="pb-2 pr-3 text-right">Owner Profit</th>
-                            <th className="pb-2 pr-3 text-right">Account</th>
-                            <th className="pb-2 pr-3 text-right">Cash</th>
                             <th className="pb-2 pr-3 text-right">Incentive</th>
                             <th className="pb-2 pr-3 text-right">Equity</th>
                             <th className="pb-2 text-right">Total</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {historyData.map(h => (
-                            <tr key={h.period} className="border-b border-gray-50 hover:bg-gray-50">
-                              <td className="py-2.5 pr-3 font-medium text-gray-800">{h.period}</td>
-                              <td className="py-2.5 pr-3 text-right text-green-600 font-medium">{fmt(h.owner_profit || h.collection)}</td>
-                              <td className="py-2.5 pr-3 text-right text-emerald-700 text-xs">{fmt(h.owner_account || h.collection_account)}</td>
-                              <td className="py-2.5 pr-3 text-right text-emerald-500 text-xs">{fmt(h.owner_cash || h.collection_cash)}</td>
-                              <td className="py-2.5 pr-3 text-right text-purple-600">{fmt(h.incentive)}</td>
-                              <td className="py-2.5 pr-3 text-right text-blue-600">{fmt(h.equity)}</td>
-                              <td className="py-2.5 text-right font-semibold text-gray-800">{fmt(h.total)}</td>
-                            </tr>
-                          ))}
+                          {stores.map((s, idx) => {
+                            const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`
+                            return (
+                              <tr key={s.store_name} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
+                                onClick={() => { setSelectedStore(s.store_name); setView('stores') }}>
+                                <td className="py-2.5 pr-3">{medal}</td>
+                                <td className="py-2.5 pr-3 font-medium text-gray-800">{s.store_name}</td>
+                                <td className="py-2.5 pr-3 text-right text-green-600 font-medium">{fmt(s.owner_profit)}</td>
+                                <td className="py-2.5 pr-3 text-right text-purple-600">{fmt(s.incentive)}</td>
+                                <td className="py-2.5 pr-3 text-right text-blue-600">{fmt(s.equity)}</td>
+                                <td className="py-2.5 text-right font-semibold text-gray-800">
+                                  {fmt((parseFloat(s.owner_profit) || 0) + (parseFloat(s.incentive) || 0) + (parseFloat(s.equity) || 0))}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                          <tr className="border-t-2 border-gray-200">
+                            <td className="py-2.5 pr-3"></td>
+                            <td className="py-2.5 pr-3 font-bold text-gray-900">Total</td>
+                            <td className="py-2.5 pr-3 text-right font-bold text-green-600">{fmt(grandTotal)}</td>
+                            <td className="py-2.5 pr-3 text-right font-bold text-purple-600">{fmt(totalIncentive)}</td>
+                            <td className="py-2.5 pr-3 text-right font-bold text-blue-600">{fmt(totalEquity)}</td>
+                            <td className="py-2.5 text-right font-bold text-gray-900">{fmt(grandTotal + totalIncentive + totalEquity)}</td>
+                          </tr>
                         </tbody>
                       </table>
                     </div>
                   </div>
                 </Card>
 
-                {/* Per-Store Charts */}
-                {ranked.filter(([, d]) => d.periods.length > 1).map(([storeName, data]) => (
-                  <Card key={storeName}>
-                    <div className="p-4">
-                      <h3 className="font-semibold text-gray-800 mb-3">{storeName}</h3>
-                      <ResponsiveContainer width="100%" height={200}>
-                        <BarChart data={data.periods} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="period" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
-                          <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false}
-                            tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                          <Tooltip contentStyle={tooltipStyle} formatter={(v) => fmt(v)} />
-                          <Bar dataKey="owner_profit" name="Owner Profit" fill={CHART_COLORS.collection} radius={[4, 4, 0, 0]} stackId="a" />
-                          <Bar dataKey="incentive" name="Incentive" fill={CHART_COLORS.incentive} stackId="a" />
-                          <Bar dataKey="equity" name="Equity" fill={CHART_COLORS.equity} radius={[4, 4, 0, 0]} stackId="a" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </Card>
-                ))}
+                {/* Partner Distribution */}
+                {summary.persons?.length > 0 && (() => {
+                  const partners = summary.persons.filter(p =>
+                    p.person !== 'Owner' && p.person !== 'Deposit' && p.person !== 'Opening Balance'
+                    && p.person !== 'QT' && p.person !== 'ChCh'
+                    && ((parseFloat(p.by_type?.incentive) || 0) + (parseFloat(p.by_type?.profit) || 0) > 0)
+                  )
+                  return partners.length > 0 && (
+                    <Card>
+                      <div className="p-4">
+                        <h3 className="font-semibold text-gray-800 mb-3">Partner Distribution</h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="text-left text-gray-500 border-b">
+                                <th className="pb-2 pr-4">Name</th>
+                                <th className="pb-2 pr-4 text-right">Incentive</th>
+                                <th className="pb-2 pr-4 text-right">Equity Share</th>
+                                <th className="pb-2 text-right">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {partners.map(p => (
+                                <tr key={p.person} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
+                                  onClick={() => { setSelectedPerson(p.person); setView('persons') }}>
+                                  <td className="py-2.5 pr-4 font-medium text-gray-800">{p.person}</td>
+                                  <td className="py-2.5 pr-4 text-right text-purple-600">{fmt(p.by_type?.incentive)}</td>
+                                  <td className="py-2.5 pr-4 text-right text-blue-600">{fmt(p.by_type?.profit)}</td>
+                                  <td className="py-2.5 text-right font-semibold text-gray-800">{fmt((parseFloat(p.by_type?.incentive) || 0) + (parseFloat(p.by_type?.profit) || 0))}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </Card>
+                  )
+                })()}
               </>
+            ) : (
+              <div className="text-center py-12 text-gray-400">No data for this period</div>
             )
-          })()}
+          })() : (
+            <div className="text-center py-8 text-gray-400">Loading...</div>
+          )}
         </div>
       )}
 
       {/* ===== ACCOUNTS VIEW ===== */}
       {view === 'accounts' && (
         <div className="space-y-4">
+          {/* Period selector */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1">
+              <button onClick={() => setYear(y => y - 1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <span className="text-base font-bold text-gray-900 min-w-[3rem] text-center">{year}</span>
+              <button onClick={() => setYear(y => y + 1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+            </div>
+            <div className="flex bg-gray-100 rounded-xl p-1">
+              {[{ key: 'H1', label: 'H1' }, { key: 'H2', label: 'H2' }, { key: 'CUSTOM', label: 'Custom' }].map(p => (
+                <button key={p.key} onClick={() => setPeriod(p.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    period === p.key ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}>{p.label}</button>
+              ))}
+            </div>
+            {period === 'CUSTOM' && (
+              <div className="flex items-center gap-2">
+                <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
+                  className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs" />
+                <span className="text-gray-400 text-xs">~</span>
+                <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
+                  className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs" />
+              </div>
+            )}
+          </div>
           {/* Account selector */}
           <div className="flex gap-2">
             {ACCOUNTS.map(acc => (
@@ -750,12 +789,50 @@ export default function CQCashFlow() {
       {/* ===== STORE VIEW ===== */}
       {view === 'stores' && (
         <div className="space-y-4">
+          {/* Period selector for store view */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1">
+              <button onClick={() => setYear(y => y - 1)}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <span className="text-base font-bold text-gray-900 min-w-[3rem] text-center">{year}</span>
+              <button onClick={() => setYear(y => y + 1)}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+            </div>
+            <div className="flex bg-gray-100 rounded-xl p-1">
+              {[{ key: 'H1', label: 'H1' }, { key: 'H2', label: 'H2' }, { key: 'CUSTOM', label: 'Custom' }].map(p => (
+                <button key={p.key} onClick={() => setPeriod(p.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    period === p.key ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}>{p.label}</button>
+              ))}
+            </div>
+            {period === 'CUSTOM' && (
+              <div className="flex items-center gap-2">
+                <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
+                  className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs" />
+                <span className="text-gray-400 text-xs">~</span>
+                <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
+                  className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs" />
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center gap-3">
             <select value={selectedStore} onChange={e => setSelectedStore(e.target.value)}
               className={inputCls + ' flex-1'}>
               <option value="">Select store...</option>
               {storesList.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+            {selectedStore && !storeLockStatus.is_locked && (
+              <button onClick={() => { setForm(f => ({ ...f, store_name: selectedStore })); setShowForm(true) }}
+                className="px-3 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 flex items-center gap-1">
+                <PlusIcon className="w-4 h-4" /> Add
+              </button>
+            )}
             {selectedStore && (
               <button onClick={handleToggleLock}
                 className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition ${
@@ -767,6 +844,43 @@ export default function CQCashFlow() {
               </button>
             )}
           </div>
+
+          {/* Add Transaction Form (inside store view) */}
+          {showForm && selectedStore && (
+            <Card>
+              <div className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-800">Add Transaction — {selectedStore}</h3>
+                  <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})}
+                    className={inputCls} />
+                  <select value={form.transaction_type} onChange={e => setForm({...form, transaction_type: e.target.value})}
+                    className={inputCls}>
+                    {TX_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+                  </select>
+                  <select value={form.account_type} onChange={e => setForm({...form, account_type: e.target.value})}
+                    className={inputCls}>
+                    {ACCOUNT_TYPES.map(a => <option key={a.key} value={a.key}>{a.label}</option>)}
+                  </select>
+                  <input placeholder="Person" value={form.person} onChange={e => setForm({...form, person: e.target.value})}
+                    className={inputCls} list="person-suggestions" />
+                  <datalist id="person-suggestions">
+                    {personsList.map(p => <option key={p} value={p} />)}
+                  </datalist>
+                  <input type="number" placeholder="Amount" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})}
+                    className={inputCls} />
+                </div>
+                <input placeholder="Note" value={form.note} onChange={e => setForm({...form, note: e.target.value})}
+                  className={inputCls + ' w-full'} />
+                <button onClick={handleCreate}
+                  className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">
+                  Save
+                </button>
+              </div>
+            </Card>
+          )}
 
           {/* Lock status badge */}
           {storeLockStatus.is_locked && (
@@ -928,6 +1042,35 @@ export default function CQCashFlow() {
       {/* ===== PERSON VIEW ===== */}
       {view === 'persons' && (
         <div className="space-y-4">
+          {/* Period selector */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1">
+              <button onClick={() => setYear(y => y - 1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <span className="text-base font-bold text-gray-900 min-w-[3rem] text-center">{year}</span>
+              <button onClick={() => setYear(y => y + 1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+            </div>
+            <div className="flex bg-gray-100 rounded-xl p-1">
+              {[{ key: 'H1', label: 'H1' }, { key: 'H2', label: 'H2' }, { key: 'CUSTOM', label: 'Custom' }].map(p => (
+                <button key={p.key} onClick={() => setPeriod(p.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    period === p.key ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}>{p.label}</button>
+              ))}
+            </div>
+            {period === 'CUSTOM' && (
+              <div className="flex items-center gap-2">
+                <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
+                  className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs" />
+                <span className="text-gray-400 text-xs">~</span>
+                <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
+                  className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs" />
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <select value={selectedPerson} onChange={e => setSelectedPerson(e.target.value)}
               className={inputCls + ' flex-1'}>
