@@ -1529,7 +1529,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         store_acct_cash = defaultdict(lambda: {'owner_account': Decimal('0'), 'owner_cash': Decimal('0')})
         for period_label, ps_list in ps_by_period.items():
             for ps in ps_list:
-                store_name = ps.store.name if ps.store else None
+                store_name = ps.organization.name if ps.organization else None
                 if not store_name or store_name not in registered_stores:
                     continue
                 has_owner = any(p.partner_type == 'OWNER' for p in ps.partners.all())
