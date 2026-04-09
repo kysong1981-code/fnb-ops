@@ -1496,6 +1496,48 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
 
         period_totals = {r['period']: r for r in period_agg}
 
+        # Per-store per-period aggregates (only registered stores)
+        store_period_agg = qs.exclude(period='').filter(
+            store_name__in=registered_stores
+        ).values('period', 'store_name').annotate(
+            owner_profit=Sum('amount', filter=Q(transaction_type='COLLECTION', profit_share__isnull=False)),
+            incentive=Sum('amount', filter=Q(transaction_type='INCENTIVE')),
+            equity=Sum('amount', filter=Q(transaction_type='PROFIT')),
+        ).order_by('period', 'store_name')
+
+        # Group store data by period
+        store_by_period = defaultdict(list)
+        for r in store_period_agg:
+            op = float(r['owner_profit'] or 0)
+            inc = float(r['incentive'] or 0)
+            eq = float(r['equity'] or 0)
+            if op > 0 or inc > 0 or eq > 0:
+                store_by_period[r['period']].append({
+                    'store_name': r['store_name'],
+                    'owner_profit': op,
+                    'incentive': inc,
+                    'equity': eq,
+                })
+
+        # Per-store owner account/cash from ProfitShare
+        store_acct_cash = defaultdict(lambda: {'owner_account': Decimal('0'), 'owner_cash': Decimal('0')})
+        for period_label, ps_list in ps_by_period.items():
+            for ps in ps_list:
+                store_name = ps.store.name if ps.store else None
+                if not store_name or store_name not in registered_stores:
+                    continue
+                has_owner = any(p.partner_type == 'OWNER' for p in ps.partners.all())
+                if has_owner:
+                    for p in ps.partners.all():
+                        if p.partner_type == 'OWNER':
+                            store_acct_cash[(period_label, store_name)]['owner_account'] += (p.bank_account or Decimal('0'))
+                            store_acct_cash[(period_label, store_name)]['owner_cash'] += (p.bank_cash or Decimal('0'))
+                else:
+                    total_p_acct = sum((p.total_account or Decimal('0')) for p in ps.partners.all())
+                    total_p_cash = sum((p.total_cash or Decimal('0')) for p in ps.partners.all())
+                    store_acct_cash[(period_label, store_name)]['owner_account'] += (ps.net_profit_account or Decimal('0')) - total_p_acct
+                    store_acct_cash[(period_label, store_name)]['owner_cash'] += (ps.net_profit_cash or Decimal('0')) - total_p_cash
+
         # Build period data
         history_data = []
         for period_label in periods:
@@ -1521,6 +1563,13 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                     owner_account += (ps.net_profit_account or Decimal('0')) - total_p_acct
                     owner_cash += (ps.net_profit_cash or Decimal('0')) - total_p_cash
 
+            # Add per-store account/cash to store data
+            stores = store_by_period.get(period_label, [])
+            for s in stores:
+                skey = (period_label, s['store_name'])
+                s['owner_account'] = float(store_acct_cash[skey]['owner_account'])
+                s['owner_cash'] = float(store_acct_cash[skey]['owner_cash'])
+
             history_data.append({
                 'period': period_label,
                 'owner_profit': owner_profit,
@@ -1529,6 +1578,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                 'cash_collection': cash_collection,
                 'incentive': incentive,
                 'equity': equity,
+                'stores': stores,
             })
 
         return Response(history_data)
