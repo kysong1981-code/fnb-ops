@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Fragment } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { cqTransactionAPI } from '../../services/api'
 import Card from '../ui/Card'
 import { PlusIcon, TrashIcon } from '../icons'
@@ -22,12 +22,10 @@ const ACCOUNT_TYPES = [
 
 const VIEWS = [
   { key: 'summary', label: 'Summary' },
+  { key: 'store_overview', label: 'Store Overview' },
   { key: 'accounts', label: 'Accounts' },
-  { key: 'history', label: 'History' },
   { key: 'stores', label: 'By Store' },
   { key: 'persons', label: 'By Person' },
-  { key: 'all', label: 'All Transactions' },
-  { key: 'import', label: 'CSV Import' },
 ]
 
 const ACCOUNTS = ['QT', 'ChCh', 'KRW']
@@ -95,7 +93,6 @@ export default function CQCashFlow() {
 
   // Data
   const [summary, setSummary] = useState(null)
-  const [transactions, setTransactions] = useState([])
   const [storesList, setStoresList] = useState([])
   const [personsList, setPersonsList] = useState([])
   const [storeLedger, setStoreLedger] = useState(null)
@@ -122,10 +119,6 @@ export default function CQCashFlow() {
   const [showBalanceForm, setShowBalanceForm] = useState(false)
   const [balanceForm, setBalanceForm] = useState({ date: localDateStr(new Date()), amount: '' })
 
-  // CSV import
-  const [importFile, setImportFile] = useState(null)
-  const [importResult, setImportResult] = useState(null)
-  const fileRef = useRef(null)
 
   const showMsg = (msg) => { setSuccess(msg); setTimeout(() => setSuccess(''), 3000) }
   const inputCls = 'px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
@@ -159,15 +152,6 @@ export default function CQCashFlow() {
       setError('Failed to load data')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const loadAllTransactions = async () => {
-    try {
-      const res = await cqTransactionAPI.list({ date_start: dateRange.start, date_end: dateRange.end })
-      setTransactions(res.data.results || res.data || [])
-    } catch (e) {
-      setError('Failed to load transactions')
     }
   }
 
@@ -254,15 +238,6 @@ export default function CQCashFlow() {
     }
   }
 
-  const loadHistory = async () => {
-    try {
-      const res = await cqTransactionAPI.history()
-      setHistoryData(res.data || [])
-    } catch (e) {
-      setError('Failed to load history')
-    }
-  }
-
   const handleCreate = async () => {
     if (!form.amount || !form.date) return
     try {
@@ -274,7 +249,6 @@ export default function CQCashFlow() {
       setForm({ date: localDateStr(new Date()), store_name: '', transaction_type: 'COLLECTION', person: '', amount: '', account_type: 'CASH', note: '' })
       setShowForm(false)
       loadData()
-      if (view === 'all') loadAllTransactions()
     } catch (e) {
       setError('Failed to create transaction')
     }
@@ -286,46 +260,10 @@ export default function CQCashFlow() {
       await cqTransactionAPI.delete(id)
       showMsg('Deleted')
       loadData()
-      if (view === 'all') loadAllTransactions()
       if (view === 'stores') loadStoreLedger()
       if (view === 'persons') loadPersonalLedger()
     } catch (e) {
       setError('Delete failed')
-    }
-  }
-
-  const handleImport = async () => {
-    if (!importFile) return
-    const formData = new FormData()
-    formData.append('file', importFile)
-    try {
-      setLoading(true)
-      const res = await cqTransactionAPI.importCSV(formData)
-      setImportResult(res.data)
-      if (res.data.created_count > 0) {
-        showMsg(`${res.data.created_count} transactions imported`)
-        loadData()
-      }
-    } catch (e) {
-      setError('CSV import failed')
-    } finally {
-      setLoading(false)
-      setImportFile(null)
-      if (fileRef.current) fileRef.current.value = ''
-    }
-  }
-
-  const handleExport = async () => {
-    try {
-      const res = await cqTransactionAPI.exportCSV({ date_start: dateRange.start, date_end: dateRange.end })
-      const url = window.URL.createObjectURL(new Blob([res.data]))
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `cq_transactions_${dateRange.start}_${dateRange.end}.csv`
-      a.click()
-      window.URL.revokeObjectURL(url)
-    } catch (e) {
-      setError('CSV export failed')
     }
   }
 
@@ -406,11 +344,7 @@ export default function CQCashFlow() {
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl overflow-x-auto">
         {VIEWS.map(v => (
           <button key={v.key}
-            onClick={() => {
-              setView(v.key)
-              if (v.key === 'all') loadAllTransactions()
-              if (v.key === 'history') loadHistory()
-            }}
+            onClick={() => setView(v.key)}
             className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
               view === v.key ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}>
@@ -526,207 +460,148 @@ export default function CQCashFlow() {
             </Card>
           )}
 
-          {/* Store Overview - Owner Profit Only */}
-          {summary.stores?.length > 0 && (
-            <Card>
-              <div className="p-4">
-                <h3 className="font-semibold text-gray-800 mb-3">Store Overview</h3>
-                <div className="space-y-2">
-                  {summary.stores
-                    .filter(s => parseFloat(s.owner_profit) > 0)
-                    .sort((a, b) => parseFloat(b.owner_profit) - parseFloat(a.owner_profit))
-                    .map(s => {
-                      const maxProfit = Math.max(...summary.stores.map(x => parseFloat(x.owner_profit) || 0))
-                      const pct = maxProfit > 0 ? (parseFloat(s.owner_profit) / maxProfit) * 100 : 0
-                      return (
-                        <div key={s.store_name}
-                          className="cursor-pointer hover:bg-gray-50 rounded-xl p-3 transition"
-                          onClick={() => { setSelectedStore(s.store_name); setView('stores') }}>
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-sm font-medium text-gray-800">{s.store_name}</span>
-                            <span className="text-sm font-bold text-green-600">{fmt(s.owner_profit)}</span>
-                          </div>
-                          <div className="w-full bg-gray-100 rounded-full h-2">
-                            <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                          </div>
-                        </div>
-                      )
-                    })}
-                  {/* Total */}
-                  <div className="pt-3 mt-1 border-t-2 border-gray-200 flex justify-between items-center">
-                    <span className="font-bold text-gray-900">Total</span>
-                    <span className="font-bold text-green-600 text-lg">
-                      {fmt(summary.stores.reduce((s, r) => s + (parseFloat(r.owner_profit) || 0), 0))}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {/* Partner Distribution */}
-          {summary.persons?.length > 0 && (() => {
-            const partners = summary.persons.filter(p =>
-              p.person !== 'Owner' && p.person !== 'Deposit' && p.person !== 'Opening Balance'
-              && p.person !== 'QT' && p.person !== 'ChCh'
-              && ((parseFloat(p.by_type?.incentive) || 0) + (parseFloat(p.by_type?.profit) || 0) > 0)
-            )
-            return partners.length > 0 && (
-            <Card>
-              <div className="p-4">
-                <h3 className="font-semibold text-gray-800 mb-3">Partner Distribution</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-gray-500 border-b">
-                        <th className="pb-2 pr-4">Name</th>
-                        <th className="pb-2 pr-4 text-right">Incentive</th>
-                        <th className="pb-2 pr-4 text-right">Equity Share</th>
-                        <th className="pb-2 text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {partners.map(p => (
-                        <tr key={p.person} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
-                          onClick={() => { setSelectedPerson(p.person); setView('persons') }}>
-                          <td className="py-2.5 pr-4 font-medium text-gray-800">{p.person}</td>
-                          <td className="py-2.5 pr-4 text-right text-purple-600">{fmt(p.by_type?.incentive)}</td>
-                          <td className="py-2.5 pr-4 text-right text-blue-600">{fmt(p.by_type?.profit)}</td>
-                          <td className="py-2.5 text-right font-semibold text-gray-800">{fmt((parseFloat(p.by_type?.incentive) || 0) + (parseFloat(p.by_type?.profit) || 0))}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </Card>
-            )
-          })()}
-
-          {!summary.stores?.length && (
+          {!historyData.length && (
             <div className="text-center py-12 text-gray-400">
               <div className="text-4xl mb-3">📭</div>
-              <div>No transactions for this period</div>
-              <div className="text-xs mt-1">Add transactions manually or import via CSV</div>
+              <div>No data yet</div>
             </div>
           )}
         </div>
       )}
 
-      {/* ===== HISTORY VIEW ===== */}
-      {view === 'history' && (
+      {/* ===== STORE OVERVIEW VIEW ===== */}
+      {view === 'store_overview' && (
         <div className="space-y-4">
           {historyData.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">No history data yet</div>
-          ) : (
-            <>
-              {/* Total Trend Chart */}
-              <Card>
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-800 mb-4">📊 Period Comparison</h3>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={historyData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="period" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
-                      <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false}
-                        tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip contentStyle={tooltipStyle} formatter={(v) => fmt(v)} />
-                      <Legend wrapperStyle={{ fontSize: '12px' }} />
-                      <Bar dataKey="collection" name="Owner Profit" fill={CHART_COLORS.collection} radius={[4, 4, 0, 0]} stackId="a" />
-                      <Bar dataKey="incentive" name="Incentive" fill={CHART_COLORS.incentive} radius={[0, 0, 0, 0]} stackId="a" />
-                      <Bar dataKey="equity" name="Equity Share" fill={CHART_COLORS.equity} radius={[4, 4, 0, 0]} stackId="a" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </Card>
+            <div className="text-center py-12 text-gray-400">No data yet</div>
+          ) : (() => {
+            // Aggregate per-store totals across all periods
+            const storeMap = {}
+            historyData.forEach(h => {
+              (h.stores || []).forEach(s => {
+                if (!storeMap[s.store_name]) {
+                  storeMap[s.store_name] = { owner_profit: 0, owner_account: 0, owner_cash: 0, incentive: 0, equity: 0, total: 0, periods: [] }
+                }
+                const profit = s.owner_profit || s.collection || 0
+                storeMap[s.store_name].owner_profit += profit
+                storeMap[s.store_name].owner_account += s.owner_account || s.collection_account || 0
+                storeMap[s.store_name].owner_cash += s.owner_cash || s.collection_cash || 0
+                storeMap[s.store_name].incentive += s.incentive || 0
+                storeMap[s.store_name].equity += s.equity || 0
+                storeMap[s.store_name].total += s.total || 0
+                if (profit > 0 || (s.incentive || 0) > 0 || (s.equity || 0) > 0) {
+                  storeMap[s.store_name].periods.push({
+                    period: h.period,
+                    owner_profit: profit,
+                    incentive: s.incentive || 0,
+                    equity: s.equity || 0,
+                    total: s.total || 0,
+                  })
+                }
+              })
+            })
+            const ranked = Object.entries(storeMap)
+              .filter(([, v]) => v.owner_profit > 0)
+              .sort((a, b) => b[1].owner_profit - a[1].owner_profit)
+            const grandTotal = ranked.reduce((s, [, v]) => s + v.owner_profit, 0)
+            const maxProfit = ranked.length > 0 ? ranked[0][1].owner_profit : 0
 
-              {/* Owner Account vs Cash Trend */}
-              <Card>
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-800 mb-4">💰 Owner Profit: Account vs Cash</h3>
-                  <ResponsiveContainer width="100%" height={240}>
-                    <BarChart data={historyData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="period" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
-                      <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false}
-                        tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip contentStyle={tooltipStyle} formatter={(v) => fmt(v)} />
-                      <Legend wrapperStyle={{ fontSize: '12px' }} />
-                      <Bar dataKey="collection_account" name="Account" fill={CHART_COLORS.collectionAccount} radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="collection_cash" name="Cash" fill={CHART_COLORS.collectionCash} radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </Card>
-
-              {/* History Table */}
-              <Card>
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-800 mb-3">📋 Period Detail</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-gray-500 border-b">
-                          <th className="pb-2 pr-3">Period</th>
-                          <th className="pb-2 pr-3 text-right">Owner Profit</th>
-                          <th className="pb-2 pr-3 text-right">Account</th>
-                          <th className="pb-2 pr-3 text-right">Cash</th>
-                          <th className="pb-2 pr-3 text-right">Incentive</th>
-                          <th className="pb-2 pr-3 text-right">Equity</th>
-                          <th className="pb-2 text-right">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {historyData.map(h => (
-                          <tr key={h.period} className="border-b border-gray-50 hover:bg-gray-50">
-                            <td className="py-2.5 pr-3 font-medium text-gray-800">{h.period}</td>
-                            <td className="py-2.5 pr-3 text-right text-green-600 font-medium">{fmt(h.collection)}</td>
-                            <td className="py-2.5 pr-3 text-right text-emerald-700 text-xs">{fmt(h.collection_account)}</td>
-                            <td className="py-2.5 pr-3 text-right text-emerald-500 text-xs">{fmt(h.collection_cash)}</td>
-                            <td className="py-2.5 pr-3 text-right text-purple-600">{fmt(h.incentive)}</td>
-                            <td className="py-2.5 pr-3 text-right text-blue-600">{fmt(h.equity)}</td>
-                            <td className="py-2.5 text-right font-semibold text-gray-800">{fmt(h.total)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Per-Store History (if multiple stores in data) */}
-              {(() => {
-                const allStores = [...new Set(historyData.flatMap(h => (h.stores || []).map(s => s.store_name)))]
-                if (allStores.length <= 1) return null
-                return allStores.map(storeName => {
-                  const storeHistory = historyData.map(h => {
-                    const s = h.stores?.find(s => s.store_name === storeName) || {}
-                    return { period: h.period, collection: s.collection || 0, incentive: s.incentive || 0, equity: s.equity || 0, total: s.total || 0 }
-                  }).filter(d => d.total > 0)
-                  if (storeHistory.length === 0) return null
-                  return (
-                    <Card key={storeName}>
-                      <div className="p-4">
-                        <h3 className="font-semibold text-gray-800 mb-4">🏪 {storeName}</h3>
-                        <ResponsiveContainer width="100%" height={200}>
-                          <BarChart data={storeHistory} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                            <XAxis dataKey="period" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
-                            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false}
-                              tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                            <Tooltip contentStyle={tooltipStyle} formatter={(v) => fmt(v)} />
-                            <Bar dataKey="collection" name="Owner" fill={CHART_COLORS.collection} radius={[4, 4, 0, 0]} stackId="a" />
-                            <Bar dataKey="incentive" name="Incentive" fill={CHART_COLORS.incentive} stackId="a" />
-                            <Bar dataKey="equity" name="Equity" fill={CHART_COLORS.equity} radius={[4, 4, 0, 0]} stackId="a" />
-                          </BarChart>
-                        </ResponsiveContainer>
+            return (
+              <>
+                {/* Ranked Store List */}
+                <Card>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-gray-800 mb-3">Owner Profit by Store</h3>
+                    <div className="space-y-2">
+                      {ranked.map(([name, data], idx) => {
+                        const pct = maxProfit > 0 ? (data.owner_profit / maxProfit) * 100 : 0
+                        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`
+                        return (
+                          <div key={name}
+                            className="cursor-pointer hover:bg-gray-50 rounded-xl p-3 transition"
+                            onClick={() => { setSelectedStore(name); setView('stores') }}>
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-sm font-medium text-gray-800">
+                                <span className="mr-2">{medal}</span>{name}
+                              </span>
+                              <span className="text-sm font-bold text-green-600">{fmt(data.owner_profit)}</span>
+                            </div>
+                            <div className="w-full bg-gray-100 rounded-full h-2">
+                              <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                            </div>
+                            <div className="flex gap-4 mt-1 text-xs text-gray-400">
+                              <span>Account: {fmt(data.owner_account)}</span>
+                              <span>Cash: {fmt(data.owner_cash)}</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                      <div className="pt-3 mt-1 border-t-2 border-gray-200 flex justify-between items-center">
+                        <span className="font-bold text-gray-900">Total</span>
+                        <span className="font-bold text-green-600 text-lg">{fmt(grandTotal)}</span>
                       </div>
-                    </Card>
-                  )
-                })
-              })()}
-            </>
-          )}
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Period Detail Table */}
+                <Card>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-gray-800 mb-3">Period Detail</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-gray-500 border-b">
+                            <th className="pb-2 pr-3">Period</th>
+                            <th className="pb-2 pr-3 text-right">Owner Profit</th>
+                            <th className="pb-2 pr-3 text-right">Account</th>
+                            <th className="pb-2 pr-3 text-right">Cash</th>
+                            <th className="pb-2 pr-3 text-right">Incentive</th>
+                            <th className="pb-2 pr-3 text-right">Equity</th>
+                            <th className="pb-2 text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {historyData.map(h => (
+                            <tr key={h.period} className="border-b border-gray-50 hover:bg-gray-50">
+                              <td className="py-2.5 pr-3 font-medium text-gray-800">{h.period}</td>
+                              <td className="py-2.5 pr-3 text-right text-green-600 font-medium">{fmt(h.owner_profit || h.collection)}</td>
+                              <td className="py-2.5 pr-3 text-right text-emerald-700 text-xs">{fmt(h.owner_account || h.collection_account)}</td>
+                              <td className="py-2.5 pr-3 text-right text-emerald-500 text-xs">{fmt(h.owner_cash || h.collection_cash)}</td>
+                              <td className="py-2.5 pr-3 text-right text-purple-600">{fmt(h.incentive)}</td>
+                              <td className="py-2.5 pr-3 text-right text-blue-600">{fmt(h.equity)}</td>
+                              <td className="py-2.5 text-right font-semibold text-gray-800">{fmt(h.total)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Per-Store Charts */}
+                {ranked.filter(([, d]) => d.periods.length > 1).map(([storeName, data]) => (
+                  <Card key={storeName}>
+                    <div className="p-4">
+                      <h3 className="font-semibold text-gray-800 mb-3">{storeName}</h3>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={data.periods} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="period" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
+                          <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false}
+                            tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                          <Tooltip contentStyle={tooltipStyle} formatter={(v) => fmt(v)} />
+                          <Bar dataKey="owner_profit" name="Owner Profit" fill={CHART_COLORS.collection} radius={[4, 4, 0, 0]} stackId="a" />
+                          <Bar dataKey="incentive" name="Incentive" fill={CHART_COLORS.incentive} stackId="a" />
+                          <Bar dataKey="equity" name="Equity" fill={CHART_COLORS.equity} radius={[4, 4, 0, 0]} stackId="a" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </Card>
+                ))}
+              </>
+            )
+          })()}
         </div>
       )}
 
@@ -1137,151 +1012,6 @@ export default function CQCashFlow() {
         </div>
       )}
 
-      {/* ===== ALL TRANSACTIONS VIEW ===== */}
-      {view === 'all' && (
-        <Card>
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-800">All Transactions</h3>
-              <button onClick={handleExport}
-                className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs hover:bg-gray-200">
-                Export CSV
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-gray-500 border-b">
-                    <th className="pb-2 pr-3">Date</th>
-                    <th className="pb-2 pr-3">Store</th>
-                    <th className="pb-2 pr-3">Type</th>
-                    <th className="pb-2 pr-3">Person</th>
-                    <th className="pb-2 pr-3 text-right">Amount</th>
-                    <th className="pb-2 pr-3">Account</th>
-                    <th className="pb-2 pr-3">Note</th>
-                    <th className="pb-2 w-8"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map(tx => {
-                    const txType = getTxType(tx.transaction_type)
-                    return (
-                      <tr key={tx.id} className="border-b border-gray-50">
-                        <td className="py-2 pr-3 text-gray-600">{tx.date}</td>
-                        <td className="py-2 pr-3 text-gray-800">{tx.store_name}</td>
-                        <td className="py-2 pr-3">
-                          <span className={`px-2 py-0.5 rounded-full text-xs ${txType.bg} ${txType.color}`}>
-                            {txType.label}
-                          </span>
-                        </td>
-                        <td className="py-2 pr-3 text-gray-800">{tx.person}</td>
-                        <td className="py-2 pr-3 text-right font-medium">
-                          {fmt(tx.amount)}
-                        </td>
-                        <td className="py-2 pr-3 text-gray-500 text-xs">{tx.account_type}</td>
-                        <td className="py-2 pr-3 text-gray-500 text-xs max-w-[150px] truncate">{tx.note}</td>
-                        <td className="py-2 pl-2">
-                          <button onClick={() => handleDelete(tx.id)}
-                            className="text-gray-300 hover:text-red-500">
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {transactions.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="py-8 text-center text-gray-400">No transactions</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* ===== CSV IMPORT VIEW ===== */}
-      {view === 'import' && (
-        <div className="space-y-4">
-          <Card>
-            <div className="p-4 space-y-4">
-              <h3 className="font-semibold text-gray-800">📥 CSV Import</h3>
-              <div className="bg-blue-50 rounded-xl p-4 text-sm text-blue-800">
-                <div className="font-medium mb-2">CSV Format (column names required):</div>
-                <code className="block bg-white p-3 rounded-lg text-xs overflow-x-auto whitespace-pre">
-{`date,store,type,person,amount,account_type,note,period,incentive_rate
-2026-01-01,Q Airport,COLLECTION,,18200,CASH,Monthly collection,,
-2026-03-31,Q Airport,INCENTIVE,jongjin,7885,CASH,Incentive,2025-Oct,0.1
-2026-03-31,Q Airport,PROFIT,sky,49675,CASH,Profit share,2025-Oct,
-2026-03-31,,EXPENSE,yong,80000,CASH,Owner expense,,`}
-                </code>
-                <div className="mt-3 text-xs space-y-1">
-                  <div><strong>type:</strong> COLLECTION, INCENTIVE, PROFIT, EXPENSE, TRANSFER, EXCHANGE</div>
-                  <div><strong>account_type:</strong> CASH, ACCOUNT, KRW (default: CASH)</div>
-                  <div><strong>period:</strong> Semi-annual label (optional, e.g. 2025-Oct)</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <input type="file" accept=".csv" ref={fileRef}
-                  onChange={e => setImportFile(e.target.files[0])}
-                  className={inputCls + ' flex-1'} />
-                <button onClick={handleImport} disabled={!importFile || loading}
-                  className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-                  {loading ? 'Processing...' : 'Import'}
-                </button>
-              </div>
-
-              {importResult && (
-                <div className={`rounded-xl p-4 ${importResult.created_count > 0 ? 'bg-green-50' : 'bg-red-50'}`}>
-                  <div className="font-medium text-sm">
-                    ✅ {importResult.created_count} imported
-                    {importResult.error_count > 0 && (
-                      <span className="text-red-600 ml-2">❌ {importResult.error_count} failed</span>
-                    )}
-                  </div>
-                  {importResult.errors?.length > 0 && (
-                    <div className="mt-2 text-xs text-red-600 space-y-1">
-                      {importResult.errors.map((err, i) => <div key={i}>{err}</div>)}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </Card>
-
-          {/* Template Download */}
-          <Card>
-            <div className="p-4 space-y-3">
-              <h3 className="font-semibold text-gray-800">📋 Quick Templates</h3>
-              <p className="text-sm text-gray-500">
-                Quickly input monthly collection data per store.
-                Save as CSV from Excel then upload.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button onClick={() => {
-                  const template = 'date,store,type,person,amount,account_type,note,period,incentive_rate\n'
-                    + storesList.map(s => `${localDateStr(new Date())},${s},COLLECTION,,0,CASH,Monthly collection,,`).join('\n')
-                  const blob = new Blob(['\ufeff' + template], { type: 'text/csv;charset=utf-8' })
-                  const a = document.createElement('a')
-                  a.href = URL.createObjectURL(blob)
-                  a.download = 'collection_template.csv'
-                  a.click()
-                }}
-                  className="px-4 py-3 bg-green-50 text-green-700 rounded-xl text-sm hover:bg-green-100 text-left">
-                  <div className="font-medium">📥 Collection Template</div>
-                  <div className="text-xs text-green-500 mt-1">{storesList.length} stores included</div>
-                </button>
-                <button onClick={handleExport}
-                  className="px-4 py-3 bg-gray-50 text-gray-700 rounded-xl text-sm hover:bg-gray-100 text-left">
-                  <div className="font-medium">📤 Export Current Data</div>
-                  <div className="text-xs text-gray-500 mt-1">Backup or edit & re-upload</div>
-                </button>
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
     </div>
   )
 }
