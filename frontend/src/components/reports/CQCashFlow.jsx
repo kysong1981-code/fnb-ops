@@ -475,19 +475,43 @@ export default function CQCashFlow() {
                   <BarChart data={historyData
                     .filter(h => (h.owner_profit || 0) > 0)
                     .map(h => {
-                      // period label: "2024-Oct" = H1 of 2024, "2025-Apr" = H2 of 2024
                       const [yr, mon] = h.period.split('-')
                       let label = h.period
                       if (mon === 'Oct') label = `${yr} H1`
                       else if (mon === 'Apr') label = `${parseInt(yr)-1} H2`
-                      return { period: label, owner_profit: h.owner_profit || 0 }
+                      return {
+                        period: label,
+                        owner_profit: h.owner_profit || 0,
+                        owner_account: h.owner_account || 0,
+                        owner_cash: h.owner_cash || 0,
+                      }
                     })}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="period" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
                     <Tooltip
-                      formatter={(v) => [fmt(v), 'Owner Profit']}
-                      contentStyle={tooltipStyle} />
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null
+                        const d = payload[0].payload
+                        return (
+                          <div style={{ ...tooltipStyle, padding: '10px 14px', background: '#fff' }}>
+                            <div className="text-xs font-bold text-gray-800 mb-2">{d.period}</div>
+                            <div className="flex justify-between gap-6 text-xs">
+                              <span className="text-gray-500">Total</span>
+                              <span className="font-bold text-green-600">{fmt(d.owner_profit)}</span>
+                            </div>
+                            <div className="flex justify-between gap-6 text-xs mt-1">
+                              <span className="text-gray-500">Account</span>
+                              <span className="font-medium text-gray-700">{fmt(d.owner_account)}</span>
+                            </div>
+                            <div className="flex justify-between gap-6 text-xs mt-1">
+                              <span className="text-gray-500">Cash</span>
+                              <span className="font-medium text-orange-600">{fmt(d.owner_cash)}</span>
+                            </div>
+                          </div>
+                        )
+                      }}
+                    />
                     <Bar dataKey="owner_profit" fill="#10b981" radius={[6, 6, 0, 0]} name="Owner Profit" />
                   </BarChart>
                 </ResponsiveContainer>

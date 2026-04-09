@@ -1470,6 +1470,9 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         from users.models import Organization
         registered_stores = set(Organization.objects.values_list('name', flat=True))
 
+        # Build owner profit account/cash breakdown from ProfitShare model
+        from reports.models import ProfitShare, PartnerShare
+
         # Build period data
         history_data = []
         for period_label in periods:
@@ -1479,6 +1482,24 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
             cash_collection = period_qs.filter(transaction_type='COLLECTION', profit_share__isnull=True).aggregate(total=Sum('amount'))['total'] or 0
             incentive = period_qs.filter(transaction_type='INCENTIVE').aggregate(total=Sum('amount'))['total'] or 0
             equity = period_qs.filter(transaction_type='PROFIT').aggregate(total=Sum('amount'))['total'] or 0
+
+            # Calculate owner account/cash from ProfitShare data
+            owner_account = Decimal('0')
+            owner_cash = Decimal('0')
+            ps_ids = list(period_qs.filter(
+                transaction_type='COLLECTION', profit_share__isnull=False
+            ).values_list('profit_share_id', flat=True).distinct())
+            for ps in ProfitShare.objects.filter(id__in=ps_ids):
+                has_owner_partner = ps.partners.filter(partner_type='OWNER').exists()
+                if has_owner_partner:
+                    for p in ps.partners.filter(partner_type='OWNER'):
+                        owner_account += (p.bank_account or Decimal('0'))
+                        owner_cash += (p.bank_cash or Decimal('0'))
+                else:
+                    total_p_acct = sum((p.total_account or Decimal('0')) for p in ps.partners.all())
+                    total_p_cash = sum((p.total_cash or Decimal('0')) for p in ps.partners.all())
+                    owner_account += (ps.net_profit_account or Decimal('0')) - total_p_acct
+                    owner_cash += (ps.net_profit_cash or Decimal('0')) - total_p_cash
 
             # Per-store breakdown for this period (registered stores only)
             stores = []
@@ -1501,6 +1522,8 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
             history_data.append({
                 'period': period_label,
                 'owner_profit': float(owner_profit),
+                'owner_account': float(owner_account),
+                'owner_cash': float(owner_cash),
                 'cash_collection': float(cash_collection),
                 'incentive': float(incentive),
                 'equity': float(equity),
