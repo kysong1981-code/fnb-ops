@@ -135,6 +135,8 @@ export default function CQCashFlow() {
 
   // Edit transaction (CEO only)
   const [editingTx, setEditingTx] = useState(null)
+  // Detail view (tap row to see details like attachment)
+  const [detailTx, setDetailTx] = useState(null)
 
   // Account expense form (KRW: direct save, QT/ChCh: needs approval)
   const [expForm, setExpForm] = useState({ date: localDateStr(new Date()), description: '', amount: '', category: 'EXPENSE', exchangeRate: '', krwAmount: '', attachment: null })
@@ -1073,12 +1075,13 @@ export default function CQCashFlow() {
                           const isRealTx = !String(item.id).startsWith('exp_')
                           const canEdit = isCEO && isRealTx && !item.is_locked
                           const isEditing = editingTx?.id === item.id
+                          const isDetail = detailTx?.id === item.id && !isEditing
                           const colSpan = isKRW ? (isCEO ? 4 : 3) : (isCEO ? 6 : 5)
                           return (
                           <React.Fragment key={item.id}>
                           <tr
-                            onClick={() => canEdit && !isEditing && handleEditTx(item)}
-                            className={`border-b border-gray-50 ${item.source === 'cash_management' ? 'bg-amber-50/50' : ''} ${isEditing ? 'bg-blue-50' : canEdit ? 'cursor-pointer active:bg-blue-50' : ''}`}>
+                            onClick={() => !isEditing && setDetailTx(isDetail ? null : item)}
+                            className={`border-b border-gray-50 cursor-pointer ${item.source === 'cash_management' ? 'bg-amber-50/50' : ''} ${isEditing ? 'bg-blue-50' : isDetail ? 'bg-gray-50' : 'active:bg-gray-50'}`}>
                             <td className="py-2 pr-3 text-gray-600 text-xs">{item.date}</td>
                             <td className="py-2 pr-3 text-gray-800 text-xs">
                               {item.source === 'cash_management' ? (
@@ -1094,13 +1097,49 @@ export default function CQCashFlow() {
                             </td>
                             {!isKRW && <td className="py-2 text-right font-medium text-gray-800 text-xs">{f(item.balance)}</td>}
                             {isCEO && (
-                              <td className="py-2 pl-1">
+                              <td className="py-2 pl-1" onClick={e => e.stopPropagation()}>
                                 {canEdit && !isEditing && (
-                                  <span className="text-gray-300 text-[10px]">tap</span>
+                                  <span className="inline-flex items-center gap-0.5">
+                                    <button onClick={() => { setDetailTx(null); handleEditTx(item) }} title="수정"
+                                      className="p-1 text-gray-300 hover:text-blue-500 active:text-blue-600 rounded">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                                    </button>
+                                    <button onClick={() => handleDeleteTx(item.id)} title="삭제"
+                                      className="p-1 text-gray-300 hover:text-red-500 active:text-red-600 rounded">
+                                      <TrashIcon className="w-3.5 h-3.5" />
+                                    </button>
+                                  </span>
                                 )}
                               </td>
                             )}
                           </tr>
+                          {/* Detail row (tap to expand) */}
+                          {isDetail && (
+                            <tr className="bg-gray-50 border-b border-gray-100">
+                              <td colSpan={colSpan} className="px-3 py-2.5">
+                                <div className="text-xs space-y-1.5">
+                                  <div className="flex gap-4 flex-wrap">
+                                    <span className="text-gray-400">Type: <span className="text-gray-700 font-medium">{item.transaction_type}</span></span>
+                                    <span className="text-gray-400">Store: <span className="text-gray-700 font-medium">{item.store_name || '-'}</span></span>
+                                    <span className="text-gray-400">Amount: <span className={`font-medium ${item.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>{f(item.amount)}</span></span>
+                                  </div>
+                                  {item.note && <div className="text-gray-400">Note: <span className="text-gray-700">{item.note}</span></div>}
+                                  {item.attachment && (
+                                    <div className="mt-2">
+                                      <a href={item.attachment} target="_blank" rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-blue-600 hover:bg-blue-50">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                        첨부파일 보기
+                                      </a>
+                                    </div>
+                                  )}
+                                  {item.source === 'cash_management' && (
+                                    <div className="text-amber-600 text-[11px]">💰 Cash Management에서 자동 생성</div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
                           {/* Inline edit row */}
                           {isEditing && (
                             <tr className="bg-blue-50 border-b border-blue-100">
