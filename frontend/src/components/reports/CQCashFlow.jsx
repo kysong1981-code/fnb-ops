@@ -514,37 +514,40 @@ export default function CQCashFlow() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-left text-gray-500 border-b">
-                        <th className="pb-2 pr-4">Store</th>
-                        <th className="pb-2 pr-4 text-right">Owner Profit</th>
-                        <th className="pb-2 pr-4 text-right">Incentive</th>
-                        <th className="pb-2 pr-4 text-right">Equity Share</th>
+                        <th className="pb-2 pr-3">Store</th>
+                        <th className="pb-2 pr-3 text-right">Cash 수금</th>
+                        <th className="pb-2 pr-3 text-right">Owner</th>
+                        <th className="pb-2 pr-3 text-right">Incentive</th>
+                        <th className="pb-2 pr-3 text-right">Equity</th>
                         <th className="pb-2 text-right">Total</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {summary.stores.map(s => {
-                        const total = (parseFloat(s.collection) || 0) + (parseFloat(s.incentive) || 0) + (parseFloat(s.profit) || 0)
-                        return (
+                      {summary.stores.map(s => (
                           <tr key={s.store_name} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
                             onClick={() => { setSelectedStore(s.store_name); setView('stores') }}>
-                            <td className="py-2.5 pr-4 font-medium text-gray-800">{s.store_name}</td>
-                            <td className="py-2.5 pr-4 text-right text-green-600 font-medium">{fmt(s.collection)}</td>
-                            <td className="py-2.5 pr-4 text-right text-purple-600">{fmt(s.incentive)}</td>
-                            <td className="py-2.5 pr-4 text-right text-blue-600">{fmt(s.profit)}</td>
-                            <td className="py-2.5 text-right font-semibold text-gray-800">{fmt(total)}</td>
+                            <td className="py-2.5 pr-3 font-medium text-gray-800">{s.store_name}</td>
+                            <td className="py-2.5 pr-3 text-right text-orange-600">{fmt(s.cash_collection)}</td>
+                            <td className="py-2.5 pr-3 text-right text-green-600 font-medium">{fmt(s.owner_profit)}</td>
+                            <td className="py-2.5 pr-3 text-right text-purple-600">{fmt(s.incentive)}</td>
+                            <td className="py-2.5 pr-3 text-right text-blue-600">{fmt(s.equity_share)}</td>
+                            <td className="py-2.5 text-right font-semibold text-gray-800">{fmt(s.total)}</td>
                           </tr>
-                        )
-                      })}
+                      ))}
                       {/* Total row */}
                       {(() => {
-                        const grandTotal = (summary.totals.collection || 0) + (summary.totals.incentive || 0) + (summary.totals.profit || 0)
+                        const totCC = summary.stores.reduce((s, r) => s + (parseFloat(r.cash_collection) || 0), 0)
+                        const totOP = summary.stores.reduce((s, r) => s + (parseFloat(r.owner_profit) || 0), 0)
+                        const totI = summary.stores.reduce((s, r) => s + (parseFloat(r.incentive) || 0), 0)
+                        const totEq = summary.stores.reduce((s, r) => s + (parseFloat(r.equity_share) || 0), 0)
                         return (
                           <tr className="border-t-2 border-gray-200 font-bold">
-                            <td className="py-3 pr-4 text-gray-900">Total</td>
-                            <td className="py-3 pr-4 text-right text-green-600">{fmt(summary.totals.collection)}</td>
-                            <td className="py-3 pr-4 text-right text-purple-600">{fmt(summary.totals.incentive)}</td>
-                            <td className="py-3 pr-4 text-right text-blue-600">{fmt(summary.totals.profit)}</td>
-                            <td className="py-3 text-right text-gray-900">{fmt(grandTotal)}</td>
+                            <td className="py-3 pr-3 text-gray-900">Total</td>
+                            <td className="py-3 pr-3 text-right text-orange-600">{fmt(totCC)}</td>
+                            <td className="py-3 pr-3 text-right text-green-600">{fmt(totOP)}</td>
+                            <td className="py-3 pr-3 text-right text-purple-600">{fmt(totI)}</td>
+                            <td className="py-3 pr-3 text-right text-blue-600">{fmt(totEq)}</td>
+                            <td className="py-3 text-right text-gray-900">{fmt(totCC + totOP + totI + totEq)}</td>
                           </tr>
                         )
                       })()}
@@ -565,21 +568,19 @@ export default function CQCashFlow() {
                     <thead>
                       <tr className="text-left text-gray-500 border-b">
                         <th className="pb-2 pr-4">Name</th>
-                        <th className="pb-2 pr-4 text-right">Owner Profit</th>
                         <th className="pb-2 pr-4 text-right">Incentive</th>
                         <th className="pb-2 pr-4 text-right">Equity Share</th>
                         <th className="pb-2 text-right">Total</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {summary.persons.map(p => (
+                      {summary.persons.filter(p => p.person !== 'Owner' && p.person !== 'Deposit' && p.person !== 'Opening Balance').map(p => (
                         <tr key={p.person} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
                           onClick={() => { setSelectedPerson(p.person); setView('persons') }}>
                           <td className="py-2.5 pr-4 font-medium text-gray-800">{p.person}</td>
-                          <td className="py-2.5 pr-4 text-right text-green-600">{fmt(p.by_type?.collection)}</td>
                           <td className="py-2.5 pr-4 text-right text-purple-600">{fmt(p.by_type?.incentive)}</td>
                           <td className="py-2.5 pr-4 text-right text-blue-600">{fmt(p.by_type?.profit)}</td>
-                          <td className="py-2.5 text-right font-semibold text-gray-800">{fmt(p.total_received)}</td>
+                          <td className="py-2.5 text-right font-semibold text-gray-800">{fmt((parseFloat(p.by_type?.incentive) || 0) + (parseFloat(p.by_type?.profit) || 0))}</td>
                         </tr>
                       ))}
                     </tbody>

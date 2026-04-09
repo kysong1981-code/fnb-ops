@@ -1285,26 +1285,25 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         store_rows = qs.exclude(store_name='').filter(
             store_name__in=registered_stores
         ).values('store_name').annotate(
-            collection=Sum('amount', filter=Q(transaction_type='COLLECTION')),
-            collection_account=Sum('amount', filter=Q(transaction_type='COLLECTION', account_type='ACCOUNT')),
-            collection_cash=Sum('amount', filter=Q(transaction_type='COLLECTION', account_type='CASH')),
+            cash_collection=Sum('amount', filter=Q(transaction_type='COLLECTION', profit_share__isnull=True)),
+            owner_profit=Sum('amount', filter=Q(transaction_type='COLLECTION', profit_share__isnull=False)),
             incentive=Sum('amount', filter=Q(transaction_type='INCENTIVE')),
-            profit=Sum('amount', filter=Q(transaction_type='PROFIT')),
+            equity_share=Sum('amount', filter=Q(transaction_type='PROFIT')),
         ).order_by('store_name')
 
         store_summary = []
         for row in store_rows:
-            c = row['collection'] or 0
+            cc = row['cash_collection'] or 0
+            op = row['owner_profit'] or 0
             i = row['incentive'] or 0
-            p = row['profit'] or 0
+            eq = row['equity_share'] or 0
             store_summary.append({
                 'store_name': row['store_name'],
-                'collection': c,
-                'collection_account': row['collection_account'] or 0,
-                'collection_cash': row['collection_cash'] or 0,
+                'cash_collection': cc,
+                'owner_profit': op,
                 'incentive': i,
-                'profit': p,
-                'total': float(c) + float(i) + float(p),
+                'equity_share': eq,
+                'total': float(cc) + float(op) + float(i) + float(eq),
             })
         store_summary.sort(key=lambda x: x['total'], reverse=True)
 
