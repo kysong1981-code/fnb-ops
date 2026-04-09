@@ -137,7 +137,7 @@ export default function CQCashFlow() {
   const [editingTx, setEditingTx] = useState(null)
 
   // Account expense form (KRW: direct save, QT/ChCh: needs approval)
-  const [expForm, setExpForm] = useState({ date: localDateStr(new Date()), description: '', amount: '', category: 'EXPENSE' })
+  const [expForm, setExpForm] = useState({ date: localDateStr(new Date()), description: '', amount: '', category: 'EXPENSE', krwAmount: '', attachment: null })
 
   // Store lock status
   const [storeLockStatus, setStoreLockStatus] = useState({ is_locked: false, locked_by_name: '' })
@@ -291,7 +291,34 @@ export default function CQCashFlow() {
   const handleSaveExpense = async () => {
     if (!expForm.date || !expForm.amount) return
     try {
-      if (selectedAccount === 'KRW') {
+      if (expForm.category === 'EXCHANGE') {
+        // Exchange: NZD expense from current account + KRW income to KRW account
+        if (!expForm.krwAmount) {
+          setError('KRW 금액을 입력하세요')
+          return
+        }
+        // 1) NZD expense from QT/ChCh/KRW
+        const formData = new FormData()
+        formData.append('date', expForm.date)
+        formData.append('account', selectedAccount.toUpperCase())
+        formData.append('category', 'EXCHANGE')
+        formData.append('description', expForm.description || `환전 → KRW ₩${Number(expForm.krwAmount).toLocaleString()}`)
+        formData.append('amount', expForm.amount)
+        if (expForm.attachment) formData.append('attachment', expForm.attachment)
+        await cqAPI.createExpense(formData)
+        // 2) KRW income
+        await cqTransactionAPI.create({
+          date: expForm.date,
+          store_name: `환전 ← ${selectedAccount} $${Number(expForm.amount).toLocaleString()}`,
+          transaction_type: 'EXCHANGE',
+          person: 'KRW',
+          amount: expForm.krwAmount,
+          account_type: 'KRW',
+          note: expForm.description || `환전 ← ${selectedAccount}`,
+        })
+        loadPendingExpenses()
+        showMsg('환전 저장됨 (NZD 승인 대기)')
+      } else if (selectedAccount === 'KRW') {
         // KRW: direct CQTransaction (no approval)
         await cqTransactionAPI.create({
           date: expForm.date,
@@ -311,11 +338,15 @@ export default function CQCashFlow() {
         formData.append('category', expForm.category)
         formData.append('description', expForm.description || '')
         formData.append('amount', expForm.amount)
+        if (expForm.attachment) formData.append('attachment', expForm.attachment)
         await cqAPI.createExpense(formData)
         loadPendingExpenses()
         showMsg('승인 대기 중')
       }
-      setExpForm({ date: localDateStr(new Date()), description: '', amount: '', category: 'EXPENSE' })
+      setExpForm({ date: localDateStr(new Date()), description: '', amount: '', category: 'EXPENSE', krwAmount: '', attachment: null })
+      // Reset file input
+      const fileInput = document.getElementById('expense-attachment')
+      if (fileInput) fileInput.value = ''
       loadAccountStatement()
     } catch (e) {
       const detail = e.response?.data?.detail || e.response?.data?.error || JSON.stringify(e.response?.data) || 'Failed to save'
@@ -767,44 +798,6 @@ export default function CQCashFlow() {
       {/* ===== ACCOUNTS VIEW ===== */}
       {view === 'accounts' && (
         <div className="space-y-4">
-          {/* Pending Expenses - Approval Needed */}
-          {pendingExpenses.length > 0 && (
-            <Card>
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600 text-xs font-bold">{pendingExpenses.length}</span>
-                  <h3 className="font-bold text-gray-900">승인필요</h3>
-                </div>
-                <div className="space-y-2">
-                  {pendingExpenses.map(exp => (
-                    <div key={exp.id} className="flex items-center gap-3 p-3 bg-amber-50/70 rounded-xl border border-amber-100">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">{exp.account}</span>
-                          <span className="text-sm font-medium text-gray-900 truncate">{exp.description}</span>
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{exp.category}</span>
-                        </div>
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-xs text-gray-500">{exp.date}</span>
-                          <span className="text-xs text-gray-400">{exp.organization_name}</span>
-                          <span className="text-sm font-bold text-red-600">
-                            {exp.account === 'KRW' ? `₩${Number(exp.amount).toLocaleString()}` : `$${Number(exp.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}`}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleApproveExpense(exp.id)}
-                        className="px-4 py-2 bg-green-600 text-white text-xs font-bold rounded-xl hover:bg-green-700 transition-all whitespace-nowrap"
-                      >
-                        ✓ 승인
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Card>
-          )}
-
           {/* 6M / Year / Custom selector */}
           <div className="flex flex-wrap items-center gap-3">
             {acctMode === 'YEAR' && (
@@ -865,7 +858,7 @@ export default function CQCashFlow() {
                     onChange={e => setExpForm(p => ({ ...p, description: e.target.value }))}
                     className="px-2 py-2 text-sm border rounded-xl bg-gray-50" />
                   <input type="number" value={expForm.amount}
-                    placeholder={selectedAccount === 'KRW' ? '금액 (₩)' : 'Amount ($)'}
+                    placeholder={selectedAccount === 'KRW' ? '금액 (₩)' : 'NZD ($)'}
                     onChange={e => setExpForm(p => ({ ...p, amount: e.target.value }))}
                     className="px-2 py-2 text-sm border rounded-xl bg-gray-50" />
                   <select value={expForm.category}
@@ -875,26 +868,82 @@ export default function CQCashFlow() {
                       <>
                         <option value="EXPENSE">지출</option>
                         <option value="COLLECTION">입금</option>
-                        <option value="EXCHANGE">환전</option>
                         <option value="TRANSFER">이체</option>
                       </>
                     ) : (
                       <>
                         <option value="EXPENSE">Expense</option>
                         <option value="TRANSFER">Transfer</option>
-                        <option value="EXCHANGE">Exchange</option>
+                        <option value="EXCHANGE">Exchange (환전)</option>
                       </>
                     )}
                   </select>
                 </div>
-                <div className="flex items-center justify-between mt-3">
+                {/* Exchange: KRW amount field */}
+                {expForm.category === 'EXCHANGE' && selectedAccount !== 'KRW' && (
+                  <div className="mt-2">
+                    <input type="number" value={expForm.krwAmount} placeholder="KRW 수입 금액 (₩)"
+                      onChange={e => setExpForm(p => ({ ...p, krwAmount: e.target.value }))}
+                      className="w-full px-2 py-2 text-sm border rounded-xl bg-amber-50 border-amber-200" />
+                    <div className="text-xs text-gray-400 mt-1">
+                      {expForm.amount && expForm.krwAmount
+                        ? `환율: ₩${(Number(expForm.krwAmount) / Number(expForm.amount)).toFixed(0)} / $1 NZD`
+                        : 'NZD → KRW 환전 금액'}
+                    </div>
+                  </div>
+                )}
+                {/* File attachment */}
+                <div className="flex items-center gap-3 mt-3">
+                  <label className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 rounded-xl text-xs text-gray-600 cursor-pointer hover:bg-gray-200 transition-all">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                    {expForm.attachment ? expForm.attachment.name : '사진 첨부'}
+                    <input id="expense-attachment" type="file" accept="image/*,.pdf" className="hidden"
+                      onChange={e => setExpForm(p => ({ ...p, attachment: e.target.files[0] || null }))} />
+                  </label>
+                  {expForm.attachment && (
+                    <button onClick={() => { setExpForm(p => ({ ...p, attachment: null })); const fi = document.getElementById('expense-attachment'); if (fi) fi.value = '' }}
+                      className="text-xs text-red-500 hover:text-red-700">✕</button>
+                  )}
+                  <div className="flex-1" />
                   {selectedAccount !== 'KRW' && (
-                    <span className="text-xs text-amber-600">* 상대방 승인 필요</span>
+                    <span className="text-xs text-amber-600">* 승인 필요</span>
                   )}
                   <button onClick={handleSaveExpense}
-                    className="px-5 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-all ml-auto">
+                    className="px-5 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-all">
                     저장
                   </button>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Pending Expenses - Approval */}
+          {pendingExpenses.length > 0 && (
+            <Card>
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-red-100 text-red-600 text-[10px] font-bold">{pendingExpenses.length}</span>
+                  <h3 className="text-sm font-bold text-gray-900">승인 대기</h3>
+                </div>
+                <div className="space-y-2">
+                  {pendingExpenses.map(exp => (
+                    <div key={exp.id} className="flex items-center gap-3 p-2.5 bg-amber-50/70 rounded-xl border border-amber-100">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold">{exp.account}</span>
+                          <span className="font-medium text-gray-900 truncate">{exp.description}</span>
+                          <span className="font-bold text-red-600 ml-auto">
+                            {exp.account === 'KRW' ? `₩${Number(exp.amount).toLocaleString()}` : `$${Number(exp.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}`}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-400 mt-0.5">{exp.date} · {exp.created_by_name || ''}</div>
+                      </div>
+                      <button onClick={() => handleApproveExpense(exp.id)}
+                        className="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 whitespace-nowrap">
+                        ✓ 승인
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             </Card>
