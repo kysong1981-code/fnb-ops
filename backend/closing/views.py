@@ -1287,6 +1287,8 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         ).values('store_name').annotate(
             cash_collection=Sum('amount', filter=Q(transaction_type='COLLECTION', profit_share__isnull=True)),
             owner_profit=Sum('amount', filter=Q(transaction_type='COLLECTION', profit_share__isnull=False)),
+            owner_profit_account=Sum('amount', filter=Q(transaction_type='COLLECTION', profit_share__isnull=False, account_type='ACCOUNT')),
+            owner_profit_cash=Sum('amount', filter=Q(transaction_type='COLLECTION', profit_share__isnull=False, account_type='CASH')),
             incentive=Sum('amount', filter=Q(transaction_type='INCENTIVE')),
             equity_share=Sum('amount', filter=Q(transaction_type='PROFIT')),
         ).order_by('store_name')
@@ -1295,14 +1297,18 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         for row in store_rows:
             cc = row['cash_collection'] or 0
             op = row['owner_profit'] or 0
+            op_acct = row['owner_profit_account'] or 0
+            op_cash = row['owner_profit_cash'] or 0
             i = row['incentive'] or 0
             eq = row['equity_share'] or 0
             store_summary.append({
                 'store_name': row['store_name'],
                 'cash_collection': cc,
                 'owner_profit': op,
+                'owner_profit_account': op_acct,
+                'owner_profit_cash': op_cash,
                 'incentive': i,
-                'equity_share': eq,
+                'equity': eq,
                 'total': float(cc) + float(op) + float(i) + float(eq),
             })
         store_summary.sort(key=lambda x: x['total'], reverse=True)

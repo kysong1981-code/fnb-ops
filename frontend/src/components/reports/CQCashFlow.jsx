@@ -530,6 +530,8 @@ export default function CQCashFlow() {
                           <tr className="text-left text-gray-500 border-b">
                             <th className="pb-2 pr-3">#</th>
                             <th className="pb-2 pr-3">Store</th>
+                            <th className="pb-2 pr-3 text-right">Cash</th>
+                            <th className="pb-2 pr-3 text-right">Account</th>
                             <th className="pb-2 pr-3 text-right">Owner Profit</th>
                             <th className="pb-2 pr-3 text-right">Incentive</th>
                             <th className="pb-2 pr-3 text-right">Equity</th>
@@ -539,11 +541,15 @@ export default function CQCashFlow() {
                         <tbody>
                           {stores.map((s, idx) => {
                             const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`
+                            const opCash = parseFloat(s.owner_profit_cash) || 0
+                            const opAcct = parseFloat(s.owner_profit_account) || 0
                             return (
                               <tr key={s.store_name} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
                                 onClick={() => { setSelectedStore(s.store_name); setView('stores') }}>
                                 <td className="py-2.5 pr-3">{medal}</td>
                                 <td className="py-2.5 pr-3 font-medium text-gray-800">{s.store_name}</td>
+                                <td className="py-2.5 pr-3 text-right text-orange-600 text-xs">{fmt(opCash)}</td>
+                                <td className="py-2.5 pr-3 text-right text-emerald-700 text-xs">{fmt(opAcct)}</td>
                                 <td className="py-2.5 pr-3 text-right text-green-600 font-medium">{fmt(s.owner_profit)}</td>
                                 <td className="py-2.5 pr-3 text-right text-purple-600">{fmt(s.incentive)}</td>
                                 <td className="py-2.5 pr-3 text-right text-blue-600">{fmt(s.equity)}</td>
@@ -553,14 +559,22 @@ export default function CQCashFlow() {
                               </tr>
                             )
                           })}
-                          <tr className="border-t-2 border-gray-200">
-                            <td className="py-2.5 pr-3"></td>
-                            <td className="py-2.5 pr-3 font-bold text-gray-900">Total</td>
-                            <td className="py-2.5 pr-3 text-right font-bold text-green-600">{fmt(grandTotal)}</td>
-                            <td className="py-2.5 pr-3 text-right font-bold text-purple-600">{fmt(totalIncentive)}</td>
-                            <td className="py-2.5 pr-3 text-right font-bold text-blue-600">{fmt(totalEquity)}</td>
-                            <td className="py-2.5 text-right font-bold text-gray-900">{fmt(grandTotal + totalIncentive + totalEquity)}</td>
-                          </tr>
+                          {(() => {
+                            const totalCash = stores.reduce((s, r) => s + (parseFloat(r.owner_profit_cash) || 0), 0)
+                            const totalAcct = stores.reduce((s, r) => s + (parseFloat(r.owner_profit_account) || 0), 0)
+                            return (
+                              <tr className="border-t-2 border-gray-200">
+                                <td className="py-2.5 pr-3"></td>
+                                <td className="py-2.5 pr-3 font-bold text-gray-900">Total</td>
+                                <td className="py-2.5 pr-3 text-right font-bold text-orange-600 text-xs">{fmt(totalCash)}</td>
+                                <td className="py-2.5 pr-3 text-right font-bold text-emerald-700 text-xs">{fmt(totalAcct)}</td>
+                                <td className="py-2.5 pr-3 text-right font-bold text-green-600">{fmt(grandTotal)}</td>
+                                <td className="py-2.5 pr-3 text-right font-bold text-purple-600">{fmt(totalIncentive)}</td>
+                                <td className="py-2.5 pr-3 text-right font-bold text-blue-600">{fmt(totalEquity)}</td>
+                                <td className="py-2.5 text-right font-bold text-gray-900">{fmt(grandTotal + totalIncentive + totalEquity)}</td>
+                              </tr>
+                            )
+                          })()}
                         </tbody>
                       </table>
                     </div>
