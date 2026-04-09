@@ -20,6 +20,7 @@ export default function ManagerHeader() {
   const [roleOpen, setRoleOpen] = useState(false)
   const avatarRef = useRef(null)
   const storeRef = useRef(null)
+  const mobileStoreRef = useRef(null)
   const roleRef = useRef(null)
 
   const getGreeting = () => {
@@ -37,7 +38,7 @@ export default function ManagerHeader() {
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (avatarRef.current && !avatarRef.current.contains(e.target)) setAvatarOpen(false)
-      if (storeRef.current && !storeRef.current.contains(e.target)) setStoreOpen(false)
+      if (storeRef.current && !storeRef.current.contains(e.target) && mobileStoreRef.current && !mobileStoreRef.current.contains(e.target)) setStoreOpen(false)
       if (roleRef.current && !roleRef.current.contains(e.target)) setRoleOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -265,7 +266,7 @@ export default function ManagerHeader() {
     {/* Mobile Store Selector Bar */}
     {hasMultipleStores && selectedStore && (
       <div className="sm:hidden bg-white border-b border-gray-100 px-4 py-2">
-        <div className="relative" ref={storeRef}>
+        <div className="relative" ref={mobileStoreRef}>
           <button
             onClick={() => setStoreOpen(!storeOpen)}
             className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-blue-50 active:bg-blue-100"
