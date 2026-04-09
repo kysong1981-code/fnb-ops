@@ -137,7 +137,7 @@ export default function CQCashFlow() {
   const [editingTx, setEditingTx] = useState(null)
 
   // Account expense form (KRW: direct save, QT/ChCh: needs approval)
-  const [expForm, setExpForm] = useState({ date: localDateStr(new Date()), description: '', amount: '', category: 'EXPENSE', krwAmount: '', attachment: null })
+  const [expForm, setExpForm] = useState({ date: localDateStr(new Date()), description: '', amount: '', category: 'EXPENSE', exchangeRate: '', krwAmount: '', attachment: null })
 
   // Store lock status
   const [storeLockStatus, setStoreLockStatus] = useState({ is_locked: false, locked_by_name: '' })
@@ -297,24 +297,28 @@ export default function CQCashFlow() {
           setError('KRW 금액을 입력하세요')
           return
         }
-        // 1) NZD expense from QT/ChCh/KRW
+        const rateInfo = expForm.exchangeRate ? ` @${expForm.exchangeRate}` : ''
+        const desc = expForm.description || `환전 → KRW ₩${Number(expForm.krwAmount).toLocaleString()}${rateInfo}`
+        // 1) NZD expense from QT/ChCh
         const formData = new FormData()
         formData.append('date', expForm.date)
         formData.append('account', selectedAccount.toUpperCase())
         formData.append('category', 'EXCHANGE')
-        formData.append('description', expForm.description || `환전 → KRW ₩${Number(expForm.krwAmount).toLocaleString()}`)
+        formData.append('description', desc)
         formData.append('amount', expForm.amount)
+        if (expForm.exchangeRate) formData.append('exchange_rate', expForm.exchangeRate)
+        if (expForm.krwAmount) formData.append('krw_amount', expForm.krwAmount)
         if (expForm.attachment) formData.append('attachment', expForm.attachment)
         await cqAPI.createExpense(formData)
         // 2) KRW income
         await cqTransactionAPI.create({
           date: expForm.date,
-          store_name: `환전 ← ${selectedAccount} $${Number(expForm.amount).toLocaleString()}`,
+          store_name: `환전 ← ${selectedAccount} $${Number(expForm.amount).toLocaleString()}${rateInfo}`,
           transaction_type: 'EXCHANGE',
           person: 'KRW',
           amount: expForm.krwAmount,
           account_type: 'KRW',
-          note: expForm.description || `환전 ← ${selectedAccount}`,
+          note: desc,
         })
         loadPendingExpenses()
         showMsg('환전 저장됨 (NZD 승인 대기)')
@@ -343,7 +347,7 @@ export default function CQCashFlow() {
         loadPendingExpenses()
         showMsg('승인 대기 중')
       }
-      setExpForm({ date: localDateStr(new Date()), description: '', amount: '', category: 'EXPENSE', krwAmount: '', attachment: null })
+      setExpForm({ date: localDateStr(new Date()), description: '', amount: '', category: 'EXPENSE', exchangeRate: '', krwAmount: '', attachment: null })
       // Reset file input
       const fileInput = document.getElementById('expense-attachment')
       if (fileInput) fileInput.value = ''
@@ -868,27 +872,33 @@ export default function CQCashFlow() {
                       <>
                         <option value="EXPENSE">지출</option>
                         <option value="COLLECTION">입금</option>
-                        <option value="TRANSFER">이체</option>
                       </>
                     ) : (
                       <>
-                        <option value="EXPENSE">Expense</option>
-                        <option value="TRANSFER">Transfer</option>
-                        <option value="EXCHANGE">Exchange (환전)</option>
+                        <option value="EXPENSE">지출</option>
+                        <option value="EXCHANGE">환전</option>
                       </>
                     )}
                   </select>
                 </div>
-                {/* Exchange: KRW amount field */}
+                {/* Exchange: exchange rate + KRW amount */}
                 {expForm.category === 'EXCHANGE' && selectedAccount !== 'KRW' && (
-                  <div className="mt-2">
-                    <input type="number" value={expForm.krwAmount} placeholder="KRW 수입 금액 (₩)"
-                      onChange={e => setExpForm(p => ({ ...p, krwAmount: e.target.value }))}
-                      className="w-full px-2 py-2 text-sm border rounded-xl bg-amber-50 border-amber-200" />
-                    <div className="text-xs text-gray-400 mt-1">
-                      {expForm.amount && expForm.krwAmount
-                        ? `환율: ₩${(Number(expForm.krwAmount) / Number(expForm.amount)).toFixed(0)} / $1 NZD`
-                        : 'NZD → KRW 환전 금액'}
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div>
+                      <input type="number" value={expForm.exchangeRate} placeholder="환율 (₩ / $1 NZD)"
+                        onChange={e => {
+                          const rate = e.target.value
+                          const krw = rate && expForm.amount ? Math.round(Number(rate) * Number(expForm.amount)) : ''
+                          setExpForm(p => ({ ...p, exchangeRate: rate, krwAmount: krw ? String(krw) : '' }))
+                        }}
+                        className="w-full px-2 py-2 text-sm border rounded-xl bg-gray-50" />
+                      <div className="text-xs text-gray-400 mt-0.5">환율</div>
+                    </div>
+                    <div>
+                      <input type="number" value={expForm.krwAmount} placeholder="KRW 금액 (₩)"
+                        onChange={e => setExpForm(p => ({ ...p, krwAmount: e.target.value }))}
+                        className="w-full px-2 py-2 text-sm border rounded-xl bg-amber-50 border-amber-200" />
+                      <div className="text-xs text-gray-400 mt-0.5">KRW 수입</div>
                     </div>
                   </div>
                 )}
