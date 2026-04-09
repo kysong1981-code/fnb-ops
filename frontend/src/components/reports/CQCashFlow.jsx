@@ -954,6 +954,29 @@ export default function CQCashFlow() {
             const isKRW = selectedAccount === 'KRW'
             return (
             <>
+              {/* Balance Cards (QT/ChCh only) */}
+              {!isKRW && (
+              <Card>
+                <div className="p-5">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">잔액</div>
+                      <div className={`text-2xl font-bold ${accountData.total_balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {f(accountData.total_balance)}
+                      </div>
+                    </div>
+                    {accountData.opening_balance != null && accountData.opening_balance !== 0 && (
+                      <div>
+                        <div className="text-xs text-gray-500 mb-1">이월</div>
+                        <div className={`text-2xl font-bold ${accountData.opening_balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                          {f(accountData.opening_balance)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+              )}
 
               {/* Per-store breakdown (hide for KRW) */}
               {selectedAccount !== 'KRW' && accountData.store_summary?.length > 0 && (
