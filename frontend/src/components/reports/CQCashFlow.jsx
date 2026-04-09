@@ -1096,10 +1096,13 @@ export default function CQCashFlow() {
                       <tbody>
                         {accountData.ledger?.map(item => {
                           const isRealTx = !String(item.id).startsWith('exp_')
+                          const canEdit = isCEO && isRealTx && !item.is_locked
                           return (
-                          <tr key={item.id} className={`border-b border-gray-50 ${item.source === 'cash_management' ? 'bg-amber-50/50' : ''}`}>
-                            <td className="py-2 pr-3 text-gray-600">{item.date}</td>
-                            <td className="py-2 pr-3 text-gray-800">
+                          <tr key={item.id}
+                            onClick={() => canEdit && handleEditTx(item)}
+                            className={`border-b border-gray-50 ${item.source === 'cash_management' ? 'bg-amber-50/50' : ''} ${canEdit ? 'cursor-pointer active:bg-blue-50' : ''}`}>
+                            <td className="py-2 pr-3 text-gray-600 text-xs">{item.date}</td>
+                            <td className="py-2 pr-3 text-gray-800 text-xs">
                               {item.source === 'cash_management' ? (
                                 <span className="inline-flex items-center gap-1">
                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
@@ -1107,24 +1110,18 @@ export default function CQCashFlow() {
                                 </span>
                               ) : (item.store_name || item.note)}
                             </td>
-                            {!isKRW && <td className="py-2 pr-3 text-gray-500 text-xs">{item.note}</td>}
-                            <td className={`py-2 pr-3 text-right font-medium ${item.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {!isKRW && <td className="py-2 pr-3 text-gray-500 text-[11px] hidden sm:table-cell">{item.note}</td>}
+                            <td className={`py-2 pr-3 text-right font-medium text-xs ${item.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                               {item.amount >= 0 ? '+' : ''}{f(item.amount)}
                             </td>
-                            {!isKRW && <td className="py-2 text-right font-medium text-gray-800">{f(item.balance)}</td>}
+                            {!isKRW && <td className="py-2 text-right font-medium text-gray-800 text-xs">{f(item.balance)}</td>}
                             {isCEO && (
-                              <td className="py-2 pl-2">
-                                {isRealTx && !item.is_locked && (
-                                  <div className="flex gap-1">
-                                    <button onClick={() => handleEditTx(item)} title="Edit"
-                                      className="p-1 text-gray-400 hover:text-blue-600 rounded">
-                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                    </button>
-                                    <button onClick={() => handleDeleteTx(item.id)} title="Delete"
-                                      className="p-1 text-gray-400 hover:text-red-600 rounded">
-                                      <TrashIcon className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
+                              <td className="py-2 pl-1" onClick={e => e.stopPropagation()}>
+                                {canEdit && (
+                                  <button onClick={() => handleDeleteTx(item.id)} title="Delete"
+                                    className="p-1.5 text-gray-300 hover:text-red-500 active:text-red-600 rounded">
+                                    <TrashIcon className="w-3.5 h-3.5" />
+                                  </button>
                                 )}
                               </td>
                             )}
