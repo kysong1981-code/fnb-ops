@@ -136,6 +136,9 @@ export default function CQCashFlow() {
   // Edit transaction (CEO only)
   const [editingTx, setEditingTx] = useState(null)
 
+  // Account expense form (KRW: direct save, QT/ChCh: needs approval)
+  const [expForm, setExpForm] = useState({ date: localDateStr(new Date()), description: '', amount: '', category: 'EXPENSE' })
+
   // Store lock status
   const [storeLockStatus, setStoreLockStatus] = useState({ is_locked: false, locked_by_name: '' })
   // Opening balance form
@@ -282,6 +285,41 @@ export default function CQCashFlow() {
       showMsg('Deleted')
     } catch (e) {
       setError(e.response?.data?.error || 'Failed to delete')
+    }
+  }
+
+  const handleSaveExpense = async () => {
+    if (!expForm.date || !expForm.amount) return
+    try {
+      if (selectedAccount === 'KRW') {
+        // KRW: direct CQTransaction (no approval)
+        await cqTransactionAPI.create({
+          date: expForm.date,
+          store_name: expForm.description || '',
+          transaction_type: expForm.category,
+          person: 'KRW',
+          amount: expForm.amount,
+          account_type: 'KRW',
+          note: expForm.description || '',
+        })
+        showMsg('저장됨')
+      } else {
+        // QT/ChCh: CQExpense with approval flow
+        const formData = new FormData()
+        formData.append('date', expForm.date)
+        formData.append('account', selectedAccount.toUpperCase())
+        formData.append('category', expForm.category)
+        formData.append('description', expForm.description || '')
+        formData.append('amount', expForm.amount)
+        await cqAPI.createExpense(formData)
+        loadPendingExpenses()
+        showMsg('승인 대기 중')
+      }
+      setExpForm({ date: localDateStr(new Date()), description: '', amount: '', category: 'EXPENSE' })
+      loadAccountStatement()
+    } catch (e) {
+      const detail = e.response?.data?.detail || e.response?.data?.error || JSON.stringify(e.response?.data) || 'Failed to save'
+      setError(detail)
     }
   }
 
@@ -812,42 +850,61 @@ export default function CQCashFlow() {
             ))}
           </div>
 
+          {/* Expense Form */}
+          {isCEO && (
+            <Card>
+              <div className="p-4">
+                <h3 className="font-semibold text-gray-800 mb-3">
+                  {selectedAccount === 'KRW' ? 'KRW 입력' : `${selectedAccount} 지출 입력`}
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <input type="date" value={expForm.date}
+                    onChange={e => setExpForm(p => ({ ...p, date: e.target.value }))}
+                    className="px-2 py-2 text-sm border rounded-xl bg-gray-50" />
+                  <input type="text" value={expForm.description} placeholder="내용"
+                    onChange={e => setExpForm(p => ({ ...p, description: e.target.value }))}
+                    className="px-2 py-2 text-sm border rounded-xl bg-gray-50" />
+                  <input type="number" value={expForm.amount}
+                    placeholder={selectedAccount === 'KRW' ? '금액 (₩)' : 'Amount ($)'}
+                    onChange={e => setExpForm(p => ({ ...p, amount: e.target.value }))}
+                    className="px-2 py-2 text-sm border rounded-xl bg-gray-50" />
+                  <select value={expForm.category}
+                    onChange={e => setExpForm(p => ({ ...p, category: e.target.value }))}
+                    className="px-2 py-2 text-sm border rounded-xl bg-gray-50">
+                    {selectedAccount === 'KRW' ? (
+                      <>
+                        <option value="EXPENSE">지출</option>
+                        <option value="COLLECTION">입금</option>
+                        <option value="EXCHANGE">환전</option>
+                        <option value="TRANSFER">이체</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="EXPENSE">Expense</option>
+                        <option value="TRANSFER">Transfer</option>
+                        <option value="EXCHANGE">Exchange</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+                <div className="flex items-center justify-between mt-3">
+                  {selectedAccount !== 'KRW' && (
+                    <span className="text-xs text-amber-600">* 상대방 승인 필요</span>
+                  )}
+                  <button onClick={handleSaveExpense}
+                    className="px-5 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-all ml-auto">
+                    저장
+                  </button>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {accountData && (() => {
             const f = selectedAccount === 'KRW' ? fmtKRW : fmt
+            const isKRW = selectedAccount === 'KRW'
             return (
             <>
-              {/* Balance Cards */}
-              <Card>
-                <div className="p-5">
-                  {accountData.actual_balance != null && (
-                    <div className="text-center mb-4">
-                      <div className="text-xs text-gray-500 mb-1">{selectedAccount} 실제 잔액</div>
-                      <div className={`text-3xl font-bold ${accountData.actual_balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {f(accountData.actual_balance)}
-                      </div>
-                    </div>
-                  )}
-                  <div className={`grid ${accountData.actual_balance != null ? 'grid-cols-2 gap-4 pt-4 border-t border-gray-100' : ''}`}>
-                    <div className={accountData.actual_balance != null ? '' : 'text-center mb-3'}>
-                      <div className="text-xs text-gray-500 mb-1">{accountData.actual_balance != null ? '기간 내 잔액' : `${selectedAccount} Balance`}</div>
-                      <div className={`text-xl font-bold ${accountData.total_balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {f(accountData.total_balance)}
-                      </div>
-                    </div>
-                    {accountData.opening_balance != null && accountData.opening_balance !== 0 && (
-                      <div>
-                        <div className="text-xs text-gray-500 mb-1">이월 잔액</div>
-                        <div className={`text-xl font-bold ${accountData.opening_balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                          {f(accountData.opening_balance)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex justify-between items-center pt-3 mt-3 border-t border-gray-100">
-                    <span className="text-xs text-gray-400">{accountData.transaction_count} transactions</span>
-                  </div>
-                </div>
-              </Card>
 
               {/* Per-store breakdown (hide for KRW) */}
               {selectedAccount !== 'KRW' && accountData.store_summary?.length > 0 && (
@@ -945,10 +1002,10 @@ export default function CQCashFlow() {
                       <thead>
                         <tr className="text-left text-gray-500 border-b">
                           <th className="pb-2 pr-3">Date</th>
-                          <th className="pb-2 pr-3">Store</th>
-                          <th className="pb-2 pr-3">Note</th>
+                          <th className="pb-2 pr-3">{isKRW ? '내용' : 'Store'}</th>
+                          {!isKRW && <th className="pb-2 pr-3">Note</th>}
                           <th className="pb-2 pr-3 text-right">Amount</th>
-                          <th className="pb-2 text-right">Balance</th>
+                          {!isKRW && <th className="pb-2 text-right">Balance</th>}
                           {isCEO && <th className="pb-2 pl-2 w-16"></th>}
                         </tr>
                       </thead>
@@ -964,13 +1021,13 @@ export default function CQCashFlow() {
                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                                   {item.store_name || 'Expense'}
                                 </span>
-                              ) : item.store_name}
+                              ) : (item.store_name || item.note)}
                             </td>
-                            <td className="py-2 pr-3 text-gray-500 text-xs">{item.note}</td>
+                            {!isKRW && <td className="py-2 pr-3 text-gray-500 text-xs">{item.note}</td>}
                             <td className={`py-2 pr-3 text-right font-medium ${item.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                               {item.amount >= 0 ? '+' : ''}{f(item.amount)}
                             </td>
-                            <td className="py-2 text-right font-medium text-gray-800">{f(item.balance)}</td>
+                            {!isKRW && <td className="py-2 text-right font-medium text-gray-800">{f(item.balance)}</td>}
                             {isCEO && (
                               <td className="py-2 pl-2">
                                 {isRealTx && !item.is_locked && (
