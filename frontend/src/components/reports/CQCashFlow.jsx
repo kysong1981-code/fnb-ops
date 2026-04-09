@@ -109,9 +109,18 @@ export default function CQCashFlow() {
     person: '', amount: '', account_type: 'CASH', note: '',
   })
 
-  // Accounts
+  // Accounts - own period state
   const [selectedAccount, setSelectedAccount] = useState('QT')
   const [accountData, setAccountData] = useState(null)
+  const [acctYear, setAcctYear] = useState(currentP.year)
+  const [acctMode, setAcctMode] = useState('YEAR') // 'YEAR' or 'CUSTOM'
+  const [acctStart, setAcctStart] = useState('')
+  const [acctEnd, setAcctEnd] = useState('')
+
+  // Computed account date range: YEAR = full fiscal year (Jan 1 - Dec 31)
+  const acctDateRange = acctMode === 'CUSTOM'
+    ? { start: acctStart || `${acctYear}-01-01`, end: acctEnd || `${acctYear}-12-31` }
+    : { start: `${acctYear}-01-01`, end: `${acctYear}-12-31` }
 
   // Store lock status
   const [storeLockStatus, setStoreLockStatus] = useState({ is_locked: false, locked_by_name: '' })
@@ -192,8 +201,8 @@ export default function CQCashFlow() {
     try {
       const res = await cqTransactionAPI.accountStatement({
         account: selectedAccount,
-        date_start: dateRange.start,
-        date_end: dateRange.end,
+        date_start: acctDateRange.start,
+        date_end: acctDateRange.end,
       })
       setAccountData(res.data)
     } catch (e) {
@@ -202,8 +211,11 @@ export default function CQCashFlow() {
   }
 
   useEffect(() => {
-    if (view === 'accounts' && selectedAccount) loadAccountStatement()
-  }, [view, selectedAccount, year, period, customStart, customEnd])
+    if (view === 'accounts' && selectedAccount) {
+      if (acctMode === 'CUSTOM' && (!acctStart || !acctEnd)) return
+      loadAccountStatement()
+    }
+  }, [view, selectedAccount, acctYear, acctMode, acctStart, acctEnd])
 
   const handleToggleLock = async () => {
     try {
@@ -632,31 +644,33 @@ export default function CQCashFlow() {
       {/* ===== ACCOUNTS VIEW ===== */}
       {view === 'accounts' && (
         <div className="space-y-4">
-          {/* Period selector */}
+          {/* Year / Custom selector */}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1">
-              <button onClick={() => setYear(y => y - 1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </button>
-              <span className="text-base font-bold text-gray-900 min-w-[3rem] text-center">{year}</span>
-              <button onClick={() => setYear(y => y + 1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </button>
-            </div>
+            {acctMode !== 'CUSTOM' && (
+              <div className="flex items-center gap-1">
+                <button onClick={() => setAcctYear(y => y - 1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
+                <span className="text-base font-bold text-gray-900 min-w-[3rem] text-center">{acctYear}</span>
+                <button onClick={() => setAcctYear(y => y + 1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
+              </div>
+            )}
             <div className="flex bg-gray-100 rounded-xl p-1">
-              {[{ key: 'H1', label: 'H1' }, { key: 'H2', label: 'H2' }, { key: 'CUSTOM', label: 'Custom' }].map(p => (
-                <button key={p.key} onClick={() => setPeriod(p.key)}
+              {[{ key: 'YEAR', label: 'Year' }, { key: 'CUSTOM', label: 'Custom' }].map(p => (
+                <button key={p.key} onClick={() => setAcctMode(p.key)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    period === p.key ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    acctMode === p.key ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
                   }`}>{p.label}</button>
               ))}
             </div>
-            {period === 'CUSTOM' && (
+            {acctMode === 'CUSTOM' && (
               <div className="flex items-center gap-2">
-                <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
+                <input type="date" value={acctStart} onChange={e => setAcctStart(e.target.value)}
                   className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs" />
                 <span className="text-gray-400 text-xs">~</span>
-                <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
+                <input type="date" value={acctEnd} onChange={e => setAcctEnd(e.target.value)}
                   className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs" />
               </div>
             )}
