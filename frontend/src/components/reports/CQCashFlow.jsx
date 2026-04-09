@@ -145,14 +145,16 @@ export default function CQCashFlow() {
     setError('')
     try {
       const params = { date_start: dateRange.start, date_end: dateRange.end }
-      const [sumRes, storesRes, personsRes] = await Promise.all([
+      const [sumRes, storesRes, personsRes, histRes] = await Promise.all([
         cqTransactionAPI.summary(params),
         cqTransactionAPI.storesList(),
         cqTransactionAPI.personsList(),
+        cqTransactionAPI.history(),
       ])
       setSummary(sumRes.data)
       setStoresList(storesRes.data.stores || [])
       setPersonsList(personsRes.data.persons || [])
+      setHistoryData(histRes.data || [])
     } catch (e) {
       setError('Failed to load data')
     } finally {
@@ -464,105 +466,85 @@ export default function CQCashFlow() {
       {/* ===== SUMMARY VIEW ===== */}
       {view === 'summary' && summary && !loading && (
         <div className="space-y-4">
-          {/* Main KPI */}
-          {(() => {
-            const totalDistributed = (summary.totals.collection || 0) + (summary.totals.incentive || 0) + (summary.totals.profit || 0)
-            return (
-              <>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div className="bg-green-50 rounded-2xl p-4 border border-green-100">
-                    <div className="text-xs text-gray-500 mb-1">Owner Profit</div>
-                    <div className="text-xl font-bold text-green-600">{fmt(summary.totals.collection)}</div>
-                    {(summary.totals.collection_account > 0 || summary.totals.collection_cash > 0) && (
-                      <div className="mt-2 pt-2 border-t border-green-200 space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-gray-500">Account</span>
-                          <span className="font-medium text-green-700">{fmt(summary.totals.collection_account)}</span>
-                        </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-gray-500">Cash</span>
-                          <span className="font-medium text-green-700">{fmt(summary.totals.collection_cash)}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100">
-                    <div className="text-xs text-gray-500 mb-1">Incentive</div>
-                    <div className="text-xl font-bold text-purple-600">{fmt(summary.totals.incentive)}</div>
-                    <div className="text-xs text-gray-400 mt-1">All partners</div>
-                  </div>
-                  <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-                    <div className="text-xs text-gray-500 mb-1">Equity Share</div>
-                    <div className="text-xl font-bold text-blue-600">{fmt(summary.totals.profit)}</div>
-                    <div className="text-xs text-gray-400 mt-1">Equity partners</div>
-                  </div>
-                  <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
-                    <div className="text-xs text-gray-500 mb-1">Total (Net Profit)</div>
-                    <div className="text-xl font-bold text-gray-800">{fmt(totalDistributed)}</div>
-                  </div>
-                </div>
-              </>
-            )
-          })()}
-
-          {/* Store Summary Table */}
-          {summary.stores?.length > 0 && (
+          {/* Owner Profit by Quarter Chart */}
+          {historyData.length > 0 && (
             <Card>
               <div className="p-4">
-                <h3 className="font-semibold text-gray-800 mb-3">📊 Store Overview</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-gray-500 border-b">
-                        <th className="pb-2 pr-3">Store</th>
-                        <th className="pb-2 pr-3 text-right">Cash 수금</th>
-                        <th className="pb-2 pr-3 text-right">Owner</th>
-                        <th className="pb-2 pr-3 text-right">Incentive</th>
-                        <th className="pb-2 pr-3 text-right">Equity</th>
-                        <th className="pb-2 text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {summary.stores.map(s => (
-                          <tr key={s.store_name} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
-                            onClick={() => { setSelectedStore(s.store_name); setView('stores') }}>
-                            <td className="py-2.5 pr-3 font-medium text-gray-800">{s.store_name}</td>
-                            <td className="py-2.5 pr-3 text-right text-orange-600">{fmt(s.cash_collection)}</td>
-                            <td className="py-2.5 pr-3 text-right text-green-600 font-medium">{fmt(s.owner_profit)}</td>
-                            <td className="py-2.5 pr-3 text-right text-purple-600">{fmt(s.incentive)}</td>
-                            <td className="py-2.5 pr-3 text-right text-blue-600">{fmt(s.equity_share)}</td>
-                            <td className="py-2.5 text-right font-semibold text-gray-800">{fmt(s.total)}</td>
-                          </tr>
-                      ))}
-                      {/* Total row */}
-                      {(() => {
-                        const totCC = summary.stores.reduce((s, r) => s + (parseFloat(r.cash_collection) || 0), 0)
-                        const totOP = summary.stores.reduce((s, r) => s + (parseFloat(r.owner_profit) || 0), 0)
-                        const totI = summary.stores.reduce((s, r) => s + (parseFloat(r.incentive) || 0), 0)
-                        const totEq = summary.stores.reduce((s, r) => s + (parseFloat(r.equity_share) || 0), 0)
-                        return (
-                          <tr className="border-t-2 border-gray-200 font-bold">
-                            <td className="py-3 pr-3 text-gray-900">Total</td>
-                            <td className="py-3 pr-3 text-right text-orange-600">{fmt(totCC)}</td>
-                            <td className="py-3 pr-3 text-right text-green-600">{fmt(totOP)}</td>
-                            <td className="py-3 pr-3 text-right text-purple-600">{fmt(totI)}</td>
-                            <td className="py-3 pr-3 text-right text-blue-600">{fmt(totEq)}</td>
-                            <td className="py-3 text-right text-gray-900">{fmt(totCC + totOP + totI + totEq)}</td>
-                          </tr>
-                        )
-                      })()}
-                    </tbody>
-                  </table>
+                <h3 className="font-semibold text-gray-800 mb-3">Owner Profit by Quarter</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={historyData.map(h => ({
+                    period: h.period,
+                    owner_profit: h.owner_profit || 0,
+                  }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="period" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+                    <Tooltip
+                      formatter={(v) => [fmt(v), 'Owner Profit']}
+                      contentStyle={tooltipStyle} />
+                    <Bar dataKey="owner_profit" fill="#10b981" radius={[6, 6, 0, 0]} name="Owner Profit" />
+                  </BarChart>
+                </ResponsiveContainer>
+                {/* Grand total */}
+                <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Total Owner Profit (All Time)</span>
+                  <span className="text-lg font-bold text-green-600">
+                    {fmt(historyData.reduce((s, h) => s + (h.owner_profit || 0), 0))}
+                  </span>
                 </div>
               </div>
             </Card>
           )}
 
-          {/* Person Summary Table */}
-          {summary.persons?.length > 0 && (
+          {/* Store Overview - Owner Profit Only */}
+          {summary.stores?.length > 0 && (
             <Card>
               <div className="p-4">
-                <h3 className="font-semibold text-gray-800 mb-3">👤 Partner Distribution</h3>
+                <h3 className="font-semibold text-gray-800 mb-3">Store Overview</h3>
+                <div className="space-y-2">
+                  {summary.stores
+                    .filter(s => parseFloat(s.owner_profit) > 0)
+                    .sort((a, b) => parseFloat(b.owner_profit) - parseFloat(a.owner_profit))
+                    .map(s => {
+                      const maxProfit = Math.max(...summary.stores.map(x => parseFloat(x.owner_profit) || 0))
+                      const pct = maxProfit > 0 ? (parseFloat(s.owner_profit) / maxProfit) * 100 : 0
+                      return (
+                        <div key={s.store_name}
+                          className="cursor-pointer hover:bg-gray-50 rounded-xl p-3 transition"
+                          onClick={() => { setSelectedStore(s.store_name); setView('stores') }}>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm font-medium text-gray-800">{s.store_name}</span>
+                            <span className="text-sm font-bold text-green-600">{fmt(s.owner_profit)}</span>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-2">
+                            <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  {/* Total */}
+                  <div className="pt-3 mt-1 border-t-2 border-gray-200 flex justify-between items-center">
+                    <span className="font-bold text-gray-900">Total</span>
+                    <span className="font-bold text-green-600 text-lg">
+                      {fmt(summary.stores.reduce((s, r) => s + (parseFloat(r.owner_profit) || 0), 0))}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Partner Distribution */}
+          {summary.persons?.length > 0 && (() => {
+            const partners = summary.persons.filter(p =>
+              p.person !== 'Owner' && p.person !== 'Deposit' && p.person !== 'Opening Balance'
+              && p.person !== 'QT' && p.person !== 'ChCh'
+              && ((parseFloat(p.by_type?.incentive) || 0) + (parseFloat(p.by_type?.profit) || 0) > 0)
+            )
+            return partners.length > 0 && (
+            <Card>
+              <div className="p-4">
+                <h3 className="font-semibold text-gray-800 mb-3">Partner Distribution</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -574,7 +556,7 @@ export default function CQCashFlow() {
                       </tr>
                     </thead>
                     <tbody>
-                      {summary.persons.filter(p => p.person !== 'Owner' && p.person !== 'Deposit' && p.person !== 'Opening Balance').map(p => (
+                      {partners.map(p => (
                         <tr key={p.person} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
                           onClick={() => { setSelectedPerson(p.person); setView('persons') }}>
                           <td className="py-2.5 pr-4 font-medium text-gray-800">{p.person}</td>
@@ -588,9 +570,10 @@ export default function CQCashFlow() {
                 </div>
               </div>
             </Card>
-          )}
+            )
+          })()}
 
-          {!summary.stores?.length && !summary.persons?.length && (
+          {!summary.stores?.length && (
             <div className="text-center py-12 text-gray-400">
               <div className="text-4xl mb-3">📭</div>
               <div>No transactions for this period</div>

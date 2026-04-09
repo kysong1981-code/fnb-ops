@@ -1466,48 +1466,44 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         # Collect all unique periods from the data
         periods = list(qs.exclude(period='').values_list('period', flat=True).distinct().order_by('period'))
 
+        # Only registered stores
+        from users.models import Organization
+        registered_stores = set(Organization.objects.values_list('name', flat=True))
+
         # Build period data
         history_data = []
         for period_label in periods:
             period_qs = qs.filter(period=period_label)
 
-            collection = period_qs.filter(transaction_type='COLLECTION').aggregate(total=Sum('amount'))['total'] or 0
-            collection_account = period_qs.filter(transaction_type='COLLECTION', account_type='ACCOUNT').aggregate(total=Sum('amount'))['total'] or 0
-            collection_cash = period_qs.filter(transaction_type='COLLECTION', account_type='CASH').aggregate(total=Sum('amount'))['total'] or 0
+            owner_profit = period_qs.filter(transaction_type='COLLECTION', profit_share__isnull=False).aggregate(total=Sum('amount'))['total'] or 0
+            cash_collection = period_qs.filter(transaction_type='COLLECTION', profit_share__isnull=True).aggregate(total=Sum('amount'))['total'] or 0
             incentive = period_qs.filter(transaction_type='INCENTIVE').aggregate(total=Sum('amount'))['total'] or 0
             equity = period_qs.filter(transaction_type='PROFIT').aggregate(total=Sum('amount'))['total'] or 0
-            total = float(collection) + float(incentive) + float(equity)
 
-            # Per-store breakdown for this period
+            # Per-store breakdown for this period (registered stores only)
             stores = []
-            store_names = period_qs.values_list('store_name', flat=True).distinct()
+            store_names = period_qs.filter(store_name__in=registered_stores).values_list('store_name', flat=True).distinct()
             for sn in store_names:
                 if not sn:
                     continue
                 s_qs = period_qs.filter(store_name=sn)
-                s_collection = s_qs.filter(transaction_type='COLLECTION').aggregate(total=Sum('amount'))['total'] or 0
-                s_collection_account = s_qs.filter(transaction_type='COLLECTION', account_type='ACCOUNT').aggregate(total=Sum('amount'))['total'] or 0
-                s_collection_cash = s_qs.filter(transaction_type='COLLECTION', account_type='CASH').aggregate(total=Sum('amount'))['total'] or 0
+                s_owner = s_qs.filter(transaction_type='COLLECTION', profit_share__isnull=False).aggregate(total=Sum('amount'))['total'] or 0
                 s_incentive = s_qs.filter(transaction_type='INCENTIVE').aggregate(total=Sum('amount'))['total'] or 0
                 s_equity = s_qs.filter(transaction_type='PROFIT').aggregate(total=Sum('amount'))['total'] or 0
                 stores.append({
                     'store_name': sn,
-                    'collection': float(s_collection),
-                    'collection_account': float(s_collection_account),
-                    'collection_cash': float(s_collection_cash),
+                    'owner_profit': float(s_owner),
                     'incentive': float(s_incentive),
                     'equity': float(s_equity),
-                    'total': float(s_collection) + float(s_incentive) + float(s_equity),
                 })
+            stores.sort(key=lambda x: x['owner_profit'], reverse=True)
 
             history_data.append({
                 'period': period_label,
-                'collection': float(collection),
-                'collection_account': float(collection_account),
-                'collection_cash': float(collection_cash),
+                'owner_profit': float(owner_profit),
+                'cash_collection': float(cash_collection),
                 'incentive': float(incentive),
                 'equity': float(equity),
-                'total': total,
                 'stores': stores,
             })
 
