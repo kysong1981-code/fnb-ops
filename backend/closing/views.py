@@ -505,28 +505,29 @@ class ClosingCashExpenseViewSet(mixins.CreateModelMixin,
             profile = self.request.user.profile if hasattr(self.request.user, 'profile') else None
 
             # Determine period (H1=Apr-Sep, H2=Oct-Mar)
-            m = closing.date.month
+            m = closing.closing_date.month
             if 4 <= m <= 9:
-                period_label = f"{closing.date.year}-Apr"
+                period_label = f"{closing.closing_date.year}-Apr"
             elif m >= 10:
-                period_label = f"{closing.date.year}-Oct"
+                period_label = f"{closing.closing_date.year}-Oct"
             else:
-                period_label = f"{closing.date.year - 1}-Oct"
+                period_label = f"{closing.closing_date.year - 1}-Oct"
 
             CQTransaction.objects.create(
                 organization=org,
-                date=closing.date,
+                date=closing.closing_date,
                 store_name=org.name,
                 transaction_type='TRANSFER',
                 person=expense.reason or expense.category,  # ChCh, QT, Manager
                 amount=expense.amount,
                 account_type='CASH',
-                note=expense.notes or f"HR Cash from {org.name}",
+                note=expense.notes or f"[Cash Mgmt] {expense.category} - {expense.notes}" if expense.notes else f"[Cash Mgmt] {expense.category} from {org.name}",
                 period=period_label,
                 created_by=profile,
             )
-        except Exception:
-            pass  # CQ auto-create is best-effort
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"CQ auto-create failed: {e}")  # Log errors for debugging
 
     def perform_destroy(self, instance):
         """삭제 시 연결된 CQ Transaction도 삭제"""
@@ -534,7 +535,7 @@ class ClosingCashExpenseViewSet(mixins.CreateModelMixin,
             closing = instance.daily_closing
             cq = CQTransaction.objects.filter(
                 organization=closing.organization,
-                date=closing.date,
+                date=closing.closing_date,
                 transaction_type='TRANSFER',
                 person=instance.reason or instance.category,
                 amount=instance.amount,
