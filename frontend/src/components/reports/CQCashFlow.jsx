@@ -872,11 +872,15 @@ export default function CQCashFlow() {
                       <>
                         <option value="EXPENSE">지출</option>
                         <option value="COLLECTION">입금</option>
+                        <option value="EXCHANGE">환전</option>
+                        <option value="TRANSFER">이체</option>
                       </>
                     ) : (
                       <>
                         <option value="EXPENSE">지출</option>
                         <option value="EXCHANGE">환전</option>
+                        <option value="COLLECTION">입금</option>
+                        <option value="TRANSFER">이체</option>
                       </>
                     )}
                   </select>
