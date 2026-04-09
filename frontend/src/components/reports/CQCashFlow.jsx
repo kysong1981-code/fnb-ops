@@ -472,10 +472,16 @@ export default function CQCashFlow() {
               <div className="p-4">
                 <h3 className="font-semibold text-gray-800 mb-3">Owner Profit by Quarter</h3>
                 <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={historyData.map(h => ({
-                    period: h.period,
-                    owner_profit: h.owner_profit || 0,
-                  }))}>
+                  <BarChart data={historyData
+                    .filter(h => (h.owner_profit || 0) > 0)
+                    .map(h => {
+                      // period label: "2024-Oct" = H1 of 2024, "2025-Apr" = H2 of 2024
+                      const [yr, mon] = h.period.split('-')
+                      let label = h.period
+                      if (mon === 'Oct') label = `${yr} H1`
+                      else if (mon === 'Apr') label = `${parseInt(yr)-1} H2`
+                      return { period: label, owner_profit: h.owner_profit || 0 }
+                    })}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="period" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
