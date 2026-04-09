@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { cqTransactionAPI, cqAPI } from '../../services/api'
+import { cqTransactionAPI, cqAPI, cashExpenseAPI } from '../../services/api'
+import { useAuth } from '../../context/AuthContext'
 import Card from '../ui/Card'
 import { PlusIcon, TrashIcon } from '../icons'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
@@ -74,6 +75,8 @@ function getCurrentPeriod() {
 }
 
 export default function CQCashFlow() {
+  const { user } = useAuth()
+  const isCEO = user?.role === 'CEO' || user?.role === 'HQ'
   const [view, setView] = useState('summary')
   const currentP = getCurrentPeriod()
   const [year, setYear] = useState(currentP.year)
@@ -129,6 +132,9 @@ export default function CQCashFlow() {
 
   // Pending expenses for approval
   const [pendingExpenses, setPendingExpenses] = useState([])
+
+  // Edit transaction (CEO only)
+  const [editingTx, setEditingTx] = useState(null)
 
   // Store lock status
   const [storeLockStatus, setStoreLockStatus] = useState({ is_locked: false, locked_by_name: '' })
@@ -232,6 +238,50 @@ export default function CQCashFlow() {
       loadAccountStatement()
     } catch (e) {
       setError(e.response?.data?.detail || 'Failed to approve')
+    }
+  }
+
+  const handleEditTx = async (tx) => {
+    if (!isCEO) return
+    // Only allow editing real CQTransaction entries (not exp_ prefixed)
+    if (String(tx.id).startsWith('exp_')) return
+    setEditingTx({
+      id: tx.id,
+      date: tx.date,
+      store_name: tx.store_name || '',
+      amount: Math.abs(tx.amount),
+      note: tx.note || '',
+      transaction_type: tx.transaction_type,
+    })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingTx) return
+    try {
+      await cqTransactionAPI.update(editingTx.id, {
+        date: editingTx.date,
+        store_name: editingTx.store_name,
+        amount: editingTx.amount,
+        note: editingTx.note,
+      })
+      setEditingTx(null)
+      loadAccountStatement()
+      showMsg('Updated')
+    } catch (e) {
+      setError(e.response?.data?.error || 'Failed to update')
+    }
+  }
+
+  const handleDeleteTx = async (txId) => {
+    if (!isCEO) return
+    if (String(txId).startsWith('exp_')) return
+    if (!confirm('Delete this entry?')) return
+    try {
+      await cqTransactionAPI.delete(txId)
+      loadAccountStatement()
+      showMsg('Deleted')
+    } catch (e) {
+      setError(e.response?.data?.error || 'Failed to delete')
     }
   }
 
@@ -860,6 +910,36 @@ export default function CQCashFlow() {
               <Card>
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-800 mb-3">Statement</h3>
+
+                  {/* Inline edit form */}
+                  {editingTx && (
+                    <div className="mb-4 p-3 bg-blue-50 rounded-xl border border-blue-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs font-semibold text-blue-700">Edit Entry</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <input type="date" value={editingTx.date}
+                          onChange={e => setEditingTx(p => ({ ...p, date: e.target.value }))}
+                          className="px-2 py-1.5 text-sm border rounded-lg" />
+                        <input type="text" value={editingTx.store_name} placeholder="Store"
+                          onChange={e => setEditingTx(p => ({ ...p, store_name: e.target.value }))}
+                          className="px-2 py-1.5 text-sm border rounded-lg" />
+                        <input type="number" value={editingTx.amount} placeholder="Amount"
+                          onChange={e => setEditingTx(p => ({ ...p, amount: e.target.value }))}
+                          className="px-2 py-1.5 text-sm border rounded-lg" />
+                        <input type="text" value={editingTx.note} placeholder="Note"
+                          onChange={e => setEditingTx(p => ({ ...p, note: e.target.value }))}
+                          className="px-2 py-1.5 text-sm border rounded-lg" />
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <button onClick={handleSaveEdit}
+                          className="px-3 py-1 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
+                        <button onClick={() => setEditingTx(null)}
+                          className="px-3 py-1 text-xs font-semibold bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
@@ -869,10 +949,13 @@ export default function CQCashFlow() {
                           <th className="pb-2 pr-3">Note</th>
                           <th className="pb-2 pr-3 text-right">Amount</th>
                           <th className="pb-2 text-right">Balance</th>
+                          {isCEO && <th className="pb-2 pl-2 w-16"></th>}
                         </tr>
                       </thead>
                       <tbody>
-                        {accountData.ledger?.map(item => (
+                        {accountData.ledger?.map(item => {
+                          const isRealTx = !String(item.id).startsWith('exp_')
+                          return (
                           <tr key={item.id} className={`border-b border-gray-50 ${item.source === 'cash_management' ? 'bg-amber-50/50' : ''}`}>
                             <td className="py-2 pr-3 text-gray-600">{item.date}</td>
                             <td className="py-2 pr-3 text-gray-800">
@@ -888,8 +971,24 @@ export default function CQCashFlow() {
                               {item.amount >= 0 ? '+' : ''}{f(item.amount)}
                             </td>
                             <td className="py-2 text-right font-medium text-gray-800">{f(item.balance)}</td>
+                            {isCEO && (
+                              <td className="py-2 pl-2">
+                                {isRealTx && !item.is_locked && (
+                                  <div className="flex gap-1">
+                                    <button onClick={() => handleEditTx(item)} title="Edit"
+                                      className="p-1 text-gray-400 hover:text-blue-600 rounded">
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    </button>
+                                    <button onClick={() => handleDeleteTx(item.id)} title="Delete"
+                                      className="p-1 text-gray-400 hover:text-red-600 rounded">
+                                      <TrashIcon className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            )}
                           </tr>
-                        ))}
+                        )})}
                       </tbody>
                     </table>
                   </div>

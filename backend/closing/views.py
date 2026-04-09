@@ -1700,70 +1700,52 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         ledger = []
         balance = opening_balance
         for tx in qs:
+            # TRANSFER type = created from ClosingCashExpense (cash management)
+            source = 'cash_management' if tx.transaction_type == 'TRANSFER' else None
+            entry = {
+                'id': tx.id, 'date': str(tx.date),
+                'store_name': tx.store_name,
+                'note': tx.note,
+                'transaction_type': tx.transaction_type,
+                'period': tx.period,
+                'is_locked': tx.is_locked,
+            }
+            if source:
+                entry['source'] = source
             if tx.transaction_type in INFLOW_TYPES:
                 balance += tx.amount
-                ledger.append({
-                    'id': tx.id, 'date': str(tx.date),
-                    'store_name': tx.store_name,
-                    'amount': float(tx.amount),
-                    'note': tx.note,
-                    'transaction_type': tx.transaction_type,
-                    'period': tx.period,
-                    'is_locked': tx.is_locked,
-                    'balance': float(balance),
-                })
+                entry['amount'] = float(tx.amount)
             else:
                 balance -= tx.amount
-                ledger.append({
-                    'id': tx.id, 'date': str(tx.date),
-                    'store_name': tx.store_name,
-                    'amount': -float(tx.amount),
-                    'note': tx.note,
-                    'transaction_type': tx.transaction_type,
-                    'period': tx.period,
-                    'is_locked': tx.is_locked,
-                    'balance': float(balance),
-                })
+                entry['amount'] = -float(tx.amount)
+            entry['balance'] = float(balance)
+            ledger.append(entry)
 
-        # Merge Cash Management records from 2025-10-01 onwards
-        # 1) CQExpense (standalone expenses)
-        # 2) ClosingCashExpense (from daily closings, reason=QT/ChCh)
-        from closing.models import CQExpense, ClosingCashExpense
+        # Merge CQExpense (standalone approved expenses) from 2025-10-01 onwards
+        # NOTE: ClosingCashExpense already auto-creates CQTransaction on perform_create,
+        # so we do NOT merge them here to avoid duplicates.
+        from closing.models import CQExpense
         from datetime import date as dt_date
         expense_cutoff = dt_date(2025, 10, 1)
 
-        # CQExpense
         cq_expense_qs = CQExpense.objects.filter(
             account=account.upper(),
             date__gte=expense_cutoff,
             status='APPROVED',
         )
-        # ClosingCashExpense (reason matches account name)
-        hr_expense_qs = ClosingCashExpense.objects.filter(
-            reason__iexact=account,
-            daily_closing__closing_date__gte=expense_cutoff,
-        ).select_related('daily_closing', 'daily_closing__organization')
 
         if date_start and dt_date.fromisoformat(date_start) > expense_cutoff:
             cq_expense_qs = cq_expense_qs.filter(date__gte=date_start)
-            hr_expense_qs = hr_expense_qs.filter(daily_closing__closing_date__gte=date_start)
         if date_end:
             cq_expense_qs = cq_expense_qs.filter(date__lte=date_end)
-            hr_expense_qs = hr_expense_qs.filter(daily_closing__closing_date__lte=date_end)
 
-        # Opening balance adjustment for expenses before date_start
+        # Opening balance adjustment for CQExpenses before date_start
         if date_start:
             prev_cq = CQExpense.objects.filter(
                 account=account.upper(), date__gte=expense_cutoff,
                 date__lt=date_start, status='APPROVED',
             ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-            prev_hr = Decimal('0')
-            for hr in ClosingCashExpense.objects.filter(
-                reason__iexact=account, daily_closing__closing_date__gte=expense_cutoff,
-                daily_closing__closing_date__lt=date_start,
-            ):
-                prev_hr += hr.amount
-            opening_balance -= (prev_cq + prev_hr)
+            opening_balance -= prev_cq
 
         # Build merged entries
         all_entries = []
@@ -1780,25 +1762,10 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                 'transaction_type': exp.category or 'EXPENSE',
                 'period': '',
                 'is_locked': True,
-                'source': 'cash_management',
+                'source': 'cq_expense',
             }))
 
-        for hr in hr_expense_qs.order_by('daily_closing__closing_date', 'created_at'):
-            store_name = hr.daily_closing.organization.name if hr.daily_closing.organization else ''
-            all_entries.append(('hr', {
-                'id': f'hr_{hr.id}',
-                'date': str(hr.daily_closing.closing_date),
-                'store_name': store_name,
-                'amount': -float(hr.amount),
-                'note': f"[Cash Mgmt] {hr.category} - {hr.notes}" if hr.notes else f"[Cash Mgmt] {hr.category}",
-                'transaction_type': 'EXPENSE',
-                'period': '',
-                'is_locked': True,
-                'source': 'cash_management',
-            }))
-
-        has_extras = cq_expense_qs.exists() or hr_expense_qs.exists()
-        if has_extras:
+        if cq_expense_qs.exists():
             # Re-sort by date and recalculate running balance
             all_entries.sort(key=lambda x: x[1]['date'])
             ledger = []
