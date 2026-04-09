@@ -186,7 +186,7 @@ export default function CQCashFlow() {
   }
 
   // Alias for backward compat in create/delete handlers
-  const loadData = () => { loadPeriodData(); loadHistoryData() }
+  const loadData = () => { loadPeriodData(); loadHistoryData(); loadPendingExpenses() }
 
   const loadStoreLedger = async () => {
     if (!selectedStore) return
@@ -207,29 +207,38 @@ export default function CQCashFlow() {
   const loadAccountStatement = async () => {
     if (!selectedAccount) return
     try {
-      const [res, expRes] = await Promise.all([
-        cqTransactionAPI.accountStatement({
-          account: selectedAccount,
-          date_start: acctDateRange.start,
-          date_end: acctDateRange.end,
-        }),
-        cqAPI.listExpenses({ account: selectedAccount, status: 'PENDING' }),
-      ])
+      const res = await cqTransactionAPI.accountStatement({
+        account: selectedAccount,
+        date_start: acctDateRange.start,
+        date_end: acctDateRange.end,
+      })
       setAccountData(res.data)
-      setPendingExpenses(expRes.data?.results || expRes.data || [])
     } catch (e) {
       setError('Failed to load account statement')
     }
   }
 
+  const loadPendingExpenses = async () => {
+    try {
+      const res = await cqAPI.listExpenses({ status: 'PENDING' })
+      setPendingExpenses(res.data?.results || res.data || [])
+    } catch (e) { /* ignore */ }
+  }
+
   const handleApproveExpense = async (expenseId) => {
     try {
       await cqAPI.approveExpense(expenseId)
+      loadPendingExpenses()
       loadAccountStatement()
     } catch (e) {
       setError(e.response?.data?.detail || 'Failed to approve')
     }
   }
+
+  // Load pending expenses when entering Accounts view
+  useEffect(() => {
+    if (view === 'accounts') loadPendingExpenses()
+  }, [view])
 
   useEffect(() => {
     if (view === 'accounts' && selectedAccount) {
@@ -340,10 +349,15 @@ export default function CQCashFlow() {
         {VIEWS.map(v => (
           <button key={v.key}
             onClick={() => setView(v.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+            className={`relative px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
               view === v.key ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}>
             {v.label}
+            {v.key === 'accounts' && pendingExpenses.length > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                {pendingExpenses.length}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -665,6 +679,44 @@ export default function CQCashFlow() {
       {/* ===== ACCOUNTS VIEW ===== */}
       {view === 'accounts' && (
         <div className="space-y-4">
+          {/* Pending Expenses - Approval Needed */}
+          {pendingExpenses.length > 0 && (
+            <Card>
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600 text-xs font-bold">{pendingExpenses.length}</span>
+                  <h3 className="font-bold text-gray-900">승인필요</h3>
+                </div>
+                <div className="space-y-2">
+                  {pendingExpenses.map(exp => (
+                    <div key={exp.id} className="flex items-center gap-3 p-3 bg-amber-50/70 rounded-xl border border-amber-100">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">{exp.account}</span>
+                          <span className="text-sm font-medium text-gray-900 truncate">{exp.description}</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{exp.category}</span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-xs text-gray-500">{exp.date}</span>
+                          <span className="text-xs text-gray-400">{exp.organization_name}</span>
+                          <span className="text-sm font-bold text-red-600">
+                            {exp.account === 'KRW' ? `₩${Number(exp.amount).toLocaleString()}` : `$${Number(exp.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}`}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleApproveExpense(exp.id)}
+                        className="px-4 py-2 bg-green-600 text-white text-xs font-bold rounded-xl hover:bg-green-700 transition-all whitespace-nowrap"
+                      >
+                        ✓ 승인
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* 6M / Year / Custom selector */}
           <div className="flex flex-wrap items-center gap-3">
             {acctMode === 'YEAR' && (
@@ -746,44 +798,6 @@ export default function CQCashFlow() {
                   </div>
                 </div>
               </Card>
-
-              {/* Pending Expenses - Approval */}
-              {pendingExpenses.length > 0 && (
-                <Card>
-                  <div className="p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-                      <h3 className="font-semibold text-gray-800">승인 대기 ({pendingExpenses.length})</h3>
-                    </div>
-                    <div className="space-y-2">
-                      {pendingExpenses.map(exp => {
-                        const f = selectedAccount === 'KRW' ? fmtKRW : fmt
-                        return (
-                          <div key={exp.id} className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-gray-800">{exp.description}</span>
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{exp.category}</span>
-                              </div>
-                              <div className="flex items-center gap-3 mt-1">
-                                <span className="text-xs text-gray-500">{exp.date}</span>
-                                <span className="text-xs text-gray-500">{exp.organization_name}</span>
-                                <span className="text-sm font-bold text-red-600">-{f(exp.amount)}</span>
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => handleApproveExpense(exp.id)}
-                              className="ml-3 px-4 py-2 bg-green-600 text-white text-xs font-semibold rounded-xl hover:bg-green-700 transition-all whitespace-nowrap"
-                            >
-                              ✓ 승인
-                            </button>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </Card>
-              )}
 
               {/* Per-store breakdown (hide for KRW) */}
               {selectedAccount !== 'KRW' && accountData.store_summary?.length > 0 && (
