@@ -79,14 +79,18 @@ export default function CQCashFlow() {
   const [view, setView] = useState('summary')
   const currentP = getCurrentPeriod()
   const [year, setYear] = useState(currentP.year)
-  const [period, setPeriod] = useState(currentP.period) // 'H1', 'H2', 'ALL'
+  const [period, setPeriod] = useState(currentP.period) // 'H1', 'H2', 'CUSTOM'
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  // Custom date range
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+
   // Computed date range from year/period
-  const dateRange = period === 'ALL'
-    ? { start: `${year}-04-01`, end: `${year + 1}-03-31` }
+  const dateRange = period === 'CUSTOM'
+    ? { start: customStart || `${year}-04-01`, end: customEnd || `${year + 1}-03-31` }
     : getPeriodDates(year, period)
 
   // Data
@@ -127,13 +131,14 @@ export default function CQCashFlow() {
   const inputCls = 'px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 
   useEffect(() => {
+    if (period === 'CUSTOM' && (!customStart || !customEnd)) return
     loadData()
-  }, [year, period])
+  }, [year, period, customStart, customEnd])
 
   useEffect(() => {
     if (view === 'stores' && selectedStore) loadStoreLedger()
     if (view === 'persons' && selectedPerson) loadPersonalLedger()
-  }, [selectedStore, selectedPerson, year, period])
+  }, [selectedStore, selectedPerson, year, period, customStart, customEnd])
 
   const loadData = async () => {
     setLoading(true)
@@ -196,7 +201,7 @@ export default function CQCashFlow() {
 
   useEffect(() => {
     if (view === 'accounts' && selectedAccount) loadAccountStatement()
-  }, [view, selectedAccount, year, period])
+  }, [view, selectedAccount, year, period, customStart, customEnd])
 
   const handleToggleLock = async () => {
     try {
@@ -324,8 +329,8 @@ export default function CQCashFlow() {
 
   const getTxType = (key) => TX_TYPES.find(t => t.key === key) || TX_TYPES[0]
 
-  const periodLabel = period === 'ALL'
-    ? `FY ${year}/${year + 1}`
+  const periodLabel = period === 'CUSTOM'
+    ? `${customStart || '?'} ~ ${customEnd || '?'}`
     : period === 'H1'
       ? `H1 (Apr - Sep ${year})`
       : `H2 (Oct ${year} - Mar ${year + 1})`
@@ -355,7 +360,7 @@ export default function CQCashFlow() {
             {[
               { key: 'H1', label: 'H1' },
               { key: 'H2', label: 'H2' },
-              { key: 'ALL', label: 'Full Year' },
+              { key: 'CUSTOM', label: 'Custom' },
             ].map(p => (
               <button key={p.key}
                 onClick={() => setPeriod(p.key)}
@@ -375,8 +380,21 @@ export default function CQCashFlow() {
         </button>
       </div>
 
+      {/* Custom date range picker */}
+      {period === 'CUSTOM' && (
+        <div className="flex items-center gap-2">
+          <input type="date" value={customStart}
+            onChange={e => setCustomStart(e.target.value)}
+            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <span className="text-gray-400 text-sm">~</span>
+          <input type="date" value={customEnd}
+            onChange={e => setCustomEnd(e.target.value)}
+            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+      )}
+
       {/* Period label */}
-      <div className="text-sm text-gray-500">{periodLabel}</div>
+      {period !== 'CUSTOM' && <div className="text-sm text-gray-500">{periodLabel}</div>}
 
       {/* Messages */}
       {error && <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm">{error}</div>}

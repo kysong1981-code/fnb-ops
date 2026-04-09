@@ -1279,8 +1279,12 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         for k in totals:
             totals[k] = totals[k] or 0
 
-        # Per-store summary (grouped by store_name using annotate - guaranteed no duplicates)
-        store_rows = qs.exclude(store_name='').values('store_name').annotate(
+        # Per-store summary — only registered stores
+        from users.models import Organization
+        registered_stores = set(Organization.objects.values_list('name', flat=True))
+        store_rows = qs.exclude(store_name='').filter(
+            store_name__in=registered_stores
+        ).values('store_name').annotate(
             collection=Sum('amount', filter=Q(transaction_type='COLLECTION')),
             collection_account=Sum('amount', filter=Q(transaction_type='COLLECTION', account_type='ACCOUNT')),
             collection_cash=Sum('amount', filter=Q(transaction_type='COLLECTION', account_type='CASH')),
