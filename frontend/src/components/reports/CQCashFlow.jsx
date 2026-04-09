@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { cqTransactionAPI } from '../../services/api'
+import { cqTransactionAPI, cqAPI } from '../../services/api'
 import Card from '../ui/Card'
 import { PlusIcon, TrashIcon } from '../icons'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
@@ -127,6 +127,9 @@ export default function CQCashFlow() {
     return { start: localDateStr(sixAgo), end: localDateStr(now) }
   })()
 
+  // Pending expenses for approval
+  const [pendingExpenses, setPendingExpenses] = useState([])
+
   // Store lock status
   const [storeLockStatus, setStoreLockStatus] = useState({ is_locked: false, locked_by_name: '' })
   // Opening balance form
@@ -204,14 +207,27 @@ export default function CQCashFlow() {
   const loadAccountStatement = async () => {
     if (!selectedAccount) return
     try {
-      const res = await cqTransactionAPI.accountStatement({
-        account: selectedAccount,
-        date_start: acctDateRange.start,
-        date_end: acctDateRange.end,
-      })
+      const [res, expRes] = await Promise.all([
+        cqTransactionAPI.accountStatement({
+          account: selectedAccount,
+          date_start: acctDateRange.start,
+          date_end: acctDateRange.end,
+        }),
+        cqAPI.listExpenses({ account: selectedAccount, status: 'PENDING' }),
+      ])
       setAccountData(res.data)
+      setPendingExpenses(expRes.data?.results || expRes.data || [])
     } catch (e) {
       setError('Failed to load account statement')
+    }
+  }
+
+  const handleApproveExpense = async (expenseId) => {
+    try {
+      await cqAPI.approveExpense(expenseId)
+      loadAccountStatement()
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Failed to approve')
     }
   }
 
@@ -730,6 +746,44 @@ export default function CQCashFlow() {
                   </div>
                 </div>
               </Card>
+
+              {/* Pending Expenses - Approval */}
+              {pendingExpenses.length > 0 && (
+                <Card>
+                  <div className="p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                      <h3 className="font-semibold text-gray-800">승인 대기 ({pendingExpenses.length})</h3>
+                    </div>
+                    <div className="space-y-2">
+                      {pendingExpenses.map(exp => {
+                        const f = selectedAccount === 'KRW' ? fmtKRW : fmt
+                        return (
+                          <div key={exp.id} className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-gray-800">{exp.description}</span>
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{exp.category}</span>
+                              </div>
+                              <div className="flex items-center gap-3 mt-1">
+                                <span className="text-xs text-gray-500">{exp.date}</span>
+                                <span className="text-xs text-gray-500">{exp.organization_name}</span>
+                                <span className="text-sm font-bold text-red-600">-{f(exp.amount)}</span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleApproveExpense(exp.id)}
+                              className="ml-3 px-4 py-2 bg-green-600 text-white text-xs font-semibold rounded-xl hover:bg-green-700 transition-all whitespace-nowrap"
+                            >
+                              ✓ 승인
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </Card>
+              )}
 
               {/* Per-store breakdown (hide for KRW) */}
               {selectedAccount !== 'KRW' && accountData.store_summary?.length > 0 && (
