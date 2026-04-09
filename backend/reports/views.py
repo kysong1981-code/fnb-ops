@@ -2558,15 +2558,8 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
             store_name = instance.organization.name if instance.organization else ''
             profile = request.user.profile
 
-            # Determine which cash account (QT/ChCh) this store sends to
-            cash_account = 'QT'  # default
-            from closing.models import CQTransaction as CQTx
-            recent_transfer = CQTx.objects.filter(
-                store_name=store_name, transaction_type='TRANSFER',
-                person__in=['QT', 'ChCh']
-            ).order_by('-date').first()
-            if recent_transfer:
-                cash_account = recent_transfer.person
+            # Use the cash_account field from ProfitShare (QT or ChCh)
+            cash_account = instance.cash_account or 'QT'
 
             for partner in instance.partners.all():
                 incentive_account = partner.incentive_account or Decimal('0')

@@ -274,6 +274,13 @@ class ProfitShare(models.Model):
     hr_cash_total = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Total HR Cash collected during this period")
     carry_over_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Carry-over from previous period (HR Cash - distributions)")
 
+    # Cash Account - which account (QT/ChCh) this store's cash goes to
+    CASH_ACCOUNT_CHOICES = (
+        ('QT', 'QT'),
+        ('ChCh', 'ChCh'),
+    )
+    cash_account = models.CharField(max_length=10, choices=CASH_ACCOUNT_CHOICES, default='QT', help_text="Which cash account this store sends to")
+
     # Lock & Notes
     is_locked = models.BooleanField(default=False)
     notes = models.TextField(blank=True, default='')

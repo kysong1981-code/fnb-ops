@@ -112,15 +112,20 @@ export default function CQCashFlow() {
   // Accounts - own period state
   const [selectedAccount, setSelectedAccount] = useState('QT')
   const [accountData, setAccountData] = useState(null)
-  const [acctYear, setAcctYear] = useState(currentP.year)
-  const [acctMode, setAcctMode] = useState('YEAR') // 'YEAR' or 'CUSTOM'
+  const [acctYear, setAcctYear] = useState(new Date().getFullYear())
+  const [acctMode, setAcctMode] = useState('6M') // '6M', 'YEAR', 'CUSTOM'
   const [acctStart, setAcctStart] = useState('')
   const [acctEnd, setAcctEnd] = useState('')
 
-  // Computed account date range: YEAR = full fiscal year (Jan 1 - Dec 31)
-  const acctDateRange = acctMode === 'CUSTOM'
-    ? { start: acctStart || `${acctYear}-01-01`, end: acctEnd || `${acctYear}-12-31` }
-    : { start: `${acctYear}-01-01`, end: `${acctYear}-12-31` }
+  // Computed account date range
+  const acctDateRange = (() => {
+    if (acctMode === 'CUSTOM') return { start: acctStart, end: acctEnd }
+    if (acctMode === 'YEAR') return { start: `${acctYear}-01-01`, end: `${acctYear}-12-31` }
+    // 6M: last 6 months from today
+    const now = new Date()
+    const sixAgo = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate())
+    return { start: localDateStr(sixAgo), end: localDateStr(now) }
+  })()
 
   // Store lock status
   const [storeLockStatus, setStoreLockStatus] = useState({ is_locked: false, locked_by_name: '' })
@@ -213,7 +218,7 @@ export default function CQCashFlow() {
   useEffect(() => {
     if (view === 'accounts' && selectedAccount) {
       if (acctMode === 'CUSTOM' && (!acctStart || !acctEnd)) return
-      loadAccountStatement()
+      if (acctDateRange.start && acctDateRange.end) loadAccountStatement()
     }
   }, [view, selectedAccount, acctYear, acctMode, acctStart, acctEnd])
 
@@ -644,9 +649,9 @@ export default function CQCashFlow() {
       {/* ===== ACCOUNTS VIEW ===== */}
       {view === 'accounts' && (
         <div className="space-y-4">
-          {/* Year / Custom selector */}
+          {/* 6M / Year / Custom selector */}
           <div className="flex flex-wrap items-center gap-3">
-            {acctMode !== 'CUSTOM' && (
+            {acctMode === 'YEAR' && (
               <div className="flex items-center gap-1">
                 <button onClick={() => setAcctYear(y => y - 1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -658,7 +663,7 @@ export default function CQCashFlow() {
               </div>
             )}
             <div className="flex bg-gray-100 rounded-xl p-1">
-              {[{ key: 'YEAR', label: 'Year' }, { key: 'CUSTOM', label: 'Custom' }].map(p => (
+              {[{ key: '6M', label: '6 Months' }, { key: 'YEAR', label: 'Year' }, { key: 'CUSTOM', label: 'Custom' }].map(p => (
                 <button key={p.key} onClick={() => setAcctMode(p.key)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     acctMode === p.key ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
@@ -790,9 +795,16 @@ export default function CQCashFlow() {
                       </thead>
                       <tbody>
                         {accountData.ledger?.map(item => (
-                          <tr key={item.id} className="border-b border-gray-50">
+                          <tr key={item.id} className={`border-b border-gray-50 ${item.source === 'cash_management' ? 'bg-amber-50/50' : ''}`}>
                             <td className="py-2 pr-3 text-gray-600">{item.date}</td>
-                            <td className="py-2 pr-3 text-gray-800">{item.store_name}</td>
+                            <td className="py-2 pr-3 text-gray-800">
+                              {item.source === 'cash_management' ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                  {item.store_name || 'Expense'}
+                                </span>
+                              ) : item.store_name}
+                            </td>
                             <td className="py-2 pr-3 text-gray-500 text-xs">{item.note}</td>
                             <td className={`py-2 pr-3 text-right font-medium ${item.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                               {item.amount >= 0 ? '+' : ''}{f(item.amount)}

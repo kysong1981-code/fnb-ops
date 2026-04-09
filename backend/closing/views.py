@@ -1722,6 +1722,57 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                     'balance': float(balance),
                 })
 
+        # Merge CQExpense records from 2025-10-01 onwards
+        from closing.models import CQExpense
+        from datetime import date as dt_date
+        expense_cutoff = dt_date(2025, 10, 1)
+        expense_qs = CQExpense.objects.filter(
+            account=account.upper(),
+            date__gte=expense_cutoff,
+            status='APPROVED',
+        )
+        if date_start and dt_date.fromisoformat(date_start) > expense_cutoff:
+            expense_qs = expense_qs.filter(date__gte=date_start)
+        if date_end:
+            expense_qs = expense_qs.filter(date__lte=date_end)
+
+        # Count CQExpense before date_start for opening balance adjustment
+        if date_start:
+            prev_expense_total = CQExpense.objects.filter(
+                account=account.upper(),
+                date__gte=expense_cutoff,
+                date__lt=date_start,
+                status='APPROVED',
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            opening_balance -= prev_expense_total
+
+        # Merge expenses into ledger, re-sort, recalculate running balance
+        all_entries = []
+        for item in ledger:
+            all_entries.append(('tx', item))
+        for exp in expense_qs.order_by('date', 'created_at'):
+            all_entries.append(('expense', {
+                'id': f'exp_{exp.id}',
+                'date': str(exp.date),
+                'store_name': exp.get_category_display() if exp.category else '',
+                'amount': -float(exp.amount),
+                'note': f"[Cash Mgmt] {exp.description}",
+                'transaction_type': exp.category or 'EXPENSE',
+                'period': '',
+                'is_locked': True,
+                'source': 'cash_management',
+            }))
+
+        if expense_qs.exists():
+            # Re-sort by date and recalculate running balance
+            all_entries.sort(key=lambda x: x[1]['date'])
+            ledger = []
+            balance = opening_balance
+            for entry_type, item in all_entries:
+                balance += Decimal(str(item['amount']))
+                item['balance'] = float(balance)
+                ledger.append(item)
+
         # Reverse ledger so most recent appears first
         ledger.reverse()
 

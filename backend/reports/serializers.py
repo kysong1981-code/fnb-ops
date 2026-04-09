@@ -258,6 +258,8 @@ class ProfitShareSerializer(serializers.ModelSerializer):
             'evaluation_score',
             # HR Cash tracking
             'hr_cash_total', 'carry_over_balance',
+            # Cash Account
+            'cash_account',
             # Lock & Notes
             'is_locked', 'notes',
             # Partners
