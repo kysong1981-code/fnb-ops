@@ -1471,63 +1471,63 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         registered_stores = set(Organization.objects.values_list('name', flat=True))
 
         # Build owner profit account/cash breakdown from ProfitShare model
-        from reports.models import ProfitShare, PartnerShare
+        from reports.models import ProfitShare
+        from django.db.models import Q
+
+        # Pre-calculate owner account/cash per period from ProfitShare
+        all_locked_ps = ProfitShare.objects.filter(is_locked=True).prefetch_related('partners')
+        ps_by_period = defaultdict(list)
+        for ps in all_locked_ps:
+            if ps.period_type == 'H1':
+                plabel = f"{ps.year}-Oct"
+            else:
+                plabel = f"{ps.year + 1}-Apr"
+            ps_by_period[plabel].append(ps)
+
+        # Aggregate all period totals in fewer queries
+        from django.db.models import Case, When, Value, BooleanField
+        period_agg = qs.exclude(period='').values('period').annotate(
+            owner_profit=Sum('amount', filter=Q(transaction_type='COLLECTION', profit_share__isnull=False)),
+            cash_collection=Sum('amount', filter=Q(transaction_type='COLLECTION', profit_share__isnull=True)),
+            incentive=Sum('amount', filter=Q(transaction_type='INCENTIVE')),
+            equity=Sum('amount', filter=Q(transaction_type='PROFIT')),
+        ).order_by('period')
+
+        period_totals = {r['period']: r for r in period_agg}
 
         # Build period data
         history_data = []
         for period_label in periods:
-            period_qs = qs.filter(period=period_label)
+            row = period_totals.get(period_label, {})
+            owner_profit = float(row.get('owner_profit') or 0)
+            cash_collection = float(row.get('cash_collection') or 0)
+            incentive = float(row.get('incentive') or 0)
+            equity = float(row.get('equity') or 0)
 
-            owner_profit = period_qs.filter(transaction_type='COLLECTION', profit_share__isnull=False).aggregate(total=Sum('amount'))['total'] or 0
-            cash_collection = period_qs.filter(transaction_type='COLLECTION', profit_share__isnull=True).aggregate(total=Sum('amount'))['total'] or 0
-            incentive = period_qs.filter(transaction_type='INCENTIVE').aggregate(total=Sum('amount'))['total'] or 0
-            equity = period_qs.filter(transaction_type='PROFIT').aggregate(total=Sum('amount'))['total'] or 0
-
-            # Calculate owner account/cash from ProfitShare data
+            # Owner account/cash from ProfitShare
             owner_account = Decimal('0')
             owner_cash = Decimal('0')
-            ps_ids = list(period_qs.filter(
-                transaction_type='COLLECTION', profit_share__isnull=False
-            ).values_list('profit_share_id', flat=True).distinct())
-            for ps in ProfitShare.objects.filter(id__in=ps_ids):
-                has_owner_partner = ps.partners.filter(partner_type='OWNER').exists()
-                if has_owner_partner:
-                    for p in ps.partners.filter(partner_type='OWNER'):
-                        owner_account += (p.bank_account or Decimal('0'))
-                        owner_cash += (p.bank_cash or Decimal('0'))
+            for ps in ps_by_period.get(period_label, []):
+                has_owner = any(p.partner_type == 'OWNER' for p in ps.partners.all())
+                if has_owner:
+                    for p in ps.partners.all():
+                        if p.partner_type == 'OWNER':
+                            owner_account += (p.bank_account or Decimal('0'))
+                            owner_cash += (p.bank_cash or Decimal('0'))
                 else:
                     total_p_acct = sum((p.total_account or Decimal('0')) for p in ps.partners.all())
                     total_p_cash = sum((p.total_cash or Decimal('0')) for p in ps.partners.all())
                     owner_account += (ps.net_profit_account or Decimal('0')) - total_p_acct
                     owner_cash += (ps.net_profit_cash or Decimal('0')) - total_p_cash
 
-            # Per-store breakdown for this period (registered stores only)
-            stores = []
-            store_names = period_qs.filter(store_name__in=registered_stores).values_list('store_name', flat=True).distinct()
-            for sn in store_names:
-                if not sn:
-                    continue
-                s_qs = period_qs.filter(store_name=sn)
-                s_owner = s_qs.filter(transaction_type='COLLECTION', profit_share__isnull=False).aggregate(total=Sum('amount'))['total'] or 0
-                s_incentive = s_qs.filter(transaction_type='INCENTIVE').aggregate(total=Sum('amount'))['total'] or 0
-                s_equity = s_qs.filter(transaction_type='PROFIT').aggregate(total=Sum('amount'))['total'] or 0
-                stores.append({
-                    'store_name': sn,
-                    'owner_profit': float(s_owner),
-                    'incentive': float(s_incentive),
-                    'equity': float(s_equity),
-                })
-            stores.sort(key=lambda x: x['owner_profit'], reverse=True)
-
             history_data.append({
                 'period': period_label,
-                'owner_profit': float(owner_profit),
+                'owner_profit': owner_profit,
                 'owner_account': float(owner_account),
                 'owner_cash': float(owner_cash),
-                'cash_collection': float(cash_collection),
-                'incentive': float(incentive),
-                'equity': float(equity),
-                'stores': stores,
+                'cash_collection': cash_collection,
+                'incentive': incentive,
+                'equity': equity,
             })
 
         return Response(history_data)
