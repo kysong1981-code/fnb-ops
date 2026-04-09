@@ -1473,6 +1473,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         # Build owner profit account/cash breakdown from ProfitShare model
         from reports.models import ProfitShare
         from django.db.models import Q
+        from collections import defaultdict
 
         # Pre-calculate owner account/cash per period from ProfitShare
         all_locked_ps = ProfitShare.objects.filter(is_locked=True).prefetch_related('partners')
