@@ -40,6 +40,7 @@ const EMPTY_SUMMARY = {
   incentive_cash: '',
   incentive_pct: '',
   evaluation_score: 0,
+  cash_account: 'QT',
   notes: '',
 }
 
@@ -142,6 +143,7 @@ export default function ProfitShare() {
           incentive_cash: ps.incentive_cash || '',
           incentive_pct: ps.incentive_pct || '',
           evaluation_score: ps.evaluation_score || 0,
+          cash_account: ps.cash_account || 'QT',
           notes: ps.notes || '',
         })
         if (ps.evaluation_score > 0) {
@@ -267,6 +269,7 @@ export default function ProfitShare() {
       incentive_cash: n(summary.incentive_cash),
       incentive_pct: n(summary.incentive_pct),
       evaluation_score: parseInt(summary.evaluation_score) || 0,
+      cash_account: summary.cash_account || 'QT',
       notes: summary.notes || '',
       partners: partners.map((p, i) => ({
         ...(p.id ? { id: p.id } : {}),
@@ -816,6 +819,31 @@ export default function ProfitShare() {
               rows={2}
               placeholder="Notes..."
             />
+          </div>
+        </CardBody>
+      </Card>
+
+      {/* Cash Account Selector */}
+      <Card className="mb-4">
+        <CardBody>
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium text-gray-700">Cash Account</label>
+            <div className="flex gap-2">
+              {['QT', 'ChCh'].map(acc => (
+                <button
+                  key={acc}
+                  onClick={() => !disabled && handleSummaryChange('cash_account', acc)}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                    summary.cash_account === acc
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  } ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                >
+                  {acc}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-gray-400">파트너 현금 지급 계좌</span>
           </div>
         </CardBody>
       </Card>
