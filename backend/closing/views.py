@@ -1683,15 +1683,26 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
             if org.name not in store_account_map:
                 store_account_map[org.name] = 'QT'
 
-        # For QT/ChCh: include person=account OR (Deposit/Owner from mapped stores)
+        # For QT/ChCh: include person=account (historical ledger) +
+        # Deposit/Owner from mapped stores AFTER the last person=account record
         base_qs = self.get_queryset()
         if account.upper() in ('QT', 'CHCH'):
             mapped_stores = [s for s, a in store_account_map.items() if a.upper() == account.upper()]
-            qs = base_qs.filter(
-                Q(person__iexact=account) |
-                Q(person='Deposit', store_name__in=mapped_stores) |
-                Q(person='Owner', store_name__in=mapped_stores)
-            )
+            # Find cutoff: last date of person=account (imported Excel data)
+            last_acct_tx = base_qs.filter(person__iexact=account).order_by('-date').first()
+            cutoff_date = last_acct_tx.date if last_acct_tx else None
+
+            if cutoff_date:
+                # Include: all person=account + Deposit/Owner AFTER cutoff
+                qs = base_qs.filter(
+                    Q(person__iexact=account) |
+                    Q(person__in=['Deposit', 'Owner'], store_name__in=mapped_stores, date__gt=cutoff_date)
+                )
+            else:
+                # No historical data, use all Deposit/Owner
+                qs = base_qs.filter(
+                    Q(person__in=['Deposit', 'Owner'], store_name__in=mapped_stores)
+                )
         else:
             qs = base_qs.filter(person__iexact=account)
 
