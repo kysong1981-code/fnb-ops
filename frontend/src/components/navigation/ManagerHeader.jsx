@@ -67,15 +67,17 @@ export default function ManagerHeader() {
 
   return (
     <>
-    <header className="bg-white border-b border-gray-100 px-6 py-4 shrink-0">
+    <header className="bg-white border-b border-gray-100 px-4 sm:px-6 py-2 sm:py-4 shrink-0">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-2">
             <SunIcon size={16} className="text-gray-400" />
             <p className="text-sm text-gray-500">
               {getGreeting()}, <span className="font-semibold text-gray-700">{firstName}</span>
             </p>
           </div>
+          {/* Mobile: compact greeting */}
+          <p className="sm:hidden text-sm font-semibold text-gray-700">{firstName}</p>
 
           {/* Store Selector Dropdown */}
           {selectedStore && hasMultipleStores ? (
@@ -260,6 +262,82 @@ export default function ManagerHeader() {
       </div>
     </header>
 
+    {/* Mobile Store Selector Bar */}
+    {hasMultipleStores && selectedStore && (
+      <div className="sm:hidden bg-white border-b border-gray-100 px-4 py-2">
+        <div className="relative" ref={storeRef}>
+          <button
+            onClick={() => setStoreOpen(!storeOpen)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-blue-50 active:bg-blue-100"
+          >
+            <div className="flex items-center gap-2">
+              <HomeIcon size={14} className="text-blue-500" />
+              <span className="text-sm font-semibold text-blue-700">{selectedStore.name}</span>
+            </div>
+            <svg className={`w-4 h-4 transition-transform ${storeOpen ? 'rotate-180' : ''} text-blue-400`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {storeOpen && (
+            <div className="absolute left-0 right-0 mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 max-h-[60vh] overflow-y-auto">
+              {(() => {
+                const companies = stores.filter(s => s.sub_stores && s.sub_stores.length > 0)
+                const companySubIds = new Set(companies.flatMap(c => c.sub_stores.map(ss => ss.id)))
+                const standalone = stores.filter(s => (!s.sub_stores || s.sub_stores.length === 0) && !companySubIds.has(s.id))
+                return (
+                  <>
+                    {companies.map((company) => (
+                      <div key={company.id}>
+                        <button
+                          onClick={() => handleStoreSelect(company)}
+                          className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold transition ${
+                            selectedStore?.id === company.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700 active:bg-gray-50'
+                          }`}
+                        >
+                          <HomeIcon size={14} />
+                          <span className="truncate">{company.name}</span>
+                          {selectedStore?.id === company.id && <span className="ml-auto text-blue-500">✓</span>}
+                        </button>
+                        {company.sub_stores.map((sub, idx) => (
+                          <button
+                            key={sub.id}
+                            onClick={() => {
+                              const full = stores.find(s => s.id === sub.id)
+                              if (full) handleStoreSelect(full)
+                            }}
+                            className={`w-full flex items-center gap-3 pl-8 pr-4 py-2.5 text-sm transition ${
+                              selectedStore?.id === sub.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-500 active:bg-gray-50'
+                            }`}
+                          >
+                            <span className="text-gray-300 text-xs">{idx === company.sub_stores.length - 1 ? '└' : '├'}</span>
+                            <span className="truncate">{sub.name}</span>
+                            {selectedStore?.id === sub.id && <span className="ml-auto text-blue-500">✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                    {standalone.map((store) => (
+                      <button
+                        key={store.id}
+                        onClick={() => handleStoreSelect(store)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition ${
+                          selectedStore?.id === store.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 active:bg-gray-50'
+                        }`}
+                      >
+                        <HomeIcon size={14} />
+                        <span className="truncate">{store.name}</span>
+                        {selectedStore?.id === store.id && <span className="ml-auto text-blue-500">✓</span>}
+                      </button>
+                    ))}
+                  </>
+                )
+              })()}
+            </div>
+          )}
+        </div>
+      </div>
+    )}
     </>
   )
 }

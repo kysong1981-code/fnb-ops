@@ -12,7 +12,7 @@ export default function Layout({ children }) {
 
   if (isManager) {
     return (
-      <div className="flex h-screen bg-gray-50">
+      <div className="flex h-[100dvh] bg-gray-50" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <ManagerSidebar />
         <div className="flex-1 flex flex-col overflow-hidden">
           <ManagerHeader />
