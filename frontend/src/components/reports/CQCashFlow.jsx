@@ -964,8 +964,7 @@ export default function CQCashFlow() {
             const isKRW = selectedAccount === 'KRW'
             return (
             <>
-              {/* Balance Cards (QT/ChCh only) */}
-              {!isKRW && (
+              {/* Balance Cards */}
               <Card>
                 <div className="p-5">
                   <div className="grid grid-cols-2 gap-4">
@@ -986,7 +985,6 @@ export default function CQCashFlow() {
                   </div>
                 </div>
               </Card>
-              )}
 
               {/* Per-store breakdown (hide for KRW) */}
               {selectedAccount !== 'KRW' && accountData.store_summary?.length > 0 && (
