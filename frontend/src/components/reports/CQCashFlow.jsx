@@ -113,7 +113,7 @@ export default function CQCashFlow() {
   const [selectedAccount, setSelectedAccount] = useState('QT')
   const [accountData, setAccountData] = useState(null)
   const [acctYear, setAcctYear] = useState(new Date().getFullYear())
-  const [acctMode, setAcctMode] = useState('6M') // '6M', 'YEAR', 'CUSTOM'
+  const [acctMode, setAcctMode] = useState('YEAR') // '6M', 'YEAR', 'CUSTOM'
   const [acctStart, setAcctStart] = useState('')
   const [acctEnd, setAcctEnd] = useState('')
 
@@ -701,22 +701,32 @@ export default function CQCashFlow() {
               {/* Balance Cards */}
               <Card>
                 <div className="p-5">
-                  <div className="text-center mb-3">
-                    <div className="text-xs text-gray-500 mb-1">{selectedAccount} Current Balance</div>
-                    <div className={`text-3xl font-bold ${accountData.total_balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {f(accountData.total_balance)}
-                    </div>
-                  </div>
-                  {accountData.opening_balance != null && accountData.opening_balance !== 0 && (
-                    <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                      <span className="text-xs text-gray-500">이월 잔액</span>
-                      <span className={`text-sm font-semibold ${accountData.opening_balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                        {f(accountData.opening_balance)}
-                      </span>
+                  {accountData.actual_balance != null && (
+                    <div className="text-center mb-4">
+                      <div className="text-xs text-gray-500 mb-1">{selectedAccount} 실제 잔액</div>
+                      <div className={`text-3xl font-bold ${accountData.actual_balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {f(accountData.actual_balance)}
+                      </div>
                     </div>
                   )}
-                  <div className="flex justify-between items-center pt-1">
-                    <span className="text-xs text-gray-400">{accountData.transaction_count} transactions this period</span>
+                  <div className={`grid ${accountData.actual_balance != null ? 'grid-cols-2 gap-4 pt-4 border-t border-gray-100' : ''}`}>
+                    <div className={accountData.actual_balance != null ? '' : 'text-center mb-3'}>
+                      <div className="text-xs text-gray-500 mb-1">{accountData.actual_balance != null ? '기간 내 잔액' : `${selectedAccount} Balance`}</div>
+                      <div className={`text-xl font-bold ${accountData.total_balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {f(accountData.total_balance)}
+                      </div>
+                    </div>
+                    {accountData.opening_balance != null && accountData.opening_balance !== 0 && (
+                      <div>
+                        <div className="text-xs text-gray-500 mb-1">이월 잔액</div>
+                        <div className={`text-xl font-bold ${accountData.opening_balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                          {f(accountData.opening_balance)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center pt-3 mt-3 border-t border-gray-100">
+                    <span className="text-xs text-gray-400">{accountData.transaction_count} transactions</span>
                   </div>
                 </div>
               </Card>

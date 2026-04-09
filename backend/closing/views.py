@@ -1810,10 +1810,20 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                 store_totals[tx.store_name] += amt
         store_summary = [{'store_name': s, 'total': float(t)} for s, t in sorted(store_totals.items(), key=lambda x: -x[1])]
 
+        # Actual balance from CQAccountBalance
+        from closing.models import CQAccountBalance
+        actual_balance = None
+        try:
+            acct_bal = CQAccountBalance.objects.get(account=account.upper())
+            actual_balance = float(acct_bal.balance)
+        except CQAccountBalance.DoesNotExist:
+            pass
+
         return Response({
             'account': account,
             'opening_balance': float(opening_balance),
             'total_balance': float(balance),
+            'actual_balance': actual_balance,
             'transaction_count': len(ledger),
             'ledger': ledger,
             'monthly_summary': monthly_summary,
