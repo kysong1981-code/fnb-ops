@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { cqTransactionAPI, cqAPI, cashExpenseAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import Card from '../ui/Card'
-import { PlusIcon, TrashIcon } from '../icons'
+import { PlusIcon, TrashIcon, EditIcon } from '../icons'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 const TX_TYPES = [
@@ -271,7 +271,9 @@ export default function CQCashFlow() {
       loadAccountStatement()
       showMsg('Updated')
     } catch (e) {
-      setError(e.response?.data?.error || 'Failed to update')
+      const d = e.response?.data
+      const msg = typeof d === 'string' ? d : d?.detail || d?.error || d?.non_field_errors?.[0] || JSON.stringify(d) || 'Failed to update'
+      setError(msg)
     }
   }
 
@@ -1090,7 +1092,7 @@ export default function CQCashFlow() {
                           {!isKRW && <th className="pb-2 pr-3">Note</th>}
                           <th className="pb-2 pr-3 text-right">Amount</th>
                           {!isKRW && <th className="pb-2 text-right">Balance</th>}
-                          {isCEO && <th className="pb-2 pl-2 w-16"></th>}
+                          {isCEO && <th className="pb-2 pl-2 w-20"></th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -1118,10 +1120,16 @@ export default function CQCashFlow() {
                             {isCEO && (
                               <td className="py-2 pl-1" onClick={e => e.stopPropagation()}>
                                 {canEdit && (
-                                  <button onClick={() => handleDeleteTx(item.id)} title="Delete"
-                                    className="p-1.5 text-gray-300 hover:text-red-500 active:text-red-600 rounded">
-                                    <TrashIcon className="w-3.5 h-3.5" />
-                                  </button>
+                                  <span className="inline-flex items-center gap-0.5">
+                                    <button onClick={() => handleEditTx(item)} title="Edit"
+                                      className="p-1.5 text-gray-300 hover:text-blue-500 active:text-blue-600 rounded">
+                                      <EditIcon className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button onClick={() => handleDeleteTx(item.id)} title="Delete"
+                                      className="p-1.5 text-gray-300 hover:text-red-500 active:text-red-600 rounded">
+                                      <TrashIcon className="w-3.5 h-3.5" />
+                                    </button>
+                                  </span>
                                 )}
                               </td>
                             )}

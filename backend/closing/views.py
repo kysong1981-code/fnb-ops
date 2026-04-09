@@ -1230,6 +1230,16 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
     filter_backends = [OrganizationFilterBackend]
     pagination_class = None
 
+    def get_object(self):
+        """CEO/HQ can access any transaction regardless of store_id filter."""
+        profile = self.request.user.profile
+        if profile.role in ('CEO', 'HQ'):
+            pk = self.kwargs.get(self.lookup_field)
+            obj = CQTransaction.objects.get(pk=pk)
+            self.check_object_permissions(self.request, obj)
+            return obj
+        return super().get_object()
+
     def get_queryset(self):
         qs = super().get_queryset()
         # Filters
