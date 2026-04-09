@@ -1667,7 +1667,8 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         if not account:
             return Response({'error': 'account parameter required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        qs = self.get_queryset().filter(person__iexact=account)
+        # Use base queryset (bypass get_queryset date filters for carry-over calc)
+        all_qs = CQTransaction.objects.filter(person__iexact=account)
 
         # Optional date range filter
         date_start = request.query_params.get('date_start')
@@ -1676,16 +1677,18 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         # For account statement: COLLECTION, BALANCE, TRANSFER are all inflows
         INFLOW_TYPES = ('COLLECTION', 'BALANCE', 'TRANSFER')
 
-        # Calculate carry-over balance from all transactions before date_start
+        # Calculate carry-over balance from ALL transactions before date_start
         opening_balance = Decimal('0')
         if date_start:
-            prev_qs = qs.filter(date__lt=date_start).order_by('date', 'created_at')
+            prev_qs = all_qs.filter(date__lt=date_start).order_by('date', 'created_at')
             for tx in prev_qs:
                 if tx.transaction_type in INFLOW_TYPES:
                     opening_balance += tx.amount
                 else:
                     opening_balance -= tx.amount
 
+        # Filter to period
+        qs = all_qs
         if date_start:
             qs = qs.filter(date__gte=date_start)
         if date_end:
