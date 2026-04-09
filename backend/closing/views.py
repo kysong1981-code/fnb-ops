@@ -1667,44 +1667,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         if not account:
             return Response({'error': 'account parameter required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Build store→cash_account mapping from latest ProfitShare per org
-        from reports.models import ProfitShare
-        from users.models import Organization
-        from django.db.models import Q
-        store_account_map = {}  # store_name → cash_account
-        # Use latest ProfitShare per organization (ordered by year desc, period desc)
-        seen_orgs = set()
-        for ps in ProfitShare.objects.select_related('organization').order_by('-year', '-period_type'):
-            if ps.organization and ps.organization.name not in seen_orgs:
-                store_account_map[ps.organization.name] = ps.cash_account or 'QT'
-                seen_orgs.add(ps.organization.name)
-        # Default: all orgs without ProfitShare → QT
-        for org in Organization.objects.all():
-            if org.name not in store_account_map:
-                store_account_map[org.name] = 'QT'
-
-        # For QT/ChCh: include person=account (historical ledger) +
-        # Deposit/Owner from mapped stores AFTER the last person=account record
-        base_qs = self.get_queryset()
-        if account.upper() in ('QT', 'CHCH'):
-            mapped_stores = [s for s, a in store_account_map.items() if a.upper() == account.upper()]
-            # Find cutoff: last date of person=account (imported Excel data)
-            last_acct_tx = base_qs.filter(person__iexact=account).order_by('-date').first()
-            cutoff_date = last_acct_tx.date if last_acct_tx else None
-
-            if cutoff_date:
-                # Include: all person=account + Deposit/Owner AFTER cutoff
-                qs = base_qs.filter(
-                    Q(person__iexact=account) |
-                    Q(person__in=['Deposit', 'Owner'], store_name__in=mapped_stores, date__gt=cutoff_date)
-                )
-            else:
-                # No historical data, use all Deposit/Owner
-                qs = base_qs.filter(
-                    Q(person__in=['Deposit', 'Owner'], store_name__in=mapped_stores)
-                )
-        else:
-            qs = base_qs.filter(person__iexact=account)
+        qs = self.get_queryset().filter(person__iexact=account)
 
         # Optional date range filter
         date_start = request.query_params.get('date_start')
