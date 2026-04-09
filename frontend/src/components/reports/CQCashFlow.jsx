@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { cqTransactionAPI, cqAPI, cashExpenseAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import Card from '../ui/Card'
-import { PlusIcon, TrashIcon, EditIcon } from '../icons'
+import { PlusIcon, TrashIcon } from '../icons'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 const TX_TYPES = [
@@ -1054,34 +1054,7 @@ export default function CQCashFlow() {
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-800 mb-3">Statement</h3>
 
-                  {/* Inline edit form */}
-                  {editingTx && (
-                    <div className="mb-4 p-3 bg-blue-50 rounded-xl border border-blue-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-semibold text-blue-700">Edit Entry</span>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        <input type="date" value={editingTx.date}
-                          onChange={e => setEditingTx(p => ({ ...p, date: e.target.value }))}
-                          className="px-2 py-1.5 text-sm border rounded-lg" />
-                        <input type="text" value={editingTx.store_name} placeholder="Store"
-                          onChange={e => setEditingTx(p => ({ ...p, store_name: e.target.value }))}
-                          className="px-2 py-1.5 text-sm border rounded-lg" />
-                        <input type="number" value={editingTx.amount} placeholder="Amount"
-                          onChange={e => setEditingTx(p => ({ ...p, amount: e.target.value }))}
-                          className="px-2 py-1.5 text-sm border rounded-lg" />
-                        <input type="text" value={editingTx.note} placeholder="Note"
-                          onChange={e => setEditingTx(p => ({ ...p, note: e.target.value }))}
-                          className="px-2 py-1.5 text-sm border rounded-lg" />
-                      </div>
-                      <div className="flex gap-2 mt-2">
-                        <button onClick={handleSaveEdit}
-                          className="px-3 py-1 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
-                        <button onClick={() => setEditingTx(null)}
-                          className="px-3 py-1 text-xs font-semibold bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                      </div>
-                    </div>
-                  )}
+                  {/* Edit modal is rendered at bottom of component */}
 
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -1099,10 +1072,13 @@ export default function CQCashFlow() {
                         {accountData.ledger?.map(item => {
                           const isRealTx = !String(item.id).startsWith('exp_')
                           const canEdit = isCEO && isRealTx && !item.is_locked
+                          const isEditing = editingTx?.id === item.id
+                          const colSpan = isKRW ? (isCEO ? 4 : 3) : (isCEO ? 6 : 5)
                           return (
-                          <tr key={item.id}
-                            onClick={() => canEdit && handleEditTx(item)}
-                            className={`border-b border-gray-50 ${item.source === 'cash_management' ? 'bg-amber-50/50' : ''} ${canEdit ? 'cursor-pointer active:bg-blue-50' : ''}`}>
+                          <React.Fragment key={item.id}>
+                          <tr
+                            onClick={() => canEdit && !isEditing && handleEditTx(item)}
+                            className={`border-b border-gray-50 ${item.source === 'cash_management' ? 'bg-amber-50/50' : ''} ${isEditing ? 'bg-blue-50' : canEdit ? 'cursor-pointer active:bg-blue-50' : ''}`}>
                             <td className="py-2 pr-3 text-gray-600 text-xs">{item.date}</td>
                             <td className="py-2 pr-3 text-gray-800 text-xs">
                               {item.source === 'cash_management' ? (
@@ -1118,22 +1094,55 @@ export default function CQCashFlow() {
                             </td>
                             {!isKRW && <td className="py-2 text-right font-medium text-gray-800 text-xs">{f(item.balance)}</td>}
                             {isCEO && (
-                              <td className="py-2 pl-1" onClick={e => e.stopPropagation()}>
-                                {canEdit && (
-                                  <span className="inline-flex items-center gap-0.5">
-                                    <button onClick={() => handleEditTx(item)} title="Edit"
-                                      className="p-1.5 text-gray-300 hover:text-blue-500 active:text-blue-600 rounded">
-                                      <EditIcon className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button onClick={() => handleDeleteTx(item.id)} title="Delete"
-                                      className="p-1.5 text-gray-300 hover:text-red-500 active:text-red-600 rounded">
-                                      <TrashIcon className="w-3.5 h-3.5" />
-                                    </button>
-                                  </span>
+                              <td className="py-2 pl-1">
+                                {canEdit && !isEditing && (
+                                  <span className="text-gray-300 text-[10px]">tap</span>
                                 )}
                               </td>
                             )}
                           </tr>
+                          {/* Inline edit row */}
+                          {isEditing && (
+                            <tr className="bg-blue-50 border-b border-blue-100">
+                              <td colSpan={colSpan} className="px-2 py-3">
+                                <div className="grid grid-cols-2 gap-2 mb-2">
+                                  <div>
+                                    <label className="text-[10px] text-gray-500 block mb-0.5">Date</label>
+                                    <input type="date" value={editingTx.date}
+                                      onChange={e => setEditingTx(p => ({ ...p, date: e.target.value }))}
+                                      className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg" />
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] text-gray-500 block mb-0.5">Store</label>
+                                    <input type="text" value={editingTx.store_name} placeholder="Store"
+                                      onChange={e => setEditingTx(p => ({ ...p, store_name: e.target.value }))}
+                                      className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg" />
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] text-gray-500 block mb-0.5">Amount</label>
+                                    <input type="number" value={editingTx.amount} placeholder="Amount"
+                                      onChange={e => setEditingTx(p => ({ ...p, amount: e.target.value }))}
+                                      className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg" />
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] text-gray-500 block mb-0.5">Note</label>
+                                    <input type="text" value={editingTx.note} placeholder="Note"
+                                      onChange={e => setEditingTx(p => ({ ...p, note: e.target.value }))}
+                                      className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg" />
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button onClick={handleSaveEdit}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg active:bg-blue-800">저장</button>
+                                  <button onClick={() => handleDeleteTx(item.id)}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-red-50 text-red-600 rounded-lg active:bg-red-100">삭제</button>
+                                  <button onClick={() => setEditingTx(null)}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-gray-100 text-gray-600 rounded-lg active:bg-gray-200">취소</button>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          </React.Fragment>
                         )})}
                       </tbody>
                     </table>
