@@ -1662,12 +1662,38 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='account-statement')
     def account_statement(self, request):
-        """Account statement for QT/ChCh - shows all incoming money by store and month."""
-        account = request.query_params.get('account')  # QT, ChCh, Manager
+        """Account statement for QT/ChCh/KRW - shows all incoming money by store and month."""
+        account = request.query_params.get('account')  # QT, ChCh, KRW
         if not account:
             return Response({'error': 'account parameter required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        qs = self.get_queryset().filter(person__iexact=account)
+        # Build store→cash_account mapping from latest ProfitShare per org
+        from reports.models import ProfitShare
+        from users.models import Organization
+        from django.db.models import Q
+        store_account_map = {}  # store_name → cash_account
+        # Use latest ProfitShare per organization (ordered by year desc, period desc)
+        seen_orgs = set()
+        for ps in ProfitShare.objects.select_related('organization').order_by('-year', '-period_type'):
+            if ps.organization and ps.organization.name not in seen_orgs:
+                store_account_map[ps.organization.name] = ps.cash_account or 'QT'
+                seen_orgs.add(ps.organization.name)
+        # Default: all orgs without ProfitShare → QT
+        for org in Organization.objects.all():
+            if org.name not in store_account_map:
+                store_account_map[org.name] = 'QT'
+
+        # For QT/ChCh: include person=account OR (Deposit/Owner from mapped stores)
+        base_qs = self.get_queryset()
+        if account.upper() in ('QT', 'CHCH'):
+            mapped_stores = [s for s, a in store_account_map.items() if a.upper() == account.upper()]
+            qs = base_qs.filter(
+                Q(person__iexact=account) |
+                Q(person='Deposit', store_name__in=mapped_stores) |
+                Q(person='Owner', store_name__in=mapped_stores)
+            )
+        else:
+            qs = base_qs.filter(person__iexact=account)
 
         # Optional date range filter
         date_start = request.query_params.get('date_start')
