@@ -698,8 +698,8 @@ function OverviewDashboard({ reports, lastYearReports, twoYearsAgoReports, year 
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center p-3 bg-blue-50 rounded-xl">
             <div className="text-xs text-gray-500 mb-1">{year}</div>
-            <div className="text-lg font-bold text-blue-700">${totalSalesYTD.toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</div>
-            <div className="text-xs text-gray-400">{monthsWithData.length} months</div>
+            <div className="text-lg font-bold text-blue-700">${allYearTotalSales.toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</div>
+            <div className="text-xs text-gray-400">{allMonthsWithData.length} months</div>
           </div>
           <div className="text-center p-3 bg-gray-50 rounded-xl">
             <div className="text-xs text-gray-500 mb-1">{year - 1}</div>
