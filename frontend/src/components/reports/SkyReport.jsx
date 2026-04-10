@@ -487,21 +487,14 @@ function OverviewDashboard({ reports, lastYearReports, twoYearsAgoReports, year 
     ? (periodTab === 'current' ? `H2 (Oct ${year - 1} - Mar ${year})` : `H1 (Apr - Sep ${year})`)
     : (periodTab === 'current' ? `H1 (Apr - Sep ${year})` : `H2 (Oct ${year - 1} - Mar ${year})`)
 
-  // Filter overview cards by active period (H1/H2)
-  const activePeriodMonths = isH2
-    ? (periodTab === 'current' ? H2_MONTHS : H1_MONTHS)
-    : (periodTab === 'current' ? H1_MONTHS : H2_MONTHS)
-  // For H2 current period, reports include Jan-Mar from current year + Oct-Dec from lastYear
-  // For overview cards, just filter current year's reports by active months
-  const periodFilteredReports = isH2 && periodTab === 'current'
-    ? currentH2Reports
-    : isH2 && periodTab !== 'current'
-    ? currentH1Reports
-    : !isH2 && periodTab === 'current'
-    ? currentH1Reports
-    : currentH2Reports
-  monthsWithData = periodFilteredReports.filter(r => parseFloat(r.total_sales_inc_gst) > 0)
-  // Recalculate summary stats based on period-filtered data
+  // Filter overview cards by chartPeriod (Full Year / H1 / H2)
+  const summaryCardReports = chartPeriod === 'ALL'
+    ? reports
+    : chartPeriod === 'H1'
+    ? reports.filter(r => H1_MONTHS.includes(r.month))
+    : [...lastYearReports.filter(r => [10, 11, 12].includes(r.month)), ...reports.filter(r => [1, 2, 3].includes(r.month))]
+  monthsWithData = summaryCardReports.filter(r => parseFloat(r.total_sales_inc_gst) > 0)
+  // Recalculate summary stats based on chartPeriod
   totalSalesYTD = monthsWithData.reduce((s, r) => s + (parseFloat(r.total_sales_inc_gst) || 0), 0)
   avgMonthlySales = monthsWithData.length > 0 ? totalSalesYTD / monthsWithData.length : 0
   bestMonth = null
@@ -515,6 +508,7 @@ function OverviewDashboard({ reports, lastYearReports, twoYearsAgoReports, year 
   avgMargin = marginMonths.length > 0
     ? (marginMonths.reduce((s, r) => s + ((parseFloat(r.operating_profit) || 0) / (parseFloat(r.excl_gst_sales) || 1) * 100), 0) / marginMonths.length).toFixed(1)
     : '0.0'
+  const summaryPeriodLabel = chartPeriod === 'ALL' ? 'YTD' : chartPeriod
 
   // Comparisons for active period
   const getComparisons = () => {
@@ -672,7 +666,7 @@ function OverviewDashboard({ reports, lastYearReports, twoYearsAgoReports, year 
       {/* B. Period Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card className="p-4 text-center">
-          <div className="text-xs text-gray-500 mb-1">Total Sales ({activePeriodLabel ? activePeriodLabel.split(' ')[0] : 'YTD'})</div>
+          <div className="text-xs text-gray-500 mb-1">Total Sales ({summaryPeriodLabel})</div>
           <div className="text-lg font-bold text-gray-900">${totalSalesYTD.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
           <div className="text-xs text-gray-400 mt-1">{monthsWithData.length} months</div>
         </Card>
@@ -688,7 +682,7 @@ function OverviewDashboard({ reports, lastYearReports, twoYearsAgoReports, year 
         <Card className="p-4 text-center">
           <div className="text-xs text-gray-500 mb-1">Profit Margin</div>
           <div className={`text-lg font-bold ${parseFloat(avgMargin) >= 0 ? 'text-gray-900' : 'text-red-600'}`}>{avgMargin}%</div>
-          <div className="text-xs text-gray-400 mt-1">avg {activePeriodLabel ? activePeriodLabel.split(' ')[0] : 'operating'}</div>
+          <div className="text-xs text-gray-400 mt-1">avg {summaryPeriodLabel}</div>
         </Card>
       </div>
 
