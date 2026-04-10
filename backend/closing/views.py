@@ -1241,7 +1241,12 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         return super().get_object()
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        # CEO/HQ can see all orgs' transactions
+        profile = self.request.user.profile
+        if profile.role in ('CEO', 'HQ'):
+            qs = CQTransaction.objects.all()
+        else:
+            qs = super().get_queryset()
         # Filters
         store = self.request.query_params.get('store_name')
         person = self.request.query_params.get('person')
