@@ -405,7 +405,7 @@ function OverviewDashboard({ reports, lastYearReports, twoYearsAgoReports, year 
     const marginP = excl > 0 ? (profit / excl * 100).toFixed(1) : '0.0'
     // LY Sales for same month
     const lySales = parseFloat(lastYearMap[m.value]?.total_sales_inc_gst) || 0
-    return { label: m.label, sales, cogs, cogsP, wages, wageP, profit, marginP, month: m.value, lySales }
+    return { label: m.label, sales, excl, cogs, cogsP, wages, wageP, profit, marginP, month: m.value, lySales }
   }).filter(Boolean)
 
   // Get goals from most recent report
@@ -883,7 +883,7 @@ function OverviewDashboard({ reports, lastYearReports, twoYearsAgoReports, year 
                 const totCogs = plData.reduce((s, d) => s + d.cogs, 0)
                 const totWages = plData.reduce((s, d) => s + d.wages, 0)
                 const totProfit = plData.reduce((s, d) => s + d.profit, 0)
-                const totExcl = monthsWithData.reduce((s, r) => s + (parseFloat(r.excl_gst_sales) || 0), 0)
+                const totExcl = plData.reduce((s, d) => s + d.excl, 0)
                 const totCogsP = totExcl > 0 ? (totCogs / totExcl * 100).toFixed(1) : '0.0'
                 const totWageP = totExcl > 0 ? (totWages / totExcl * 100).toFixed(1) : '0.0'
                 const totMarginP = totExcl > 0 ? (totProfit / totExcl * 100).toFixed(1) : '0.0'
