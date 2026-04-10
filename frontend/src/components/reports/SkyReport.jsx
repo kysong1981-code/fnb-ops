@@ -877,13 +877,13 @@ function OverviewDashboard({ reports, lastYearReports, twoYearsAgoReports, year 
                 const totCogs = plData.reduce((s, d) => s + d.cogs, 0)
                 const totWages = plData.reduce((s, d) => s + d.wages, 0)
                 const totProfit = plData.reduce((s, d) => s + d.profit, 0)
-                const totExcl = plData.reduce((s, d) => s + d.excl, 0)
-                const totCogsP = totExcl > 0 ? (totCogs / totExcl * 100).toFixed(1) : '0.0'
-                const totWageP = totExcl > 0 ? (totWages / totExcl * 100).toFixed(1) : '0.0'
-                const totMarginP = totExcl > 0 ? (totProfit / totExcl * 100).toFixed(1) : '0.0'
+                // Simple average of each month's percentage
+                const totCogsP = plData.length > 0 ? (plData.reduce((s, d) => s + parseFloat(d.cogsP), 0) / plData.length).toFixed(1) : '0.0'
+                const totWageP = plData.length > 0 ? (plData.reduce((s, d) => s + parseFloat(d.wageP), 0) / plData.length).toFixed(1) : '0.0'
+                const totMarginP = plData.length > 0 ? (plData.reduce((s, d) => s + parseFloat(d.marginP), 0) / plData.length).toFixed(1) : '0.0'
                 return (
                   <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold">
-                    <td className="px-4 py-2.5 text-gray-900">TOTAL</td>
+                    <td className="px-4 py-2.5 text-gray-900">TOTAL / AVG</td>
                     <td className="px-3 py-2.5 text-right text-gray-900">${fmt(totSales)}</td>
                     <td className="px-3 py-2.5 text-right text-gray-400">{totLySales > 0 ? `$${fmt(totLySales)}` : '-'}</td>
                     <td className="px-3 py-2.5 text-right text-gray-900">${fmt(totCogs)}</td>
