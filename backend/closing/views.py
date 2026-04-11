@@ -1452,7 +1452,9 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         if date_start:
             before_qs = all_qs.filter(date__lt=date_start).order_by('date', 'created_at')
             for tx in before_qs:
-                if tx.transaction_type in ('COLLECTION', 'BALANCE'):
+                is_owner = tx.transaction_type == 'COLLECTION' and tx.person.lower() == 'owner'
+                is_inflow = tx.transaction_type in ('COLLECTION', 'BALANCE') and not is_owner
+                if is_inflow:
                     carry_over += tx.amount
                 else:
                     carry_over -= tx.amount
@@ -1467,7 +1469,12 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         ledger = []
         balance = carry_over
         for tx in period_qs:
-            if tx.transaction_type in ('COLLECTION', 'BALANCE'):
+            # Inflow: cash collected from store (COLLECTION except Owner), BALANCE
+            # Outflow: Owner profit, INCENTIVE, PROFIT, EXPENSE, EXCHANGE
+            is_owner = tx.transaction_type == 'COLLECTION' and tx.person.lower() == 'owner'
+            is_inflow = tx.transaction_type in ('COLLECTION', 'BALANCE') and not is_owner
+
+            if is_inflow:
                 balance += tx.amount
                 ledger.append({
                     'id': tx.id,
