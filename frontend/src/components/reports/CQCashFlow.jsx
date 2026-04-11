@@ -1389,6 +1389,22 @@ export default function CQCashFlow() {
                   </div>
                 )
               })()}
+              {/* Carry-over + Current Balance */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100">
+                  <div className="text-xs text-gray-500 mb-1">이월 잔액</div>
+                  <div className={`text-lg font-bold ${(storeLedger.carry_over || 0) >= 0 ? 'text-amber-700' : 'text-red-600'}`}>
+                    {fmt(storeLedger.carry_over || 0)}
+                  </div>
+                </div>
+                <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
+                  <div className="text-xs text-gray-500 mb-1">현재 잔액</div>
+                  <div className={`text-lg font-bold ${(storeLedger.balance || 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                    {fmt(storeLedger.balance || 0)}
+                  </div>
+                </div>
+              </div>
+
               <Card>
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-800 mb-3">{selectedStore} Ledger</h3>
@@ -1437,6 +1453,19 @@ export default function CQCashFlow() {
                             </tr>
                           )
                         })}
+                        {(storeLedger.carry_over || 0) !== 0 && (
+                          <tr className="border-t-2 border-amber-200 bg-amber-50/50">
+                            <td className="py-2 pr-3 text-amber-700 font-medium" colSpan={3}>이월 잔액 (Carry-over)</td>
+                            <td className="py-2 pr-3 text-right text-amber-700 font-medium">
+                              {storeLedger.carry_over > 0 ? fmt(storeLedger.carry_over) : ''}
+                            </td>
+                            <td className="py-2 pr-3 text-right text-amber-700 font-medium">
+                              {storeLedger.carry_over < 0 ? fmt(Math.abs(storeLedger.carry_over)) : ''}
+                            </td>
+                            <td className="py-2 text-right font-bold text-amber-800">{fmt(storeLedger.carry_over)}</td>
+                            <td></td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>

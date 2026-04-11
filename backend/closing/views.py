@@ -1426,7 +1426,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='store-ledger')
     def store_ledger(self, request):
-        """매장 장부 - 특정 매장의 수금/배분 내역"""
+        """매장 장부 - 특정 매장의 수금/배분 내역 (이월 잔액 포함)"""
         store = request.query_params.get('store_name')
         if not store:
             return Response(
@@ -1434,11 +1434,39 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        qs = self.get_queryset().filter(store_name__icontains=store).order_by('date', 'created_at')
+        date_start = request.query_params.get('date_start')
+        date_end = request.query_params.get('date_end')
+
+        # CEO/HQ: all orgs
+        profile = request.user.profile
+        if profile.role in ('CEO', 'HQ'):
+            all_qs = CQTransaction.objects.filter(store_name__icontains=store)
+        else:
+            all_qs = CQTransaction.objects.filter(
+                organization=profile.organization,
+                store_name__icontains=store
+            )
+
+        # Calculate carry-over balance from transactions BEFORE the period
+        carry_over = Decimal('0')
+        if date_start:
+            before_qs = all_qs.filter(date__lt=date_start).order_by('date', 'created_at')
+            for tx in before_qs:
+                if tx.transaction_type in ('COLLECTION', 'BALANCE'):
+                    carry_over += tx.amount
+                else:
+                    carry_over -= tx.amount
+
+        # Current period transactions
+        period_qs = all_qs.order_by('date', 'created_at')
+        if date_start:
+            period_qs = period_qs.filter(date__gte=date_start)
+        if date_end:
+            period_qs = period_qs.filter(date__lte=date_end)
 
         ledger = []
-        balance = Decimal('0')
-        for tx in qs:
+        balance = carry_over
+        for tx in period_qs:
             if tx.transaction_type in ('COLLECTION', 'BALANCE'):
                 balance += tx.amount
                 ledger.append({
@@ -1473,6 +1501,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
 
         return Response({
             'store_name': store,
+            'carry_over': float(carry_over),
             'ledger': ledger,
             'total_collection': sum(item['income'] for item in ledger),
             'total_distributed': sum(item['expense'] for item in ledger),
