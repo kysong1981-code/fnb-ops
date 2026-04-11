@@ -517,7 +517,7 @@ class ClosingCashExpenseViewSet(mixins.CreateModelMixin,
                 organization=org,
                 date=closing.closing_date,
                 store_name=org.name,
-                transaction_type='TRANSFER',
+                transaction_type='COLLECTION',
                 person=expense.reason or expense.category,  # ChCh, QT, Manager
                 amount=expense.amount,
                 account_type='CASH',
@@ -536,7 +536,7 @@ class ClosingCashExpenseViewSet(mixins.CreateModelMixin,
             cq = CQTransaction.objects.filter(
                 organization=closing.organization,
                 date=closing.closing_date,
-                transaction_type='TRANSFER',
+                transaction_type__in=['COLLECTION', 'TRANSFER'],
                 person=instance.reason or instance.category,
                 amount=instance.amount,
             ).first()
@@ -1745,8 +1745,8 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         ledger = []
         balance = opening_balance
         for tx in qs:
-            # TRANSFER type = created from ClosingCashExpense (cash management)
-            source = 'cash_management' if tx.transaction_type == 'TRANSFER' else None
+            # Cash management auto-created entries have [Cash Mgmt] in note
+            source = 'cash_management' if (tx.note and '[Cash Mgmt]' in tx.note) else None
             entry = {
                 'id': tx.id, 'date': str(tx.date),
                 'store_name': tx.store_name,
