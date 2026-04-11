@@ -204,7 +204,7 @@ export default function CQCashFlow() {
     try {
       const [res, lockRes] = await Promise.all([
         cqTransactionAPI.storeLedger({
-          store_name: selectedStore, date_start: dateRange.start, date_end: dateRange.end,
+          store_name: selectedStore,
         }),
         cqTransactionAPI.lockStatus({ store_name: selectedStore }),
       ])
@@ -1200,50 +1200,12 @@ export default function CQCashFlow() {
       {/* ===== STORE VIEW ===== */}
       {view === 'stores' && (
         <div className="space-y-4">
-          {/* Period selector for store view */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1">
-              <button onClick={() => setYear(y => y - 1)}
-                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </button>
-              <span className="text-base font-bold text-gray-900 min-w-[3rem] text-center">{year}</span>
-              <button onClick={() => setYear(y => y + 1)}
-                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </button>
-            </div>
-            <div className="flex bg-gray-100 rounded-xl p-1">
-              {[{ key: 'H1', label: 'H1' }, { key: 'H2', label: 'H2' }, { key: 'CUSTOM', label: 'Custom' }].map(p => (
-                <button key={p.key} onClick={() => setPeriod(p.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    period === p.key ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                  }`}>{p.label}</button>
-              ))}
-            </div>
-            {period === 'CUSTOM' && (
-              <div className="flex items-center gap-2">
-                <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
-                  className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs" />
-                <span className="text-gray-400 text-xs">~</span>
-                <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
-                  className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs" />
-              </div>
-            )}
-          </div>
-
           <div className="flex items-center gap-3">
             <select value={selectedStore} onChange={e => setSelectedStore(e.target.value)}
               className={inputCls + ' flex-1'}>
               <option value="">Select store...</option>
               {storesList.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
-            {selectedStore && !storeLockStatus.is_locked && (
-              <button onClick={() => { setForm(f => ({ ...f, store_name: selectedStore })); setShowForm(true) }}
-                className="px-3 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 flex items-center gap-1">
-                <PlusIcon className="w-4 h-4" /> Add
-              </button>
-            )}
             {selectedStore && (
               <button onClick={handleToggleLock}
                 className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition ${
@@ -1380,10 +1342,10 @@ export default function CQCashFlow() {
                       <div className="text-xs text-gray-500 mb-1">Equity Share</div>
                       <div className="text-lg font-bold text-blue-600">{fmt(equityTotal)}</div>
                     </div>
-                    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
-                      <div className="text-xs text-gray-500 mb-1">Net Profit</div>
-                      <div className="text-lg font-bold text-gray-800">
-                        {fmt(storeLedger.total_collection + (storeLedger.total_distributed || 0))}
+                    <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
+                      <div className="text-xs text-gray-500 mb-1">현재 잔액</div>
+                      <div className={`text-lg font-bold ${(storeLedger.balance || 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                        {fmt(storeLedger.balance || 0)}
                       </div>
                     </div>
                   </div>
