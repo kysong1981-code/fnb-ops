@@ -1309,38 +1309,19 @@ export default function CQCashFlow() {
 
           {storeLedger && selectedStore && (
             <>
-              {/* Owner Account/Cash + Summary */}
+              {/* Cash Summary Cards */}
               {(() => {
-                const ownerItems = storeLedger.ledger?.filter(i => i.transaction_type === 'COLLECTION') || []
-                const ownerAccount = ownerItems.filter(i => i.account_type === 'ACCOUNT').reduce((s, i) => s + i.income, 0)
-                const ownerCash = ownerItems.filter(i => i.account_type === 'CASH').reduce((s, i) => s + i.income, 0)
-                const incentiveTotal = storeLedger.ledger?.filter(i => i.transaction_type === 'INCENTIVE').reduce((s, i) => s + i.expense, 0) || 0
-                const equityTotal = storeLedger.ledger?.filter(i => i.transaction_type === 'PROFIT').reduce((s, i) => s + i.expense, 0) || 0
+                const totalIn = storeLedger.ledger?.reduce((s, i) => s + i.income, 0) || 0
+                const totalOut = storeLedger.ledger?.reduce((s, i) => s + i.expense, 0) || 0
                 return (
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <div className="bg-green-50 rounded-2xl p-4 border border-green-100">
-                      <div className="text-xs text-gray-500 mb-1">Owner Profit</div>
-                      <div className="text-lg font-bold text-green-600">{fmt(storeLedger.total_collection)}</div>
-                      {(ownerAccount > 0 || ownerCash > 0) && (
-                        <div className="mt-2 pt-2 border-t border-green-200 space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-gray-500">Account</span>
-                            <span className="font-medium text-green-700">{fmt(ownerAccount)}</span>
-                          </div>
-                          <div className="flex justify-between text-xs">
-                            <span className="text-gray-500">Cash</span>
-                            <span className="font-medium text-green-700">{fmt(ownerCash)}</span>
-                          </div>
-                        </div>
-                      )}
+                      <div className="text-xs text-gray-500 mb-1">총 수금</div>
+                      <div className="text-lg font-bold text-green-600">{fmt(totalIn)}</div>
                     </div>
-                    <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100">
-                      <div className="text-xs text-gray-500 mb-1">Incentive</div>
-                      <div className="text-lg font-bold text-purple-600">{fmt(incentiveTotal)}</div>
-                    </div>
-                    <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-                      <div className="text-xs text-gray-500 mb-1">Equity Share</div>
-                      <div className="text-lg font-bold text-blue-600">{fmt(equityTotal)}</div>
+                    <div className="bg-red-50 rounded-2xl p-4 border border-red-100">
+                      <div className="text-xs text-gray-500 mb-1">총 지출</div>
+                      <div className="text-lg font-bold text-red-600">{fmt(totalOut)}</div>
                     </div>
                     <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
                       <div className="text-xs text-gray-500 mb-1">현재 잔액</div>
