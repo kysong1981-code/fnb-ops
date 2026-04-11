@@ -1437,14 +1437,15 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         date_start = request.query_params.get('date_start')
         date_end = request.query_params.get('date_end')
 
-        # CEO/HQ: all orgs
+        # CEO/HQ: all orgs, CASH only (By Store = cash tracking)
         profile = request.user.profile
         if profile.role in ('CEO', 'HQ'):
-            all_qs = CQTransaction.objects.filter(store_name__icontains=store)
+            all_qs = CQTransaction.objects.filter(store_name__icontains=store, account_type='CASH')
         else:
             all_qs = CQTransaction.objects.filter(
                 organization=profile.organization,
-                store_name__icontains=store
+                store_name__icontains=store,
+                account_type='CASH',
             )
 
         # Calculate carry-over balance from transactions BEFORE the period
