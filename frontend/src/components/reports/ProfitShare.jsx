@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { profitShareAPI } from '../../services/api'
+import { profitShareAPI, cqTransactionAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import { useStore } from '../../context/StoreContext'
 import PageHeader from '../ui/PageHeader'
@@ -41,6 +41,7 @@ const EMPTY_SUMMARY = {
   incentive_pct: '',
   evaluation_score: 0,
   cash_account: 'QT',
+  hr_cash_total: '',
   notes: '',
 }
 
@@ -90,16 +91,20 @@ export default function ProfitShare() {
   const loadSkyData = async () => {
     if (!selectedStore?.id) return
     try {
-      const res = await profitShareAPI.pullSkyData(year, periodType, selectedStore.id)
+      const [res, ledgerRes] = await Promise.all([
+        profitShareAPI.pullSkyData(year, periodType, selectedStore.id),
+        cqTransactionAPI.storeLedger({ store_name: selectedStore.name }),
+      ])
       const data = res.data
       setSkyData(data)
       // Auto-fill net_profit_cash from CQ (collected - incentive - distributed)
-      if (data && data.cash_net > 0) {
-        setSummary(prev => ({
-          ...prev,
-          net_profit_cash: prev.net_profit_cash || data.cash_net,
-        }))
-      }
+      // Auto-fill hr_cash_total from store ledger balance
+      const storeBalance = ledgerRes.data?.balance || 0
+      setSummary(prev => ({
+        ...prev,
+        net_profit_cash: prev.net_profit_cash || (data?.cash_net > 0 ? data.cash_net : prev.net_profit_cash),
+        hr_cash_total: prev.hr_cash_total || (storeBalance > 0 ? storeBalance : prev.hr_cash_total),
+      }))
     } catch {
       setSkyData(null)
     }
@@ -144,6 +149,7 @@ export default function ProfitShare() {
           incentive_pct: ps.incentive_pct || '',
           evaluation_score: ps.evaluation_score || 0,
           cash_account: ps.cash_account || 'QT',
+          hr_cash_total: ps.hr_cash_total || '',
           notes: ps.notes || '',
         })
         if (ps.evaluation_score > 0) {
@@ -270,6 +276,7 @@ export default function ProfitShare() {
       incentive_pct: n(summary.incentive_pct),
       evaluation_score: parseInt(summary.evaluation_score) || 0,
       cash_account: summary.cash_account || 'QT',
+      hr_cash_total: n(summary.hr_cash_total),
       notes: summary.notes || '',
       partners: partners.map((p, i) => ({
         ...(p.id ? { id: p.id } : {}),
@@ -823,10 +830,10 @@ export default function ProfitShare() {
         </CardBody>
       </Card>
 
-      {/* Cash Account Selector */}
+      {/* Cash Account & HR Cash */}
       <Card className="mb-4">
         <CardBody>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4 mb-3">
             <label className="text-sm font-medium text-gray-700">Cash Account</label>
             <div className="flex gap-2">
               {['QT', 'ChCh'].map(acc => (
@@ -844,6 +851,20 @@ export default function ProfitShare() {
               ))}
             </div>
             <span className="text-xs text-gray-400">파트너 현금 지급 계좌</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>현금 잔액 (CQ Report)</label>
+              <input
+                type="number" step="0.01"
+                value={summary.hr_cash_total}
+                onChange={(e) => handleSummaryChange('hr_cash_total', e.target.value)}
+                className={disabled ? readOnlyCls : inputCls}
+                disabled={disabled}
+                placeholder="자동 불러오기"
+              />
+              <p className="text-xs text-gray-400 mt-1">By Store 현재 잔액에서 자동으로 불러옵니다</p>
+            </div>
           </div>
         </CardBody>
       </Card>
