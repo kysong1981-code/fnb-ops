@@ -99,11 +99,11 @@ export default function ProfitShare() {
       setSkyData(data)
       // Auto-fill net_profit_cash from CQ (collected - incentive - distributed)
       // Auto-fill hr_cash_total from store ledger balance
-      const storeBalance = ledgerRes.data?.balance || 0
+      const storeBalance = ledgerRes.data?.balance ?? 0
       setSummary(prev => ({
         ...prev,
         net_profit_cash: prev.net_profit_cash || (data?.cash_net > 0 ? data.cash_net : prev.net_profit_cash),
-        hr_cash_total: prev.hr_cash_total || (storeBalance > 0 ? storeBalance : prev.hr_cash_total),
+        hr_cash_total: (!prev.hr_cash_total && prev.hr_cash_total !== 0) ? storeBalance : prev.hr_cash_total,
       }))
     } catch {
       setSkyData(null)
