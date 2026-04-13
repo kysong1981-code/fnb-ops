@@ -22,6 +22,7 @@ const DATE_MODES = [
   { key: 'day', label: 'Day' },
   { key: 'week', label: 'Week' },
   { key: 'month', label: 'Month' },
+  { key: 'year', label: 'Year' },
 ]
 
 function localDateStr(d) {
@@ -109,6 +110,10 @@ export default function StoreReport() {
       const d = new Date(selectedDate + 'T00:00:00')
       return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
     }
+    if (dateMode === 'year') {
+      const y = new Date(selectedDate + 'T00:00:00').getFullYear()
+      return `${y}`
+    }
     return null
   }
 
@@ -125,6 +130,10 @@ export default function StoreReport() {
   const getChartRange = () => {
     if (dateMode === 'week') return getWeekRange(selectedDate)
     if (dateMode === 'month') return getMonthRange(selectedDate)
+    if (dateMode === 'year') {
+      const y = new Date(selectedDate + 'T00:00:00').getFullYear()
+      return { start: `${y}-01-01`, end: `${y}-12-31` }
+    }
     // Day mode: show current week
     return getWeekRange(selectedDate)
   }

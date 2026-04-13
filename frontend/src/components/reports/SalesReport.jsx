@@ -15,6 +15,7 @@ import AIInsightsCard from './AIInsightsCard'
 
 const DATE_MODES = [
   { key: 'month', label: 'Month' },
+  { key: 'year', label: 'Year' },
   { key: 'custom', label: 'Custom' },
 ]
 
@@ -62,6 +63,10 @@ export default function SalesReport() {
   // Get current date range
   const getRange = () => {
     if (dateMode === 'month') return getMonthRange(date)
+    if (dateMode === 'year') {
+      const y = new Date(date + 'T00:00:00').getFullYear()
+      return { start: `${y}-01-01`, end: `${y}-12-31` }
+    }
     if (dateMode === 'custom' && startDate && endDate) return { start: startDate, end: endDate }
     return null
   }
@@ -164,6 +169,9 @@ export default function SalesReport() {
     if (dateMode === 'month') {
       const d = new Date(date + 'T00:00:00')
       return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+    }
+    if (dateMode === 'year') {
+      return `${new Date(date + 'T00:00:00').getFullYear()}`
     }
     return null
   }

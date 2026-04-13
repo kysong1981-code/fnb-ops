@@ -13,6 +13,7 @@ const DATE_MODES = [
   { key: 'day', label: 'Day' },
   { key: 'week', label: 'Week' },
   { key: 'month', label: 'Month' },
+  { key: 'year', label: 'Year' },
   { key: 'custom', label: 'Custom' },
 ]
 
@@ -122,6 +123,9 @@ export default function CashReport() {
       } else if (dateMode === 'month') {
         const { start, end } = getMonthRange(date)
         response = await reportsAPI.getCashReportRange(start, end)
+      } else if (dateMode === 'year') {
+        const y = new Date(date + 'T00:00:00').getFullYear()
+        response = await reportsAPI.getCashReportRange(`${y}-01-01`, `${y}-12-31`)
       } else {
         response = await reportsAPI.getCashReportRange(startDate, endDate)
       }
@@ -147,6 +151,9 @@ export default function CashReport() {
     if (dateMode === 'month') {
       const d = new Date(date + 'T00:00:00')
       return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+    }
+    if (dateMode === 'year') {
+      return `${new Date(date + 'T00:00:00').getFullYear()}`
     }
     return null
   }
