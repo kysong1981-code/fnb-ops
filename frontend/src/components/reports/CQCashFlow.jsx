@@ -56,8 +56,11 @@ function localDateStr(d) {
   return `${y}-${m}-${day}`
 }
 
-// Get H1/H2 date ranges: H1=Apr-Sep, H2=Oct-Mar
+// Get H1/H2/YEAR date ranges: H1=Apr-Sep, H2=Oct-Mar, YEAR=Apr-Mar
 function getPeriodDates(year, period) {
+  if (period === 'YEAR') {
+    return { start: `${year}-04-01`, end: `${year + 1}-03-31` }
+  }
   if (period === 'H1') {
     return { start: `${year}-04-01`, end: `${year}-09-30` }
   }
@@ -1437,7 +1440,7 @@ export default function CQCashFlow() {
               </button>
             </div>
             <div className="flex bg-gray-100 rounded-xl p-1">
-              {[{ key: 'H1', label: 'H1' }, { key: 'H2', label: 'H2' }, { key: 'CUSTOM', label: 'Custom' }].map(p => (
+              {[{ key: 'YEAR', label: 'Year' }, { key: 'H1', label: 'H1' }, { key: 'H2', label: 'H2' }, { key: 'CUSTOM', label: 'Custom' }].map(p => (
                 <button key={p.key} onClick={() => setPeriod(p.key)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     period === p.key ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'

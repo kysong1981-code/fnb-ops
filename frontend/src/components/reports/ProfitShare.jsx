@@ -26,6 +26,7 @@ function fmtDec(v) {
 }
 
 function periodLabel(year, periodType) {
+  if (periodType === 'YEAR') return `${year} Year (Apr-Mar)`
   if (periodType === 'H1') return `${year} H1 (Apr-Sep)`
   return `${year} H2 (Oct-Mar)`
 }
@@ -128,61 +129,127 @@ export default function ProfitShare() {
     setLoading(true)
     setError('')
     try {
-      const res = await profitShareAPI.list({
-        store_id: selectedStore.id,
-        year,
-        period_type: periodType,
-      })
-      const data = res.data?.results || res.data
-      if (Array.isArray(data) && data.length > 0) {
-        const ps = data[0]
-        setProfitShareId(ps.id)
-        setIsLocked(ps.is_locked)
-        setSummary({
-          account_revenue: ps.account_revenue || '',
-          account_25: ps.account_25 || '',
-          tax: ps.tax || '',
-          net_profit_account: ps.net_profit_account || '',
-          net_profit_cash: ps.net_profit_cash || '',
-          incentive_account: ps.incentive_account || '',
-          incentive_cash: ps.incentive_cash || '',
-          incentive_pct: ps.incentive_pct || '',
-          evaluation_score: ps.evaluation_score || 0,
-          cash_account: ps.cash_account || 'QT',
-          hr_cash_total: ps.hr_cash_total || '',
-          notes: ps.notes || '',
-        })
-        if (ps.evaluation_score > 0) {
-          setScoreData({ total_score: ps.evaluation_score, score_percentage: ps.evaluation_score / 100 })
+      if (periodType === 'YEAR') {
+        // Load both H1 and H2, combine as read-only view
+        const [h1Res, h2Res] = await Promise.all([
+          profitShareAPI.list({ store_id: selectedStore.id, year, period_type: 'H1' }),
+          profitShareAPI.list({ store_id: selectedStore.id, year, period_type: 'H2' }),
+        ])
+        const h1Data = (h1Res.data?.results || h1Res.data || [])[0]
+        const h2Data = (h2Res.data?.results || h2Res.data || [])[0]
+        if (!h1Data && !h2Data) {
+          setProfitShareId(null)
+          setIsLocked(false)
+          setSummary({ ...EMPTY_SUMMARY })
+          setPartners([])
+          setScoreData(null)
         } else {
+          const sumF = (field) => {
+            const v1 = parseFloat(h1Data?.[field] || 0)
+            const v2 = parseFloat(h2Data?.[field] || 0)
+            const total = v1 + v2
+            return total ? total.toFixed(2) : ''
+          }
+          setProfitShareId(null) // no single record — read-only
+          setIsLocked(true) // treat as locked
+          setSummary({
+            account_revenue: sumF('account_revenue'),
+            account_25: sumF('account_25'),
+            tax: sumF('tax'),
+            net_profit_account: sumF('net_profit_account'),
+            net_profit_cash: sumF('net_profit_cash'),
+            incentive_account: sumF('incentive_account'),
+            incentive_cash: sumF('incentive_cash'),
+            incentive_pct: '',
+            evaluation_score: 0,
+            cash_account: h1Data?.cash_account || h2Data?.cash_account || 'QT',
+            hr_cash_total: sumF('hr_cash_total'),
+            notes: [h1Data?.notes, h2Data?.notes].filter(Boolean).join(' | ') || '',
+          })
+          setScoreData(null)
+          // Combine partners: group by name, sum calculated fields
+          const allPartners = [...(h1Data?.partners || []), ...(h2Data?.partners || [])]
+          const grouped = {}
+          allPartners.forEach(p => {
+            const key = p.name || 'Unknown'
+            if (!grouped[key]) {
+              grouped[key] = {
+                name: p.name, partner_type: p.partner_type || 'EQUITY',
+                incentive_pct: p.incentive_pct || '', equity_pct: p.equity_pct || '',
+                fixed_amount: '', fixed_account: '', fixed_cash: '',
+                notes: '', order: p.order || 0,
+                _incentive_account: 0, _incentive_cash: 0,
+                _bank_account: 0, _bank_cash: 0,
+                _total_account: 0, _total_cash: 0, _total: 0,
+              }
+            }
+            const g = grouped[key]
+            g._incentive_account += parseFloat(p.incentive_account || 0)
+            g._incentive_cash += parseFloat(p.incentive_cash || 0)
+            g._bank_account += parseFloat(p.bank_account || 0)
+            g._bank_cash += parseFloat(p.bank_cash || 0)
+            g._total_account += parseFloat(p.total_account || 0)
+            g._total_cash += parseFloat(p.total_cash || 0)
+            g._total += parseFloat(p.total || 0)
+          })
+          setPartners(Object.values(grouped))
+        }
+      } else {
+        const res = await profitShareAPI.list({
+          store_id: selectedStore.id,
+          year,
+          period_type: periodType,
+        })
+        const data = res.data?.results || res.data
+        if (Array.isArray(data) && data.length > 0) {
+          const ps = data[0]
+          setProfitShareId(ps.id)
+          setIsLocked(ps.is_locked)
+          setSummary({
+            account_revenue: ps.account_revenue || '',
+            account_25: ps.account_25 || '',
+            tax: ps.tax || '',
+            net_profit_account: ps.net_profit_account || '',
+            net_profit_cash: ps.net_profit_cash || '',
+            incentive_account: ps.incentive_account || '',
+            incentive_cash: ps.incentive_cash || '',
+            incentive_pct: ps.incentive_pct || '',
+            evaluation_score: ps.evaluation_score || 0,
+            cash_account: ps.cash_account || 'QT',
+            hr_cash_total: ps.hr_cash_total || '',
+            notes: ps.notes || '',
+          })
+          if (ps.evaluation_score > 0) {
+            setScoreData({ total_score: ps.evaluation_score, score_percentage: ps.evaluation_score / 100 })
+          } else {
+            setScoreData(null)
+          }
+          setPartners((ps.partners || []).map(p => ({
+            id: p.id,
+            name: p.name || '',
+            partner_type: p.partner_type || 'EQUITY',
+            incentive_pct: p.incentive_pct || '',
+            equity_pct: p.equity_pct || '',
+            fixed_amount: p.fixed_amount || '',
+            fixed_account: p.fixed_account || '',
+            fixed_cash: p.fixed_cash || '',
+            notes: p.notes || '',
+            order: p.order || 0,
+            _incentive_account: p.incentive_account,
+            _incentive_cash: p.incentive_cash,
+            _bank_account: p.bank_account,
+            _bank_cash: p.bank_cash,
+            _total_account: p.total_account,
+            _total_cash: p.total_cash,
+            _total: p.total,
+          })))
+        } else {
+          setProfitShareId(null)
+          setIsLocked(false)
+          setSummary({ ...EMPTY_SUMMARY })
+          setPartners([])
           setScoreData(null)
         }
-        setPartners((ps.partners || []).map(p => ({
-          id: p.id,
-          name: p.name || '',
-          partner_type: p.partner_type || 'EQUITY',
-          incentive_pct: p.incentive_pct || '',
-          equity_pct: p.equity_pct || '',
-          fixed_amount: p.fixed_amount || '',
-          fixed_account: p.fixed_account || '',
-          fixed_cash: p.fixed_cash || '',
-          notes: p.notes || '',
-          order: p.order || 0,
-          // Read-only calculated fields (prefixed with _ to distinguish)
-          _incentive_account: p.incentive_account,
-          _incentive_cash: p.incentive_cash,
-          _bank_account: p.bank_account,
-          _bank_cash: p.bank_cash,
-          _total_account: p.total_account,
-          _total_cash: p.total_cash,
-          _total: p.total,
-        })))
-      } else {
-        setProfitShareId(null)
-        setIsLocked(false)
-        setSummary({ ...EMPTY_SUMMARY })
-        setPartners([])
-        setScoreData(null)
       }
     } catch (err) {
       console.error('Failed to load profit share:', err)
@@ -415,17 +482,17 @@ export default function ProfitShare() {
 
         {/* Period toggle */}
         <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden">
-          {['H1', 'H2'].map(p => (
+          {[{ key: 'YEAR', label: 'Year' }, { key: 'H1', label: 'H1' }, { key: 'H2', label: 'H2' }].map(p => (
             <button
-              key={p}
-              onClick={() => setPeriodType(p)}
+              key={p.key}
+              onClick={() => setPeriodType(p.key)}
               className={`px-4 py-2 text-sm font-medium transition-all ${
-                periodType === p
+                periodType === p.key
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-500 hover:bg-gray-50'
               }`}
             >
-              {p === 'H1' ? 'H1 (Apr-Sep)' : 'H2 (Oct-Mar)'}
+              {p.label}
             </button>
           ))}
         </div>
@@ -1093,7 +1160,7 @@ export default function ProfitShare() {
       </div>
 
       {/* Actions */}
-      {isCEO && (
+      {isCEO && periodType !== 'YEAR' && (
         <div className="flex gap-3 mb-8">
           <button
             onClick={handleSave}

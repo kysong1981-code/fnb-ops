@@ -2337,7 +2337,11 @@ class StoreEvaluationViewSet(viewsets.ModelViewSet):
         period_type = request.query_params.get('period_type', 'H1')
 
         # Determine month range: H1=Apr-Sep, H2=Oct-Mar (crosses year boundary)
-        if period_type == 'H1':
+        if period_type == 'YEAR':
+            sky_reports = SkyReport.objects.filter(organization=org).filter(
+                Q(year=year, month__gte=4) | Q(year=year + 1, month__lte=3)
+            )
+        elif period_type == 'H1':
             sky_reports = SkyReport.objects.filter(
                 organization=org, year=year, month__in=range(4, 10),
             )
@@ -2772,12 +2776,17 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
             return Response({'error': 'year and period_type required'}, status=status.HTTP_400_BAD_REQUEST)
 
         year = int(year)
+        from django.db.models import Q
         # H1 = Apr-Sep (months 4-9), H2 = Oct-Mar (Oct-Dec of year, Jan-Mar of year+1)
-        if period_type == 'H1':
+        if period_type == 'YEAR':
+            # Full fiscal year: Apr of year → Mar of year+1
+            reports = SkyReport.objects.filter(organization=org).filter(
+                Q(year=year, month__gte=4) | Q(year=year + 1, month__lte=3)
+            )
+        elif period_type == 'H1':
             reports = SkyReport.objects.filter(organization=org, year=year, month__gte=4, month__lte=9)
         else:
             # H2: Oct-Dec of year + Jan-Mar of year+1
-            from django.db.models import Q
             reports = SkyReport.objects.filter(organization=org).filter(
                 Q(year=year, month__gte=10) | Q(year=year + 1, month__lte=3)
             )
@@ -2801,7 +2810,11 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
         # Cash from CQ Report — breakdown by type for this store in the period
         from closing.models import CQTransaction
         from django.db.models import Q as DQ
-        if period_type == 'H1':
+        if period_type == 'YEAR':
+            cq_qs = CQTransaction.objects.filter(store_name=org.name).filter(
+                DQ(date__year=year, date__month__gte=4) | DQ(date__year=year + 1, date__month__lte=3)
+            )
+        elif period_type == 'H1':
             cq_qs = CQTransaction.objects.filter(
                 store_name=org.name, date__year=year, date__month__gte=4, date__month__lte=9
             )
@@ -2825,7 +2838,7 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
         cash_net = cash_collected - cash_incentive - cash_distributed
 
         return Response({
-            'period': f"{year} {'H1 (Apr-Sep)' if period_type == 'H1' else 'H2 (Oct-Mar)'}",
+            'period': f"{year} {'Year (Apr-Mar)' if period_type == 'YEAR' else 'H1 (Apr-Sep)' if period_type == 'H1' else 'H2 (Oct-Mar)'}",
             'report_count': reports.count(),
             'total_sales_inc_gst': float(total_sales),
             'total_excl_gst': float(total_excl_gst),

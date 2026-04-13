@@ -104,39 +104,83 @@ export default function StoreEvaluation() {
     setLoading(true)
     setError('')
     try {
-      const res = await evaluationAPI.list({
-        store_id: selectedStore.id,
-        year,
-        period_type: periodType,
-      })
-      const data = Array.isArray(res.data) ? res.data : res.data.results || []
-      if (data.length > 0) {
-        const eval_ = data[0]
-        setEvaluationId(eval_.id)
-        setIsLocked(eval_.is_locked || false)
-        setForm({
-          period_type: eval_.period_type || periodType,
-          year: eval_.year || year,
-          sales_target: eval_.sales_target || '',
-          sales_achievement: eval_.sales_achievement || '',
-          sales_score: eval_.sales_score || '',
-          cogs_target: eval_.cogs_target || '',
-          cogs_achievement: eval_.cogs_achievement || '',
-          cogs_score: eval_.cogs_score || '',
-          wage_target: eval_.wage_target || '',
-          wage_achievement: eval_.wage_achievement || '',
-          wage_score: eval_.wage_score || '',
-          service_achievement: eval_.service_achievement || eval_.service_rating || '',
-          service_score: eval_.service_score || '',
-          hygiene_achievement: eval_.hygiene_achievement || eval_.hygiene_months || '18',
-          hygiene_score: eval_.hygiene_score || '',
-          leadership_achievement: eval_.leadership_achievement || eval_.leadership_score || '5',
-          leadership_score: eval_.leadership_score_points || eval_.leadership_score || '',
-        })
+      if (periodType === 'YEAR') {
+        // Load both H1 and H2, combine as read-only
+        const [h1Res, h2Res] = await Promise.all([
+          evaluationAPI.list({ store_id: selectedStore.id, year, period_type: 'H1' }),
+          evaluationAPI.list({ store_id: selectedStore.id, year, period_type: 'H2' }),
+        ])
+        const h1Data = (Array.isArray(h1Res.data) ? h1Res.data : h1Res.data.results || [])[0]
+        const h2Data = (Array.isArray(h2Res.data) ? h2Res.data : h2Res.data.results || [])[0]
+        if (!h1Data && !h2Data) {
+          setEvaluationId(null)
+          setIsLocked(false)
+          setForm({ ...EMPTY_FORM, year, period_type: 'YEAR' })
+        } else {
+          setEvaluationId(null) // no single record
+          setIsLocked(true) // read-only
+          const avgF = (field) => {
+            const vals = [h1Data?.[field], h2Data?.[field]].map(v => parseFloat(v || 0)).filter(v => v > 0)
+            return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : ''
+          }
+          const sumF = (field) => {
+            const total = parseFloat(h1Data?.[field] || 0) + parseFloat(h2Data?.[field] || 0)
+            return total ? total.toFixed(1) : ''
+          }
+          setForm({
+            period_type: 'YEAR', year,
+            sales_target: sumF('sales_target'),
+            sales_achievement: sumF('sales_achievement'),
+            sales_score: avgF('sales_score'),
+            cogs_target: avgF('cogs_target'),
+            cogs_achievement: avgF('cogs_achievement'),
+            cogs_score: avgF('cogs_score'),
+            wage_target: avgF('wage_target'),
+            wage_achievement: avgF('wage_achievement'),
+            wage_score: avgF('wage_score'),
+            service_achievement: avgF('service_achievement') || avgF('service_rating'),
+            service_score: avgF('service_score'),
+            hygiene_achievement: avgF('hygiene_achievement') || avgF('hygiene_months') || '18',
+            hygiene_score: avgF('hygiene_score'),
+            leadership_achievement: avgF('leadership_achievement') || avgF('leadership_score') || '5',
+            leadership_score: avgF('leadership_score_points') || avgF('leadership_score'),
+          })
+        }
       } else {
-        setEvaluationId(null)
-        setIsLocked(false)
-        setForm({ ...EMPTY_FORM, year, period_type: periodType })
+        const res = await evaluationAPI.list({
+          store_id: selectedStore.id,
+          year,
+          period_type: periodType,
+        })
+        const data = Array.isArray(res.data) ? res.data : res.data.results || []
+        if (data.length > 0) {
+          const eval_ = data[0]
+          setEvaluationId(eval_.id)
+          setIsLocked(eval_.is_locked || false)
+          setForm({
+            period_type: eval_.period_type || periodType,
+            year: eval_.year || year,
+            sales_target: eval_.sales_target || '',
+            sales_achievement: eval_.sales_achievement || '',
+            sales_score: eval_.sales_score || '',
+            cogs_target: eval_.cogs_target || '',
+            cogs_achievement: eval_.cogs_achievement || '',
+            cogs_score: eval_.cogs_score || '',
+            wage_target: eval_.wage_target || '',
+            wage_achievement: eval_.wage_achievement || '',
+            wage_score: eval_.wage_score || '',
+            service_achievement: eval_.service_achievement || eval_.service_rating || '',
+            service_score: eval_.service_score || '',
+            hygiene_achievement: eval_.hygiene_achievement || eval_.hygiene_months || '18',
+            hygiene_score: eval_.hygiene_score || '',
+            leadership_achievement: eval_.leadership_achievement || eval_.leadership_score || '5',
+            leadership_score: eval_.leadership_score_points || eval_.leadership_score || '',
+          })
+        } else {
+          setEvaluationId(null)
+          setIsLocked(false)
+          setForm({ ...EMPTY_FORM, year, period_type: periodType })
+        }
       }
     } catch {
       setEvaluationId(null)
@@ -380,17 +424,17 @@ export default function StoreEvaluation() {
 
             {/* Period toggle */}
             <div className="flex bg-gray-100 rounded-xl p-1">
-              {['H1', 'H2'].map(p => (
+              {[{ key: 'YEAR', label: 'Year' }, { key: 'H1', label: 'H1' }, { key: 'H2', label: 'H2' }].map(p => (
                 <button
-                  key={p}
-                  onClick={() => setPeriodType(p)}
+                  key={p.key}
+                  onClick={() => setPeriodType(p.key)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    periodType === p
+                    periodType === p.key
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  {p} ({p === 'H1' ? 'Apr-Sep' : 'Oct-Mar'})
+                  {p.label}
                 </button>
               ))}
             </div>
