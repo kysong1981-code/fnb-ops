@@ -251,27 +251,41 @@ export default function CQCashFlow() {
 
   const handleEditTx = async (tx) => {
     if (!isCEO) return
-    // Only allow editing real CQTransaction entries (not exp_ prefixed)
-    if (String(tx.id).startsWith('exp_')) return
+    const idStr = String(tx.id)
+    const isExpense = idStr.startsWith('exp_')
+    // Extract real description for CQExpense (strip "[CQ Expense] " prefix from note)
+    const noteRaw = tx.note || ''
+    const description = isExpense ? noteRaw.replace(/^\[CQ Expense\]\s*/, '') : ''
     setEditingTx({
       id: tx.id,
       date: tx.date,
-      store_name: tx.store_name || '',
+      // For CQExpense: show description in store_name edit field (it's the main editable text)
+      store_name: isExpense ? description : (tx.store_name || ''),
       amount: Math.abs(tx.amount),
-      note: tx.note || '',
+      note: isExpense ? '' : (tx.note || ''),
       transaction_type: tx.transaction_type,
+      is_expense: isExpense,
     })
   }
 
   const handleSaveEdit = async () => {
     if (!editingTx) return
     try {
-      await cqTransactionAPI.update(editingTx.id, {
-        date: editingTx.date,
-        store_name: editingTx.store_name,
-        amount: editingTx.amount,
-        note: editingTx.note,
-      })
+      if (editingTx.is_expense) {
+        const realId = String(editingTx.id).replace(/^exp_/, '')
+        await cqAPI.updateExpense(realId, {
+          date: editingTx.date,
+          description: editingTx.store_name, // store_name field holds the description in edit form
+          amount: editingTx.amount,
+        })
+      } else {
+        await cqTransactionAPI.update(editingTx.id, {
+          date: editingTx.date,
+          store_name: editingTx.store_name,
+          amount: editingTx.amount,
+          note: editingTx.note,
+        })
+      }
       setEditingTx(null)
       loadAccountStatement()
       showMsg('Updated')
@@ -284,14 +298,19 @@ export default function CQCashFlow() {
 
   const handleDeleteTx = async (txId) => {
     if (!isCEO) return
-    if (String(txId).startsWith('exp_')) return
     if (!confirm('Delete this entry?')) return
     try {
-      await cqTransactionAPI.delete(txId)
+      const idStr = String(txId)
+      if (idStr.startsWith('exp_')) {
+        const realId = idStr.replace(/^exp_/, '')
+        await cqAPI.deleteExpense(realId)
+      } else {
+        await cqTransactionAPI.delete(txId)
+      }
       loadAccountStatement()
       showMsg('Deleted')
     } catch (e) {
-      setError(e.response?.data?.error || 'Failed to delete')
+      setError(e.response?.data?.error || e.response?.data?.detail || 'Failed to delete')
     }
   }
 
@@ -1075,8 +1094,7 @@ export default function CQCashFlow() {
                       </thead>
                       <tbody>
                         {accountData.ledger?.map(item => {
-                          const isRealTx = !String(item.id).startsWith('exp_')
-                          const canEdit = isCEO && isRealTx && !item.is_locked
+                          const canEdit = isCEO && !item.is_locked
                           const isEditing = editingTx?.id === item.id
                           const isDetail = detailTx?.id === item.id && !isEditing
                           const colSpan = isKRW ? (isCEO ? 4 : 3) : (isCEO ? 6 : 5)

@@ -642,6 +642,7 @@ export const cqAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
   approveExpense: (id) => api.post(`/closing/cq-expenses/${id}/approve/`),
+  updateExpense: (id, data) => api.patch(`/closing/cq-expenses/${id}/`, data),
   deleteExpense: (id) => api.delete(`/closing/cq-expenses/${id}/`),
   combinedLedger: (params) => api.get('/closing/cq-expenses/combined-ledger/', { params }),
 }

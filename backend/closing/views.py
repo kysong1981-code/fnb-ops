@@ -1828,7 +1828,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                 'note': f"[CQ Expense] {exp.description}",
                 'transaction_type': exp.category or 'EXPENSE',
                 'period': '',
-                'is_locked': True,
+                'is_locked': False,
                 'source': 'cq_expense',
             }))
 
