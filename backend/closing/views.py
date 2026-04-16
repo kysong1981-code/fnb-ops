@@ -1052,7 +1052,15 @@ class CQExpenseViewSet(viewsets.ModelViewSet):
     pagination_class = None
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        # CEO/HQ see all expenses regardless of store_id filter
+        try:
+            profile = self.request.user.profile
+            if profile.role in ('CEO', 'HQ'):
+                qs = CQExpense.objects.all()
+            else:
+                qs = super().get_queryset()
+        except Exception:
+            qs = super().get_queryset()
         account = self.request.query_params.get('account')
         expense_status = self.request.query_params.get('status')
         date_start = self.request.query_params.get('date_start')
@@ -1066,6 +1074,20 @@ class CQExpenseViewSet(viewsets.ModelViewSet):
         if date_end:
             qs = qs.filter(date__lte=date_end)
         return qs.select_related('created_by__user', 'approved_by__user')
+
+    def get_object(self):
+        # CEO/HQ bypass filter_backends so they can get/update/delete
+        # any expense by pk regardless of organization
+        try:
+            profile = self.request.user.profile
+            if profile.role in ('CEO', 'HQ'):
+                pk = self.kwargs.get(self.lookup_field or 'pk')
+                obj = CQExpense.objects.get(pk=pk)
+                self.check_object_permissions(self.request, obj)
+                return obj
+        except (CQExpense.DoesNotExist, Exception):
+            pass
+        return super().get_object()
 
     def perform_create(self, serializer):
         profile = self.request.user.profile
