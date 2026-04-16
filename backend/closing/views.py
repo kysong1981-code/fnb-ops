@@ -1068,16 +1068,30 @@ class CQExpenseViewSet(viewsets.ModelViewSet):
         return qs.select_related('created_by__user', 'approved_by__user')
 
     def perform_create(self, serializer):
-        serializer.save(
-            organization=self.request.user.profile.organization,
-            created_by=self.request.user.profile,
-            status='PENDING',
-        )
+        profile = self.request.user.profile
+        # CEO/HQ auto-approve their own expenses (they're the ultimate authority)
+        if profile.role in ('CEO', 'HQ'):
+            serializer.save(
+                organization=profile.organization,
+                created_by=profile,
+                status='APPROVED',
+                approved_by=profile,
+                approved_at=timezone.now(),
+            )
+        else:
+            serializer.save(
+                organization=profile.organization,
+                created_by=profile,
+                status='PENDING',
+            )
 
     def perform_destroy(self, instance):
         if instance.status == 'APPROVED':
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied('Cannot delete an approved expense.')
+            # CEO/HQ can delete their own approved expenses (they auto-approved)
+            profile = self.request.user.profile
+            if not (profile.role in ('CEO', 'HQ') and instance.created_by == profile):
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied('Cannot delete an approved expense.')
         instance.delete()
 
     @action(detail=True, methods=['post'])
