@@ -2569,14 +2569,15 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
                 incentive_cash = partner.incentive_cash or Decimal('0')
                 bank_total = (partner.bank_account or Decimal('0')) + (partner.bank_cash or Decimal('0'))
 
-                # 1a) Incentive (account portion) — shows as outflow from QT/ChCh
+                # 1a) Incentive (account portion) — tracked under partner name;
+                # account_statement expands query to include these as QT/ChCh outflows.
                 if incentive_account != Decimal('0'):
                     CQTransaction.objects.create(
                         organization=instance.organization,
                         date=period_end_date,
                         store_name=store_name,
                         transaction_type='INCENTIVE',
-                        person=cash_account,
+                        person=partner.name,
                         amount=incentive_account,
                         account_type='ACCOUNT',
                         note=f"{partner.name} 인센티브 (Account) {instance.year} {instance.get_period_type_display()}",
@@ -2609,14 +2610,15 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
                     dist_account = (partner.total_account or Decimal('0')) - (partner.incentive_account or Decimal('0'))
                     dist_cash = (partner.total_cash or Decimal('0')) - (partner.incentive_cash or Decimal('0'))
                     label = 'Equity' if partner.partner_type == 'EQUITY' else 'Profit Share'
-                    # 2a) Account portion — outflow from QT/ChCh
+                    # 2a) Account portion — tracked under partner name; also
+                    # included in QT/ChCh Account Statement via expanded query.
                     if dist_account != Decimal('0'):
                         CQTransaction.objects.create(
                             organization=instance.organization,
                             date=period_end_date,
                             store_name=store_name,
                             transaction_type='PROFIT',
-                            person=cash_account,
+                            person=partner.name,
                             amount=dist_account,
                             account_type='ACCOUNT',
                             note=f"{partner.name} {label} (Account) {instance.year} {instance.get_period_type_display()}",

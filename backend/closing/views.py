@@ -1965,7 +1965,20 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'account parameter required'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Use base queryset (bypass get_queryset date filters for carry-over calc)
-        all_qs = CQTransaction.objects.filter(person__iexact=account)
+        # Include:
+        #  - Transactions explicitly under this account (person=QT/ChCh/KRW)
+        #  - Partner Account distributions (PROFIT/INCENTIVE + ACCOUNT) whose
+        #    ProfitShare.cash_account matches this account — shown as outflows.
+        from django.db.models import Q
+        all_qs = CQTransaction.objects.filter(
+            Q(person__iexact=account) |
+            Q(
+                account_type='ACCOUNT',
+                transaction_type__in=['PROFIT', 'INCENTIVE'],
+                profit_share__isnull=False,
+                profit_share__cash_account__iexact=account,
+            )
+        )
 
         # Optional date range filter
         date_start = request.query_params.get('date_start')
