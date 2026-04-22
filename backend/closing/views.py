@@ -1449,7 +1449,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
             qs = qs.filter(date__lte=date_end)
 
         EXCLUDE = {'QT', 'ChCh', 'KRW', 'Opening Balance', 'Deposit', ''}
-        qs = qs.exclude(person__in=EXCLUDE)
+        qs = qs.exclude(person__in=EXCLUDE).filter(profit_share__isnull=False)
 
         from collections import defaultdict
         people = defaultdict(lambda: {
