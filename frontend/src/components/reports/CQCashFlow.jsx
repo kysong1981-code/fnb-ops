@@ -103,6 +103,8 @@ export default function CQCashFlow() {
   const [personsList, setPersonsList] = useState([])
   const [storeLedger, setStoreLedger] = useState(null)
   const [personalLedger, setPersonalLedger] = useState(null)
+  const [allPersons, setAllPersons] = useState([])
+  const [expandedPerson, setExpandedPerson] = useState(null)
   const [selectedStore, setSelectedStore] = useState('')
   const [selectedPerson, setSelectedPerson] = useState('')
   const [historyData, setHistoryData] = useState([])
@@ -176,7 +178,8 @@ export default function CQCashFlow() {
   useEffect(() => {
     if (view === 'stores' && selectedStore) loadStoreLedger()
     if (view === 'persons' && selectedPerson) loadPersonalLedger()
-  }, [selectedStore, selectedPerson, year, period, customStart, customEnd])
+    if (view === 'persons') loadAllPersons()
+  }, [selectedStore, selectedPerson, year, period, customStart, customEnd, view])
 
   const loadHistoryData = async () => {
     try {
@@ -481,6 +484,15 @@ export default function CQCashFlow() {
     } catch (e) {
       setError('Failed to load personal ledger')
     }
+  }
+
+  const loadAllPersons = async () => {
+    try {
+      const res = await cqTransactionAPI.allPersons({
+        date_start: dateRange.start, date_end: dateRange.end,
+      })
+      setAllPersons(res.data?.persons || [])
+    } catch (e) { /* ignore */ }
   }
 
   const handleCreate = async () => {
@@ -1673,87 +1685,109 @@ export default function CQCashFlow() {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-3">
-            <select value={selectedPerson} onChange={e => setSelectedPerson(e.target.value)}
-              className={inputCls + ' flex-1'}>
-              <option value="">Select person...</option>
-              {personsList.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-          {personalLedger && selectedPerson && (
-            <>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-green-50 rounded-2xl p-4">
-                  <div className="text-xs text-gray-500">Total Received</div>
-                  <div className="text-lg font-bold text-green-600">{fmt(personalLedger.total_income)}</div>
-                </div>
-                <div className="bg-red-50 rounded-2xl p-4">
-                  <div className="text-xs text-gray-500">Total Expense</div>
-                  <div className="text-lg font-bold text-red-600">{fmt(personalLedger.total_expense)}</div>
-                </div>
-                <div className="bg-gray-50 rounded-2xl p-4">
-                  <div className="text-xs text-gray-500">Balance</div>
-                  <div className={`text-lg font-bold ${personalLedger.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {fmt(personalLedger.balance)}
-                  </div>
-                </div>
-              </div>
-              <Card>
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-800 mb-3">👤 {selectedPerson} Ledger</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-gray-500 border-b">
-                          <th className="pb-2 pr-3">Date</th>
-                          <th className="pb-2 pr-3">Store</th>
-                          <th className="pb-2 pr-3">Type</th>
-                          <th className="pb-2 pr-3 text-right">In</th>
-                          <th className="pb-2 pr-3 text-right">Out</th>
-                          <th className="pb-2 pr-3">Note</th>
-                          <th className="pb-2 text-right">Balance</th>
-                          <th className="pb-2 w-8"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {personalLedger.ledger?.map(item => {
-                          const txType = getTxType(item.transaction_type)
+          {allPersons.length === 0 && (
+            <div className="text-center py-12 text-gray-400">No data for this period</div>
+          )}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {allPersons.map(p => {
+              const isOpen = expandedPerson === p.person
+              const maxAmt = Math.max(1, ...p.monthly.map(m => Math.max(m.in, m.out)))
+              return (
+                <Card key={p.person}>
+                  <div className="p-4">
+                    <button onClick={() => {
+                      setExpandedPerson(isOpen ? null : p.person)
+                      if (!isOpen) { setSelectedPerson(p.person); loadPersonalLedger() }
+                    }}
+                      className="w-full flex items-center justify-between mb-3 text-left">
+                      <div>
+                        <div className="font-semibold text-gray-800 flex items-center gap-2">
+                          <span>👤</span>{p.person}
+                          <span className="text-[10px] text-gray-400 font-normal">({p.tx_count})</span>
+                        </div>
+                        <div className="text-[11px] text-gray-500 mt-0.5">
+                          <span className="text-green-600 font-semibold">+{fmt(p.total_income)}</span>
+                          {p.total_expense > 0 && <> · <span className="text-red-600">-{fmt(p.total_expense)}</span></>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-base font-bold ${p.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {fmt(p.balance)}
+                        </span>
+                        <span className="text-gray-300">{isOpen ? '▲' : '▼'}</span>
+                      </div>
+                    </button>
+
+                    {/* Mini bar chart — monthly in/out */}
+                    {p.monthly.length > 0 && (
+                      <div className="flex items-end gap-1 h-16 mb-1">
+                        {p.monthly.map(m => {
+                          const inPct = (m.in / maxAmt) * 100
+                          const outPct = (m.out / maxAmt) * 100
                           return (
-                            <tr key={item.id} className="border-b border-gray-50">
-                              <td className="py-2 pr-3 text-gray-600">{item.date}</td>
-                              <td className="py-2 pr-3 text-gray-800">{item.store_name}</td>
-                              <td className="py-2 pr-3">
-                                <span className={`px-2 py-0.5 rounded-full text-xs ${txType.bg} ${txType.color}`}>
-                                  {txType.label}
-                                </span>
-                              </td>
-                              <td className="py-2 pr-3 text-right text-green-600">
-                                {item.income > 0 ? fmt(item.income) : ''}
-                              </td>
-                              <td className="py-2 pr-3 text-right text-red-600">
-                                {item.expense > 0 ? fmt(item.expense) : ''}
-                              </td>
-                              <td className="py-2 pr-3 text-gray-500 text-xs max-w-[120px] truncate">{item.note}</td>
-                              <td className="py-2 text-right font-medium text-gray-800">{fmt(item.balance)}</td>
-                              <td className="py-2 pl-2">
-                                <button onClick={() => handleDelete(item.id)}
-                                  className="text-gray-300 hover:text-red-500">
-                                  <TrashIcon className="w-4 h-4" />
-                                </button>
-                              </td>
-                            </tr>
+                            <div key={m.month} className="flex-1 flex flex-col items-center gap-0.5" title={`${m.month}: +${fmt(m.in)} / -${fmt(m.out)}`}>
+                              <div className="w-full flex items-end justify-center gap-0.5 h-full">
+                                <div className="w-1/2 bg-green-400 rounded-t" style={{ height: `${inPct}%`, minHeight: m.in > 0 ? '2px' : '0' }}></div>
+                                <div className="w-1/2 bg-red-300 rounded-t" style={{ height: `${outPct}%`, minHeight: m.out > 0 ? '2px' : '0' }}></div>
+                              </div>
+                              <div className="text-[9px] text-gray-400">{m.month.slice(5)}</div>
+                            </div>
                           )
                         })}
-                      </tbody>
-                    </table>
+                      </div>
+                    )}
+
+                    {/* By-type breakdown chips */}
+                    {Object.keys(p.by_type || {}).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {Object.entries(p.by_type).map(([t, amt]) => {
+                          const tt = getTxType(t)
+                          return (
+                            <span key={t} className={`px-2 py-0.5 rounded-full text-[10px] ${tt.bg} ${tt.color}`}>
+                              {tt.label} {fmt(amt)}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* Expanded ledger */}
+                    {isOpen && personalLedger && selectedPerson === p.person && (
+                      <div className="mt-3 overflow-x-auto border-t pt-3">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-left text-gray-500 border-b">
+                              <th className="pb-2 pr-2">Date</th>
+                              <th className="pb-2 pr-2">Store</th>
+                              <th className="pb-2 pr-2">Type</th>
+                              <th className="pb-2 pr-2 text-right">In</th>
+                              <th className="pb-2 pr-2 text-right">Out</th>
+                              <th className="pb-2 text-right">Bal</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {personalLedger.ledger?.map(item => {
+                              const txType = getTxType(item.transaction_type)
+                              return (
+                                <tr key={item.id} className="border-b border-gray-50">
+                                  <td className="py-1.5 pr-2 text-gray-600">{item.date}</td>
+                                  <td className="py-1.5 pr-2 text-gray-800">{item.store_name}</td>
+                                  <td className="py-1.5 pr-2"><span className={`px-1.5 py-0.5 rounded text-[10px] ${txType.bg} ${txType.color}`}>{txType.label}</span></td>
+                                  <td className="py-1.5 pr-2 text-right text-green-600">{item.income > 0 ? fmt(item.income) : ''}</td>
+                                  <td className="py-1.5 pr-2 text-right text-red-600">{item.expense > 0 ? fmt(item.expense) : ''}</td>
+                                  <td className="py-1.5 text-right font-medium text-gray-800">{fmt(item.balance)}</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </Card>
-            </>
-          )}
-          {!selectedPerson && (
-            <div className="text-center py-12 text-gray-400">Select a person to view ledger</div>
-          )}
+                </Card>
+              )
+            })}
+          </div>
         </div>
       )}
 

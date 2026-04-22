@@ -669,6 +669,7 @@ export const cqTransactionAPI = {
   toggleLock: (data) => api.post('/closing/cq-transactions/toggle-lock/', data),
   lockStatus: (params) => api.get('/closing/cq-transactions/lock-status/', { params }),
   accountStatement: (params) => api.get('/closing/cq-transactions/account-statement/', { params }),
+  allPersons: (params) => api.get('/closing/cq-transactions/all-persons/', { params }),
   getOpeningBalance: (account) => api.get('/closing/cq-transactions/opening-balance/', { params: { account } }),
   setOpeningBalance: (data) => api.post('/closing/cq-transactions/opening-balance/', data),
 }

@@ -1433,6 +1433,66 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
             'persons': person_summary,
         })
 
+    @action(detail=False, methods=['get'], url_path='all-persons')
+    def all_persons(self, request):
+        """All persons' summary + monthly breakdown for charts.
+
+        Excludes accounts (QT/ChCh/KRW) and special labels (Opening Balance,
+        Deposit, Owner). Returns totals and monthly income/expense per person.
+        """
+        qs = self.get_queryset()
+        date_start = request.query_params.get('date_start')
+        date_end = request.query_params.get('date_end')
+        if date_start:
+            qs = qs.filter(date__gte=date_start)
+        if date_end:
+            qs = qs.filter(date__lte=date_end)
+
+        EXCLUDE = {'QT', 'ChCh', 'KRW', 'Opening Balance', 'Deposit', ''}
+        qs = qs.exclude(person__in=EXCLUDE)
+
+        from collections import defaultdict
+        people = defaultdict(lambda: {
+            'total_income': Decimal('0'),
+            'total_expense': Decimal('0'),
+            'by_type': defaultdict(lambda: Decimal('0')),
+            'monthly': defaultdict(lambda: {'in': Decimal('0'), 'out': Decimal('0')}),
+            'tx_count': 0,
+        })
+
+        # For partner persons, inflow = COLLECTION/INCENTIVE/PROFIT
+        INFLOW_TYPES = ('COLLECTION', 'INCENTIVE', 'PROFIT')
+        for tx in qs.order_by('date', 'created_at'):
+            p = people[tx.person]
+            p['tx_count'] += 1
+            month_key = tx.date.strftime('%Y-%m')
+            if tx.transaction_type in INFLOW_TYPES:
+                p['total_income'] += tx.amount
+                p['by_type'][tx.transaction_type] += tx.amount
+                p['monthly'][month_key]['in'] += tx.amount
+            else:
+                p['total_expense'] += tx.amount
+                p['monthly'][month_key]['out'] += tx.amount
+
+        result = []
+        for name, d in people.items():
+            months = sorted(d['monthly'].keys())
+            monthly_list = [
+                {'month': m, 'in': float(d['monthly'][m]['in']), 'out': float(d['monthly'][m]['out'])}
+                for m in months
+            ]
+            result.append({
+                'person': name,
+                'total_income': float(d['total_income']),
+                'total_expense': float(d['total_expense']),
+                'balance': float(d['total_income'] - d['total_expense']),
+                'tx_count': d['tx_count'],
+                'by_type': {k: float(v) for k, v in d['by_type'].items()},
+                'monthly': monthly_list,
+            })
+        result.sort(key=lambda x: -x['total_income'])
+        return Response({'persons': result})
+
     @action(detail=False, methods=['get'], url_path='personal-ledger')
     def personal_ledger(self, request):
         """개인 장부 - 특정 사람의 수입/지출 내역"""
