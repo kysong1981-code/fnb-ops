@@ -1586,8 +1586,18 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         # Collect all unique periods from the data
         periods = list(qs.exclude(period='').values_list('period', flat=True).distinct().order_by('period'))
 
-        # Only registered stores
+        # Registered stores + parent-rollup map:
+        # sub_store names roll up into their parent top-level Organization.
         from users.models import Organization
+        top_orgs = list(Organization.objects.filter(parent__isnull=True))
+        # lower(any registered name) -> canonical top-level parent name
+        canonical_top = {}
+        for org in top_orgs:
+            canonical_top[org.name.strip().lower()] = org.name
+            for sub in org.sub_stores.all():
+                canonical_top[sub.name.strip().lower()] = org.name
+        # Set of ALL registered store names (both top-level and sub_stores)
+        # used for transaction filtering.
         registered_stores = set(Organization.objects.values_list('name', flat=True))
 
         # Build owner profit account/cash breakdown from ProfitShare model
@@ -1625,26 +1635,41 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
             equity=Sum('amount', filter=Q(transaction_type='PROFIT')),
         ).order_by('period', 'store_name')
 
-        # Group store data by period
-        store_by_period = defaultdict(list)
+        # Group store data by period, rolling sub_stores up into parent.
+        store_by_period_map = defaultdict(lambda: defaultdict(lambda: {
+            'owner_profit': 0.0, 'incentive': 0.0, 'equity': 0.0,
+        }))
         for r in store_period_agg:
+            key = (r['store_name'] or '').strip().lower()
+            canon = canonical_top.get(key)
+            if not canon:
+                continue
             op = float(r['owner_profit'] or 0)
             inc = float(r['incentive'] or 0)
             eq = float(r['equity'] or 0)
-            if op > 0 or inc > 0 or eq > 0:
-                store_by_period[r['period']].append({
-                    'store_name': r['store_name'],
-                    'owner_profit': op,
-                    'incentive': inc,
-                    'equity': eq,
-                })
+            entry = store_by_period_map[r['period']][canon]
+            entry['owner_profit'] += op
+            entry['incentive'] += inc
+            entry['equity'] += eq
+        # Convert to list form (skip entries with no activity)
+        store_by_period = defaultdict(list)
+        for period_label, stores_map in store_by_period_map.items():
+            for store_name, entry in stores_map.items():
+                if entry['owner_profit'] > 0 or entry['incentive'] > 0 or entry['equity'] > 0:
+                    store_by_period[period_label].append({
+                        'store_name': store_name,
+                        **entry,
+                    })
 
-        # Per-store owner account/cash from ProfitShare
+        # Per-store owner account/cash from ProfitShare — roll up to parent
         store_acct_cash = defaultdict(lambda: {'owner_account': Decimal('0'), 'owner_cash': Decimal('0')})
         for period_label, ps_list in ps_by_period.items():
             for ps in ps_list:
-                store_name = ps.organization.name if ps.organization else None
-                if not store_name or store_name not in registered_stores:
+                raw_name = ps.organization.name if ps.organization else None
+                if not raw_name:
+                    continue
+                store_name = canonical_top.get(raw_name.strip().lower())
+                if not store_name:
                     continue
                 has_owner = any(p.partner_type == 'OWNER' for p in ps.partners.all())
                 if has_owner:
