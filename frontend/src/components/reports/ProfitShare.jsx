@@ -85,9 +85,34 @@ export default function ProfitShare() {
     loadSkyData()
   }, [selectedStore?.id, year, periodType])
 
+  const [initialPeriodSet, setInitialPeriodSet] = useState(false)
+
   useEffect(() => {
+    // Reset initial flag when store changes so we auto-advance once per store
+    setInitialPeriodSet(false)
     loadHistory()
   }, [selectedStore?.id])
+
+  // Auto-advance to next period based on history (once per store load)
+  useEffect(() => {
+    if (initialPeriodSet || !historyData || historyData.length === 0) return
+    // Find latest period in history (only H1/H2, ignore YEAR views)
+    const halves = historyData.filter(h => h.period_type === 'H1' || h.period_type === 'H2')
+    if (halves.length === 0) { setInitialPeriodSet(true); return }
+    // Sort descending by (year, period_order). H1 < H2 in the same year.
+    const sorted = [...halves].sort((a, b) => {
+      if (b.year !== a.year) return b.year - a.year
+      const ord = p => (p === 'H2' ? 2 : 1)
+      return ord(b.period_type) - ord(a.period_type)
+    })
+    const latest = sorted[0]
+    // Next period: H1 -> H2 same year; H2 -> H1 next year
+    const nextYear = latest.period_type === 'H2' ? latest.year + 1 : latest.year
+    const nextPeriod = latest.period_type === 'H2' ? 'H1' : 'H2'
+    setYear(nextYear)
+    setPeriodType(nextPeriod)
+    setInitialPeriodSet(true)
+  }, [historyData, initialPeriodSet])
 
   const loadSkyData = async () => {
     if (!selectedStore?.id) return
@@ -471,10 +496,9 @@ export default function ProfitShare() {
         subtitle={selectedStore?.name || 'Select a store'}
       />
 
-      {/* Period Selector */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        {/* Store selector for CEO */}
-        {isCEO && stores.length > 1 && (
+      {/* Store selector for CEO (kept at top) */}
+      {isCEO && stores.length > 1 && (
+        <div className="mb-6">
           <select
             value={selectedStore?.id || ''}
             onChange={(e) => {
@@ -490,46 +514,8 @@ export default function ProfitShare() {
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
-        )}
-
-        {/* Year arrows */}
-        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl px-2 py-1">
-          <button onClick={() => setYear(y => y - 1)} className="px-2 py-1 text-gray-500 hover:text-gray-900 text-lg font-bold">&larr;</button>
-          <span className="text-sm font-semibold text-gray-700 min-w-[48px] text-center">{year}</span>
-          <button onClick={() => setYear(y => y + 1)} className="px-2 py-1 text-gray-500 hover:text-gray-900 text-lg font-bold">&rarr;</button>
         </div>
-
-        {/* Period toggle */}
-        <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden">
-          {[{ key: 'YEAR', label: 'Year' }, { key: 'H1', label: 'H1' }, { key: 'H2', label: 'H2' }].map(p => (
-            <button
-              key={p.key}
-              onClick={() => setPeriodType(p.key)}
-              className={`px-4 py-2 text-sm font-medium transition-all ${
-                periodType === p.key
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-500 hover:bg-gray-50'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Lock button */}
-        {profitShareId && isCEO && (
-          <button
-            onClick={handleToggleLock}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              isLocked
-                ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
-                : 'bg-green-50 text-green-600 border border-green-200 hover:bg-green-100'
-            }`}
-          >
-            {isLocked ? 'Locked' : 'Unlocked'}
-          </button>
-        )}
-      </div>
+      )}
 
       {/* Messages */}
       {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{error}</div>}
@@ -613,6 +599,47 @@ export default function ProfitShare() {
           </CardBody>
         </Card>
       )}
+
+      {/* Period Selector (moved below History) */}
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        {/* Year arrows */}
+        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl px-2 py-1">
+          <button onClick={() => setYear(y => y - 1)} className="px-2 py-1 text-gray-500 hover:text-gray-900 text-lg font-bold">&larr;</button>
+          <span className="text-sm font-semibold text-gray-700 min-w-[48px] text-center">{year}</span>
+          <button onClick={() => setYear(y => y + 1)} className="px-2 py-1 text-gray-500 hover:text-gray-900 text-lg font-bold">&rarr;</button>
+        </div>
+
+        {/* Period toggle */}
+        <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden">
+          {[{ key: 'YEAR', label: 'Year' }, { key: 'H1', label: 'H1' }, { key: 'H2', label: 'H2' }].map(p => (
+            <button
+              key={p.key}
+              onClick={() => setPeriodType(p.key)}
+              className={`px-4 py-2 text-sm font-medium transition-all ${
+                periodType === p.key
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Lock button */}
+        {profitShareId && isCEO && (
+          <button
+            onClick={handleToggleLock}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+              isLocked
+                ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+                : 'bg-green-50 text-green-600 border border-green-200 hover:bg-green-100'
+            }`}
+          >
+            {isLocked ? 'Locked' : 'Unlocked'}
+          </button>
+        )}
+      </div>
 
       {/* Sky Report Reference */}
       {skyData && (
