@@ -1821,24 +1821,15 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         date_start = request.query_params.get('date_start')
         date_end = request.query_params.get('date_end')
 
-        # For account statement: COLLECTION, BALANCE, TRANSFER are inflows,
-        # EXCEPT when linked to a ProfitShare (Owner distribution = outflow from QT/ChCh)
+        # For account statement: COLLECTION, BALANCE, TRANSFER are all inflows
         INFLOW_TYPES = ('COLLECTION', 'BALANCE', 'TRANSFER')
-
-        def is_inflow(tx):
-            if tx.transaction_type not in INFLOW_TYPES:
-                return False
-            # Owner profit distributions (COLLECTION + profit_share) are outflows from QT/ChCh
-            if tx.transaction_type == 'COLLECTION' and tx.profit_share_id:
-                return False
-            return True
 
         # Calculate carry-over balance from ALL transactions before date_start
         opening_balance = Decimal('0')
         if date_start:
             prev_qs = all_qs.filter(date__lt=date_start).order_by('date', 'created_at')
             for tx in prev_qs:
-                if is_inflow(tx):
+                if tx.transaction_type in INFLOW_TYPES:
                     opening_balance += tx.amount
                 else:
                     opening_balance -= tx.amount
@@ -1868,7 +1859,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
             }
             if source:
                 entry['source'] = source
-            if is_inflow(tx):
+            if tx.transaction_type in INFLOW_TYPES:
                 balance += tx.amount
                 entry['amount'] = float(tx.amount)
             else:
