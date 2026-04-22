@@ -111,6 +111,25 @@ export default function ProfitShare() {
     }
   }
 
+  const [loadingCQBalance, setLoadingCQBalance] = useState(false)
+
+  const handleLoadCQBalance = async () => {
+    if (!selectedStore?.name || disabled) return
+    setLoadingCQBalance(true)
+    setError('')
+    try {
+      const res = await cqTransactionAPI.storeLedger({ store_name: selectedStore.name })
+      const balance = res.data?.balance ?? 0
+      setSummary(prev => ({ ...prev, hr_cash_total: balance }))
+      setSuccess(`현금 잔액 불러옴: $${Number(balance).toLocaleString()}`)
+      setTimeout(() => setSuccess(''), 2500)
+    } catch (err) {
+      setError('CQ 잔액을 불러오지 못했습니다')
+    } finally {
+      setLoadingCQBalance(false)
+    }
+  }
+
   const loadHistory = async () => {
     if (!selectedStore?.id) return
     setHistoryLoading(true)
@@ -727,7 +746,7 @@ export default function ProfitShare() {
           {/* Net Profit */}
           <div className="mb-4">
             <h3 className="text-sm font-medium text-gray-700 mb-2">Net Profit</h3>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className={labelCls}>Account</label>
                 <input
@@ -749,6 +768,32 @@ export default function ProfitShare() {
                   disabled={disabled}
                   placeholder="0"
                 />
+              </div>
+              <div>
+                <label className={labelCls}>현금 잔액 (CQ Report)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number" step="0.01"
+                    value={summary.hr_cash_total}
+                    onChange={(e) => handleSummaryChange('hr_cash_total', e.target.value)}
+                    className={`flex-1 ${disabled ? readOnlyCls : inputCls}`}
+                    disabled={disabled}
+                    placeholder="0"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleLoadCQBalance}
+                    disabled={disabled || loadingCQBalance || !selectedStore?.name}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                      disabled || loadingCQBalance || !selectedStore?.name
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200'
+                    }`}
+                  >
+                    {loadingCQBalance ? '로딩...' : '자동 불러오기'}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">By Store 현재 잔액에서 불러옵니다</p>
               </div>
             </div>
           </div>
@@ -918,20 +963,6 @@ export default function ProfitShare() {
               ))}
             </div>
             <span className="text-xs text-gray-400">파트너 현금 지급 계좌</span>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>현금 잔액 (CQ Report)</label>
-              <input
-                type="number" step="0.01"
-                value={summary.hr_cash_total}
-                onChange={(e) => handleSummaryChange('hr_cash_total', e.target.value)}
-                className={disabled ? readOnlyCls : inputCls}
-                disabled={disabled}
-                placeholder="자동 불러오기"
-              />
-              <p className="text-xs text-gray-400 mt-1">By Store 현재 잔액에서 자동으로 불러옵니다</p>
-            </div>
           </div>
         </CardBody>
       </Card>
