@@ -1451,6 +1451,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         EXCLUDE = {'QT', 'ChCh', 'KRW', 'Opening Balance', 'Deposit', ''}
         qs = qs.exclude(person__in=EXCLUDE).filter(profit_share__isnull=False)
 
+        from collections import defaultdict
         # Historical totals across ALL periods (ignores date_start/date_end
         # so the chart shows a person's trajectory over time)
         all_qs_for_history = CQTransaction.objects.exclude(person__in=EXCLUDE).filter(
