@@ -121,6 +121,8 @@ export default function CQCashFlow() {
   const [stmtStoreFilter, setStmtStoreFilter] = useState('')
   const [stmtTypeFilter, setStmtTypeFilter] = useState('')
   const [stmtSearch, setStmtSearch] = useState('')
+  const [openingBalance, setOpeningBalance] = useState({ amount: '', date: '' })
+  const [showOpeningForm, setShowOpeningForm] = useState(false)
   const [acctYear, setAcctYear] = useState(new Date().getFullYear())
   const [acctMode, setAcctMode] = useState('YEAR') // '6M', 'YEAR', 'CUSTOM'
   const [acctStart, setAcctStart] = useState('')
@@ -232,6 +234,35 @@ export default function CQCashFlow() {
       setAccountData(res.data)
     } catch (e) {
       setError('Failed to load account statement')
+    }
+  }
+
+  const loadOpeningBalance = async () => {
+    if (!selectedAccount) return
+    try {
+      const res = await cqTransactionAPI.getOpeningBalance(selectedAccount)
+      setOpeningBalance({
+        amount: res.data.amount ? String(res.data.amount) : '',
+        date: res.data.date || '',
+      })
+    } catch (e) { /* ignore */ }
+  }
+
+  const handleSaveOpeningBalance = async () => {
+    if (!openingBalance.amount || !openingBalance.date) {
+      alert('금액과 날짜를 입력하세요')
+      return
+    }
+    try {
+      await cqTransactionAPI.setOpeningBalance({
+        account: selectedAccount,
+        amount: openingBalance.amount,
+        date: openingBalance.date,
+      })
+      setShowOpeningForm(false)
+      loadAccountStatement()
+    } catch (e) {
+      alert('저장 실패')
     }
   }
 
@@ -396,6 +427,7 @@ export default function CQCashFlow() {
     if (view === 'accounts' && selectedAccount) {
       if (acctMode === 'CUSTOM' && (!acctStart || !acctEnd)) return
       if (acctDateRange.start && acctDateRange.end) loadAccountStatement()
+      loadOpeningBalance()
     }
   }, [view, selectedAccount, acctYear, acctMode, acctStart, acctEnd])
 
@@ -886,6 +918,43 @@ export default function CQCashFlow() {
               </button>
             ))}
           </div>
+
+          {/* Opening Balance */}
+          {isCEO && (
+            <Card>
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-800">Opening Balance</h3>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {openingBalance.date ? (
+                        <>기준일 {openingBalance.date} · <span className="font-semibold text-gray-800">{(selectedAccount === 'KRW' ? fmtKRW : fmt)(parseFloat(openingBalance.amount) || 0)}</span></>
+                      ) : '시작 잔액이 설정되지 않았습니다'}
+                    </div>
+                  </div>
+                  <button onClick={() => setShowOpeningForm(v => !v)}
+                    className="px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100">
+                    {showOpeningForm ? '닫기' : (openingBalance.date ? '수정' : '설정')}
+                  </button>
+                </div>
+                {showOpeningForm && (
+                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <input type="date" value={openingBalance.date}
+                      onChange={e => setOpeningBalance(p => ({ ...p, date: e.target.value }))}
+                      className="px-2 py-2 text-sm border rounded-xl bg-gray-50" />
+                    <input type="number" value={openingBalance.amount}
+                      placeholder={selectedAccount === 'KRW' ? '₩ 시작 잔액' : '$ 시작 잔액'}
+                      onChange={e => setOpeningBalance(p => ({ ...p, amount: e.target.value }))}
+                      className="px-2 py-2 text-sm border rounded-xl bg-gray-50" />
+                    <button onClick={handleSaveOpeningBalance}
+                      className="px-3 py-2 text-sm font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700">
+                      저장
+                    </button>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
 
           {/* Expense Form */}
           {isCEO && (

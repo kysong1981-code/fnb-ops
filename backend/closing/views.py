@@ -1807,6 +1807,58 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
             })
         return Response({'is_locked': False})
 
+    @action(detail=False, methods=['get', 'post'], url_path='opening-balance')
+    def opening_balance(self, request):
+        """Get or set the opening balance for an account (QT/ChCh/KRW).
+
+        Stored as a single CQTransaction with transaction_type='BALANCE',
+        person=account, note='Opening Balance'. POST upserts it.
+        """
+        account = request.query_params.get('account') or request.data.get('account')
+        if not account:
+            return Response({'error': 'account required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        existing = CQTransaction.objects.filter(
+            person__iexact=account, transaction_type='BALANCE',
+            note__icontains='Opening Balance'
+        ).order_by('-date').first()
+
+        if request.method == 'GET':
+            if existing:
+                return Response({
+                    'account': account,
+                    'amount': float(existing.amount),
+                    'date': str(existing.date),
+                })
+            return Response({'account': account, 'amount': 0, 'date': None})
+
+        # POST: upsert
+        amount = request.data.get('amount')
+        date_str = request.data.get('date')
+        if amount is None or not date_str:
+            return Response({'error': 'amount and date required'}, status=status.HTTP_400_BAD_REQUEST)
+        profile = request.user.profile
+        if existing:
+            existing.amount = Decimal(str(amount))
+            existing.date = date_str
+            existing.save()
+            tx = existing
+        else:
+            tx = CQTransaction.objects.create(
+                organization=profile.organization,
+                date=date_str,
+                store_name='',
+                transaction_type='BALANCE',
+                person=account,
+                amount=Decimal(str(amount)),
+                account_type='ACCOUNT' if account.upper() != 'KRW' else 'CASH',
+                note='Opening Balance',
+                created_by=profile,
+            )
+        return Response({
+            'account': account, 'amount': float(tx.amount), 'date': str(tx.date),
+        })
+
     @action(detail=False, methods=['get'], url_path='account-statement')
     def account_statement(self, request):
         """Account statement for QT/ChCh/KRW - shows all incoming money by store and month."""
