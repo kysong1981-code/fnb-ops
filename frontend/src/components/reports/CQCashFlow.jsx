@@ -689,10 +689,11 @@ export default function CQCashFlow() {
           </div>
 
           {summary ? (() => {
-            // Per-store data for this period
+            // Per-store data for this period — show ALL registered stores,
+            // sorted by owner_profit desc (zero-value stores still listed)
             const stores = (summary.stores || [])
-              .filter(s => parseFloat(s.owner_profit) > 0)
-              .sort((a, b) => parseFloat(b.owner_profit) - parseFloat(a.owner_profit))
+              .slice()
+              .sort((a, b) => parseFloat(b.owner_profit || 0) - parseFloat(a.owner_profit || 0))
             const grandTotal = stores.reduce((s, r) => s + (parseFloat(r.owner_profit) || 0), 0)
             const maxP = stores.length > 0 ? parseFloat(stores[0].owner_profit) : 0
             const totalIncentive = stores.reduce((s, r) => s + (parseFloat(r.incentive) || 0), 0)
