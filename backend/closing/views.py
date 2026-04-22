@@ -1451,10 +1451,25 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         EXCLUDE = {'QT', 'ChCh', 'KRW', 'Opening Balance', 'Deposit', ''}
         qs = qs.exclude(person__in=EXCLUDE).filter(profit_share__isnull=False)
 
+        # Historical totals across ALL periods (ignores date_start/date_end
+        # so the chart shows a person's trajectory over time)
+        all_qs_for_history = CQTransaction.objects.exclude(person__in=EXCLUDE).filter(
+            profit_share__isnull=False
+        )
+        history_by_person = defaultdict(lambda: defaultdict(lambda: Decimal('0')))
+        for tx in all_qs_for_history.select_related('profit_share'):
+            if not tx.profit_share:
+                continue
+            key = (tx.profit_share.year, tx.profit_share.period_type)
+            if tx.transaction_type in ('COLLECTION', 'INCENTIVE', 'PROFIT'):
+                history_by_person[tx.person][key] += tx.amount
+
         from collections import defaultdict
         people = defaultdict(lambda: {
             'total_income': Decimal('0'),
             'total_expense': Decimal('0'),
+            'cash': Decimal('0'),
+            'account': Decimal('0'),
             'by_type': defaultdict(lambda: Decimal('0')),
             'monthly': defaultdict(lambda: {'in': Decimal('0'), 'out': Decimal('0')}),
             'tx_count': 0,
@@ -1470,27 +1485,49 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                 p['total_income'] += tx.amount
                 p['by_type'][tx.transaction_type] += tx.amount
                 p['monthly'][month_key]['in'] += tx.amount
+                if tx.account_type == 'ACCOUNT':
+                    p['account'] += tx.amount
+                else:
+                    p['cash'] += tx.amount
             else:
                 p['total_expense'] += tx.amount
                 p['monthly'][month_key]['out'] += tx.amount
 
+        # Build set of all persons (include those with history but no activity
+        # in the selected period)
+        all_person_names = set(people.keys()) | set(history_by_person.keys())
+
         result = []
-        for name, d in people.items():
-            months = sorted(d['monthly'].keys())
-            monthly_list = [
-                {'month': m, 'in': float(d['monthly'][m]['in']), 'out': float(d['monthly'][m]['out'])}
-                for m in months
+        for name in all_person_names:
+            d = people.get(name) or {
+                'total_income': Decimal('0'), 'total_expense': Decimal('0'),
+                'cash': Decimal('0'), 'account': Decimal('0'),
+                'by_type': {}, 'monthly': {}, 'tx_count': 0,
+            }
+            # Historical periods sorted chronologically
+            periods = sorted(history_by_person.get(name, {}).keys())
+            history = [
+                {
+                    'period': f"{y} {pt}",
+                    'year': y,
+                    'period_type': pt,
+                    'total': float(history_by_person[name][(y, pt)]),
+                }
+                for (y, pt) in periods
             ]
             result.append({
                 'person': name,
                 'total_income': float(d['total_income']),
                 'total_expense': float(d['total_expense']),
+                'cash': float(d['cash']),
+                'account': float(d['account']),
+                'total': float(d['cash'] + d['account']),
                 'balance': float(d['total_income'] - d['total_expense']),
                 'tx_count': d['tx_count'],
                 'by_type': {k: float(v) for k, v in d['by_type'].items()},
-                'monthly': monthly_list,
+                'history': history,
             })
-        result.sort(key=lambda x: -x['total_income'])
+        result.sort(key=lambda x: -x['total'])
         return Response({'persons': result})
 
     @action(detail=False, methods=['get'], url_path='personal-ledger')

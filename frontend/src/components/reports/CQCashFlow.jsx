@@ -1691,7 +1691,8 @@ export default function CQCashFlow() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {allPersons.map(p => {
               const isOpen = expandedPerson === p.person
-              const maxAmt = Math.max(1, ...p.monthly.map(m => Math.max(m.in, m.out)))
+              const hist = p.history || []
+              const maxAmt = Math.max(1, ...hist.map(h => h.total))
               return (
                 <Card key={p.person}>
                   <div className="p-4">
@@ -1699,38 +1700,44 @@ export default function CQCashFlow() {
                       setExpandedPerson(isOpen ? null : p.person)
                       if (!isOpen) { setSelectedPerson(p.person); loadPersonalLedger() }
                     }}
-                      className="w-full flex items-center justify-between mb-3 text-left">
-                      <div>
+                      className="w-full text-left mb-3">
+                      <div className="flex items-center justify-between">
                         <div className="font-semibold text-gray-800 flex items-center gap-2">
                           <span>👤</span>{p.person}
                           <span className="text-[10px] text-gray-400 font-normal">({p.tx_count})</span>
                         </div>
-                        <div className="text-[11px] text-gray-500 mt-0.5">
-                          <span className="text-green-600 font-semibold">+{fmt(p.total_income)}</span>
-                          {p.total_expense > 0 && <> · <span className="text-red-600">-{fmt(p.total_expense)}</span></>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-base font-bold ${p.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {fmt(p.balance)}
-                        </span>
                         <span className="text-gray-300">{isOpen ? '▲' : '▼'}</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-3 gap-2">
+                        <div className="bg-green-50 rounded-xl p-2">
+                          <div className="text-[10px] text-gray-500">Cash</div>
+                          <div className="text-sm font-bold text-green-700">{fmt(p.cash)}</div>
+                        </div>
+                        <div className="bg-indigo-50 rounded-xl p-2">
+                          <div className="text-[10px] text-gray-500">Account</div>
+                          <div className="text-sm font-bold text-indigo-700">{fmt(p.account)}</div>
+                        </div>
+                        <div className="bg-gray-900 text-white rounded-xl p-2">
+                          <div className="text-[10px] text-gray-300">Total</div>
+                          <div className="text-sm font-bold">{fmt(p.total)}</div>
+                        </div>
                       </div>
                     </button>
 
-                    {/* Mini bar chart — monthly in/out */}
-                    {p.monthly.length > 0 && (
-                      <div className="flex items-end gap-1 h-16 mb-1">
-                        {p.monthly.map(m => {
-                          const inPct = (m.in / maxAmt) * 100
-                          const outPct = (m.out / maxAmt) * 100
+                    {/* History bar chart — past ProfitShare period totals */}
+                    {hist.length > 0 && (
+                      <div className="flex items-end gap-1.5 h-20 mb-1 mt-2">
+                        {hist.map(h => {
+                          const pct = (h.total / maxAmt) * 100
+                          const isCurrent = h.year === year && h.period_type === period
                           return (
-                            <div key={m.month} className="flex-1 flex flex-col items-center gap-0.5" title={`${m.month}: +${fmt(m.in)} / -${fmt(m.out)}`}>
-                              <div className="w-full flex items-end justify-center gap-0.5 h-full">
-                                <div className="w-1/2 bg-green-400 rounded-t" style={{ height: `${inPct}%`, minHeight: m.in > 0 ? '2px' : '0' }}></div>
-                                <div className="w-1/2 bg-red-300 rounded-t" style={{ height: `${outPct}%`, minHeight: m.out > 0 ? '2px' : '0' }}></div>
+                            <div key={h.period} className="flex-1 flex flex-col items-center gap-1" title={`${h.period}: ${fmt(h.total)}`}>
+                              <div className="text-[9px] text-gray-500 font-semibold">{fmt(h.total)}</div>
+                              <div className="w-full flex items-end justify-center h-full">
+                                <div className={`w-full rounded-t ${isCurrent ? 'bg-blue-600' : 'bg-blue-300'}`}
+                                  style={{ height: `${pct}%`, minHeight: h.total > 0 ? '3px' : '0' }}></div>
                               </div>
-                              <div className="text-[9px] text-gray-400">{m.month.slice(5)}</div>
+                              <div className="text-[9px] text-gray-400">{h.period.replace(' ', '·')}</div>
                             </div>
                           )
                         })}
