@@ -118,6 +118,9 @@ export default function CQCashFlow() {
   // Accounts - own period state
   const [selectedAccount, setSelectedAccount] = useState('QT')
   const [accountData, setAccountData] = useState(null)
+  const [stmtStoreFilter, setStmtStoreFilter] = useState('')
+  const [stmtTypeFilter, setStmtTypeFilter] = useState('')
+  const [stmtSearch, setStmtSearch] = useState('')
   const [acctYear, setAcctYear] = useState(new Date().getFullYear())
   const [acctMode, setAcctMode] = useState('YEAR') // '6M', 'YEAR', 'CUSTOM'
   const [acctStart, setAcctStart] = useState('')
@@ -1005,89 +1008,36 @@ export default function CQCashFlow() {
             const isKRW = selectedAccount === 'KRW'
             return (
             <>
-              {/* Balance Cards */}
-              <Card>
-                <div className="p-5">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1">잔액</div>
-                      <div className={`text-2xl font-bold ${accountData.total_balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {f(accountData.total_balance)}
-                      </div>
-                    </div>
-                    {accountData.opening_balance != null && accountData.opening_balance !== 0 && (
-                      <div>
-                        <div className="text-xs text-gray-500 mb-1">이월</div>
-                        <div className={`text-2xl font-bold ${accountData.opening_balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                          {f(accountData.opening_balance)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Card>
-
-              {/* Per-store breakdown (hide for KRW) */}
-              {selectedAccount !== 'KRW' && accountData.store_summary?.length > 0 && (
-                <Card>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-gray-800 mb-3">By Store</h3>
-                    <div className="space-y-2">
-                      {accountData.store_summary.map(s => (
-                        <div key={s.store_name} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
-                          <span className="text-sm font-medium text-gray-700">{s.store_name}</span>
-                          <span className="text-sm font-bold text-green-600">{f(s.total)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-              {/* Monthly summary (hide for KRW) */}
-              {selectedAccount !== 'KRW' && accountData.monthly_summary?.length > 0 && (
-                <Card>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-gray-800 mb-3">Monthly Summary</h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-left text-gray-500 border-b">
-                            <th className="pb-2 pr-3">Month</th>
-                            {accountData.store_summary?.map(s => (
-                              <th key={s.store_name} className="pb-2 pr-3 text-right">{s.store_name}</th>
-                            ))}
-                            <th className="pb-2 text-right font-semibold">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {accountData.monthly_summary.map(m => {
-                            const storeMap = Object.fromEntries(m.stores.map(s => [s.store_name, s.amount]))
-                            return (
-                              <tr key={m.month} className="border-b border-gray-50">
-                                <td className="py-2 pr-3 text-gray-600">
-                                  {new Date(m.month + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
-                                </td>
-                                {accountData.store_summary?.map(s => (
-                                  <td key={s.store_name} className="py-2 pr-3 text-right text-gray-700">
-                                    {storeMap[s.store_name] ? f(storeMap[s.store_name]) : '-'}
-                                  </td>
-                                ))}
-                                <td className="py-2 text-right font-semibold text-gray-900">{f(m.total)}</td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </Card>
-              )}
-
               {/* Ledger (statement) */}
               <Card>
                 <div className="p-4">
-                  <h3 className="font-semibold text-gray-800 mb-3">Statement</h3>
+                  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <h3 className="font-semibold text-gray-800">Statement</h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <select value={stmtStoreFilter} onChange={e => setStmtStoreFilter(e.target.value)}
+                        className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white">
+                        <option value="">All stores</option>
+                        {Array.from(new Set((accountData.ledger || []).map(i => i.store_name).filter(Boolean))).sort().map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                      <select value={stmtTypeFilter} onChange={e => setStmtTypeFilter(e.target.value)}
+                        className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white">
+                        <option value="">All types</option>
+                        <option value="in">입금 (+)</option>
+                        <option value="out">출금 (-)</option>
+                        <option value="COLLECTION">Collection</option>
+                        <option value="PROFIT">Profit</option>
+                        <option value="INCENTIVE">Incentive</option>
+                        <option value="EXPENSE">Expense</option>
+                        <option value="TRANSFER">Transfer</option>
+                        <option value="BALANCE">Balance</option>
+                      </select>
+                      <input type="text" value={stmtSearch} onChange={e => setStmtSearch(e.target.value)}
+                        placeholder="검색..."
+                        className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg w-32" />
+                    </div>
+                  </div>
 
                   {/* Edit modal is rendered at bottom of component */}
 
@@ -1104,7 +1054,20 @@ export default function CQCashFlow() {
                         </tr>
                       </thead>
                       <tbody>
-                        {accountData.ledger?.map(item => {
+                        {(accountData.ledger || []).filter(item => {
+                          if (stmtStoreFilter && item.store_name !== stmtStoreFilter) return false
+                          if (stmtTypeFilter) {
+                            if (stmtTypeFilter === 'in' && !(item.amount >= 0)) return false
+                            else if (stmtTypeFilter === 'out' && !(item.amount < 0)) return false
+                            else if (!['in','out'].includes(stmtTypeFilter) && item.transaction_type !== stmtTypeFilter) return false
+                          }
+                          if (stmtSearch) {
+                            const q = stmtSearch.toLowerCase()
+                            const hay = `${item.store_name || ''} ${item.note || ''}`.toLowerCase()
+                            if (!hay.includes(q)) return false
+                          }
+                          return true
+                        }).map(item => {
                           const canEdit = isCEO && !item.is_locked
                           const isEditing = editingTx?.id === item.id
                           const isDetail = detailTx?.id === item.id && !isEditing
