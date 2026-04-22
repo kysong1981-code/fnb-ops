@@ -1393,7 +1393,11 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         # Per-person summary (grouped by person using annotate - guaranteed no duplicates)
         person_rows = qs.exclude(person='').values('person').annotate(
             incentive=Sum('amount', filter=Q(transaction_type='INCENTIVE')),
+            incentive_cash=Sum('amount', filter=Q(transaction_type='INCENTIVE', account_type='CASH')),
+            incentive_account=Sum('amount', filter=Q(transaction_type='INCENTIVE', account_type='ACCOUNT')),
             profit=Sum('amount', filter=Q(transaction_type='PROFIT')),
+            profit_cash=Sum('amount', filter=Q(transaction_type='PROFIT', account_type='CASH')),
+            profit_account=Sum('amount', filter=Q(transaction_type='PROFIT', account_type='ACCOUNT')),
             collection=Sum('amount', filter=Q(transaction_type='COLLECTION')),
             expense=Sum('amount', filter=Q(transaction_type='EXPENSE')),
         ).order_by('person')
@@ -1410,7 +1414,11 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                 'total_expense': exp,
                 'by_type': {
                     'incentive': inc,
+                    'incentive_cash': row['incentive_cash'] or 0,
+                    'incentive_account': row['incentive_account'] or 0,
                     'profit': prf,
+                    'profit_cash': row['profit_cash'] or 0,
+                    'profit_account': row['profit_account'] or 0,
                     'collection': col,
                 }
             })

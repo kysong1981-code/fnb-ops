@@ -2569,17 +2569,17 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
                 incentive_cash = partner.incentive_cash or Decimal('0')
                 bank_total = (partner.bank_account or Decimal('0')) + (partner.bank_cash or Decimal('0'))
 
-                # 1a) Incentive (account portion) — tracked under partner name
+                # 1a) Incentive (account portion) — shows as outflow from QT/ChCh
                 if incentive_account != Decimal('0'):
                     CQTransaction.objects.create(
                         organization=instance.organization,
                         date=period_end_date,
                         store_name=store_name,
                         transaction_type='INCENTIVE',
-                        person=partner.name,
+                        person=cash_account,
                         amount=incentive_account,
                         account_type='ACCOUNT',
-                        note=f"Incentive (Account) {instance.year} {instance.get_period_type_display()} - {partner.name}",
+                        note=f"{partner.name} 인센티브 (Account) {instance.year} {instance.get_period_type_display()}",
                         period=period_label,
                         profit_share=instance,
                         created_by=profile,
@@ -2609,17 +2609,17 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
                     dist_account = (partner.total_account or Decimal('0')) - (partner.incentive_account or Decimal('0'))
                     dist_cash = (partner.total_cash or Decimal('0')) - (partner.incentive_cash or Decimal('0'))
                     label = 'Equity' if partner.partner_type == 'EQUITY' else 'Profit Share'
-                    # 2a) Account portion — tracked under partner name
+                    # 2a) Account portion — outflow from QT/ChCh
                     if dist_account != Decimal('0'):
                         CQTransaction.objects.create(
                             organization=instance.organization,
                             date=period_end_date,
                             store_name=store_name,
                             transaction_type='PROFIT',
-                            person=partner.name,
+                            person=cash_account,
                             amount=dist_account,
                             account_type='ACCOUNT',
-                            note=f"{label} (Account) {instance.year} {instance.get_period_type_display()} - {partner.name}",
+                            note=f"{partner.name} {label} (Account) {instance.year} {instance.get_period_type_display()}",
                             period=period_label,
                             profit_share=instance,
                             created_by=profile,
@@ -2650,7 +2650,7 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
                             date=period_end_date,
                             store_name=store_name,
                             transaction_type='COLLECTION',
-                            person='Owner',
+                            person=cash_account,
                             amount=owner_account,
                             account_type='ACCOUNT',
                             note=f"Owner Profit (Account) {instance.year} {instance.get_period_type_display()}",
@@ -2691,7 +2691,7 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
                         date=period_end_date,
                         store_name=store_name,
                         transaction_type='COLLECTION',
-                        person='Owner',
+                        person=cash_account,
                         amount=owner_remainder_account,
                         account_type='ACCOUNT',
                         note=f"Owner Profit (Account) {instance.year} {instance.get_period_type_display()}",
