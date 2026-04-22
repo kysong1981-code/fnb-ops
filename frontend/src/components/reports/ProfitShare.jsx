@@ -5,6 +5,10 @@ import { useStore } from '../../context/StoreContext'
 import PageHeader from '../ui/PageHeader'
 import Card, { CardHeader, CardBody } from '../ui/Card'
 import { MoneyIcon } from '../icons'
+import {
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  Legend, ResponsiveContainer, Cell, ReferenceLine,
+} from 'recharts'
 
 const inputCls = 'w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 const readOnlyCls = 'w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-xl text-sm text-right text-gray-500'
@@ -485,9 +489,6 @@ export default function ProfitShare() {
 
   const disabled = isLocked || !isCEO
 
-  // History bar chart max
-  const maxProfit = Math.max(...historyData.map(h => Math.abs(h.net_profit_total || 0)), 1)
-
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       <PageHeader
@@ -529,37 +530,56 @@ export default function ProfitShare() {
             <h2 className="text-lg font-semibold text-gray-900">History</h2>
           </CardHeader>
           <CardBody>
-            {/* Bar Chart */}
-            <div className="flex items-end gap-2 h-32 mb-4">
-              {historyData.map(h => {
-                const profit = h.net_profit_total || 0
-                const heightPct = maxProfit > 0 ? (Math.abs(profit) / maxProfit) * 100 : 0
-                const isNegative = profit < 0
-                const isCurrent = h.year === year && h.period_type === periodType
-                return (
-                  <div
-                    key={h.id}
-                    className="flex-1 flex flex-col items-center justify-end cursor-pointer"
-                    onClick={() => navigateToPeriod(h)}
-                    title={`${periodLabel(h.year, h.period_type)}: ${fmt(profit)}`}
-                  >
-                    <span className="text-xs text-gray-500 mb-1">{fmt(profit)}</span>
-                    <div
-                      className={`w-full rounded-t transition-all ${
-                        isCurrent
-                          ? 'bg-blue-600'
-                          : isNegative
-                            ? 'bg-red-400'
-                            : 'bg-blue-400'
-                      }`}
-                      style={{ height: `${Math.max(heightPct, 4)}%`, minHeight: '4px' }}
-                    />
-                    <span className={`text-xs mt-1 ${isCurrent ? 'font-bold text-blue-600' : 'text-gray-400'}`}>
-                      {h.year} {h.period_type}
-                    </span>
-                  </div>
-                )
-              })}
+            {/* Recharts chart: bars for Net Profit + line for Incentive */}
+            <div className="h-64 mb-4 -ml-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart
+                  data={[...historyData]
+                    .slice()
+                    .sort((a, b) => (a.year - b.year) || (a.period_type === 'H1' ? -1 : 1))
+                    .map(h => ({
+                      ...h,
+                      label: `${h.year} ${h.period_type}`,
+                      net_profit: Number(h.net_profit_total) || 0,
+                      incentive: Number(h.incentive_total) || 0,
+                      isCurrent: h.year === year && h.period_type === periodType,
+                    }))}
+                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
+                  <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false}
+                    tickFormatter={(v) => {
+                      const n = Number(v)
+                      if (Math.abs(n) >= 1000) return `$${(n / 1000).toFixed(0)}k`
+                      return `$${n}`
+                    }}
+                  />
+                  <Tooltip
+                    formatter={(v, name) => [fmt(v), name === 'net_profit' ? 'Net Profit' : 'Incentive']}
+                    labelStyle={{ color: '#111827', fontWeight: 600 }}
+                    contentStyle={{ borderRadius: 12, border: '1px solid #e5e7eb', fontSize: 12 }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle"
+                    formatter={(v) => v === 'net_profit' ? 'Net Profit' : 'Incentive'}
+                  />
+                  <ReferenceLine y={0} stroke="#9ca3af" />
+                  <Bar dataKey="net_profit" radius={[6, 6, 0, 0]} cursor="pointer"
+                    onClick={(d) => d && navigateToPeriod(d)}>
+                    {historyData
+                      .slice()
+                      .sort((a, b) => (a.year - b.year) || (a.period_type === 'H1' ? -1 : 1))
+                      .map(h => {
+                        const isCurrent = h.year === year && h.period_type === periodType
+                        const profit = Number(h.net_profit_total) || 0
+                        const color = isCurrent ? '#2563eb' : profit < 0 ? '#f87171' : '#93c5fd'
+                        return <Cell key={h.id} fill={color} />
+                      })}
+                  </Bar>
+                  <Line type="monotone" dataKey="incentive" stroke="#f59e0b" strokeWidth={2.5}
+                    dot={{ r: 4, fill: '#f59e0b' }} activeDot={{ r: 6 }} />
+                </ComposedChart>
+              </ResponsiveContainer>
             </div>
 
             {/* Table */}
