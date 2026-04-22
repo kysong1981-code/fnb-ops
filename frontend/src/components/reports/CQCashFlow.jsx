@@ -123,6 +123,7 @@ export default function CQCashFlow() {
   const [stmtSearch, setStmtSearch] = useState('')
   const [openingBalance, setOpeningBalance] = useState({ amount: '', date: '' })
   const [showOpeningForm, setShowOpeningForm] = useState(false)
+  const [showStatement, setShowStatement] = useState(false)
   const [acctYear, setAcctYear] = useState(new Date().getFullYear())
   const [acctMode, setAcctMode] = useState('YEAR') // '6M', 'YEAR', 'CUSTOM'
   const [acctStart, setAcctStart] = useState('')
@@ -132,6 +133,8 @@ export default function CQCashFlow() {
   const acctDateRange = (() => {
     if (acctMode === 'CUSTOM') return { start: acctStart, end: acctEnd }
     if (acctMode === 'YEAR') return { start: `${acctYear}-01-01`, end: `${acctYear}-12-31` }
+    if (acctMode === 'H1') return { start: `${acctYear}-04-01`, end: `${acctYear}-09-30` }
+    if (acctMode === 'H2') return { start: `${acctYear}-10-01`, end: `${acctYear + 1}-03-31` }
     // 6M: last 6 months from today
     const now = new Date()
     const sixAgo = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate())
@@ -876,7 +879,7 @@ export default function CQCashFlow() {
         <div className="space-y-4">
           {/* 6M / Year / Custom selector */}
           <div className="flex flex-wrap items-center gap-3">
-            {acctMode === 'YEAR' && (
+            {['YEAR', 'H1', 'H2'].includes(acctMode) && (
               <div className="flex items-center gap-1">
                 <button onClick={() => setAcctYear(y => y - 1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -887,8 +890,14 @@ export default function CQCashFlow() {
                 </button>
               </div>
             )}
-            <div className="flex bg-gray-100 rounded-xl p-1">
-              {[{ key: '6M', label: '6 Months' }, { key: 'YEAR', label: 'Year' }, { key: 'CUSTOM', label: 'Custom' }].map(p => (
+            <div className="flex bg-gray-100 rounded-xl p-1 flex-wrap">
+              {[
+                { key: '6M', label: '6 Months' },
+                { key: 'YEAR', label: 'Year' },
+                { key: 'H1', label: 'H1 (4~9월)' },
+                { key: 'H2', label: 'H2 (10~3월)' },
+                { key: 'CUSTOM', label: 'Custom' },
+              ].map(p => (
                 <button key={p.key} onClick={() => setAcctMode(p.key)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     acctMode === p.key ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
@@ -1075,9 +1084,153 @@ export default function CQCashFlow() {
           {accountData && (() => {
             const f = selectedAccount === 'KRW' ? fmtKRW : fmt
             const isKRW = selectedAccount === 'KRW'
+            const ps = accountData.period_summary || { inflows: { total: 0, by_store: [] }, outflows: { total: 0, by_partner: [], by_category: [] }, net: 0 }
+            const opening = parseFloat(accountData.opening_balance) || 0
+            const ending = parseFloat(accountData.total_balance) || 0
+            const drill = (type, label) => {
+              if (type === 'store') {
+                setStmtStoreFilter(label)
+                setStmtTypeFilter('')
+              } else if (type === 'type') {
+                setStmtStoreFilter('')
+                setStmtTypeFilter(label)
+              } else if (type === 'search') {
+                setStmtStoreFilter('')
+                setStmtTypeFilter('')
+                setStmtSearch(label)
+              }
+              setShowStatement(true)
+              setTimeout(() => {
+                const el = document.getElementById('stmt-card')
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }, 50)
+            }
             return (
             <>
+              {/* Overview */}
+              <Card>
+                <div className="p-4 grid grid-cols-3 gap-3">
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">Opening</div>
+                    <div className="text-xl font-bold text-gray-700">{f(opening)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">Net 변동</div>
+                    <div className={`text-xl font-bold ${ps.net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {ps.net >= 0 ? '+' : ''}{f(ps.net)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">Ending</div>
+                    <div className={`text-xl font-bold ${ending >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{f(ending)}</div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Inflows */}
+              <Card>
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                      <span>📥</span>Inflows
+                    </h3>
+                    <span className="text-lg font-bold text-green-600">{f(ps.inflows.total)}</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {(ps.inflows.by_store || []).map(row => (
+                      <button key={row.label} onClick={() => drill('store', row.label)}
+                        className="w-full flex items-center justify-between p-3 bg-green-50/50 hover:bg-green-50 rounded-xl transition text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                          <span className="text-sm font-medium text-gray-700">{row.label}</span>
+                          <span className="text-[10px] text-gray-400">({row.count})</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-green-700">{f(row.amount)}</span>
+                          <span className="text-gray-300">›</span>
+                        </div>
+                      </button>
+                    ))}
+                    {(!ps.inflows.by_store || ps.inflows.by_store.length === 0) && (
+                      <div className="text-center text-gray-400 text-sm py-4">No inflows</div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+
+              {/* Outflows */}
+              <Card>
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                      <span>📤</span>Outflows
+                    </h3>
+                    <span className="text-lg font-bold text-red-600">{f(ps.outflows.total)}</span>
+                  </div>
+
+                  {/* Partner Distributions */}
+                  {(ps.outflows.by_partner || []).length > 0 && (
+                    <div className="mb-3">
+                      <div className="text-xs text-gray-500 font-semibold mb-1.5">Partner 분배</div>
+                      <div className="space-y-1.5">
+                        {ps.outflows.by_partner.map(row => (
+                          <button key={`p-${row.label}`} onClick={() => drill('search', row.label)}
+                            className="w-full flex items-center justify-between p-3 bg-red-50/50 hover:bg-red-50 rounded-xl transition text-left">
+                            <div className="flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                              <span className="text-sm font-medium text-gray-700">{row.label}</span>
+                              <span className="text-[10px] text-gray-400">({row.count})</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-red-700">{f(row.amount)}</span>
+                              <span className="text-gray-300">›</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CQ Expense categories */}
+                  {(ps.outflows.by_category || []).length > 0 && (
+                    <div className="mb-1">
+                      <div className="text-xs text-gray-500 font-semibold mb-1.5">CQ Expenses</div>
+                      <div className="space-y-1.5">
+                        {ps.outflows.by_category.map(row => (
+                          <button key={`c-${row.label}`} onClick={() => drill('type', 'EXPENSE')}
+                            className="w-full flex items-center justify-between p-3 bg-orange-50/50 hover:bg-orange-50 rounded-xl transition text-left">
+                            <div className="flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                              <span className="text-sm font-medium text-gray-700">{row.label}</span>
+                              <span className="text-[10px] text-gray-400">({row.count})</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-orange-700">{f(row.amount)}</span>
+                              <span className="text-gray-300">›</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(!ps.outflows.by_partner?.length && !ps.outflows.by_category?.length) && (
+                    <div className="text-center text-gray-400 text-sm py-4">No outflows</div>
+                  )}
+                </div>
+              </Card>
+
+              {/* Statement toggle */}
+              <div className="flex justify-center">
+                <button onClick={() => setShowStatement(v => !v)}
+                  className="px-4 py-2 text-xs font-semibold bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200">
+                  {showStatement ? '▲ Statement 접기' : '▼ Statement 전체 보기'}
+                </button>
+              </div>
+
               {/* Ledger (statement) */}
+              {showStatement && (
+              <div id="stmt-card">
               <Card>
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
@@ -1252,6 +1405,8 @@ export default function CQCashFlow() {
                   </div>
                 </div>
               </Card>
+              </div>
+              )}
             </>
           )})()}
 

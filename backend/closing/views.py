@@ -2020,6 +2020,61 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         except CQAccountBalance.DoesNotExist:
             pass
 
+        # ====== Period Summary (inflows/outflows at a glance) ======
+        inflow_by_store = defaultdict(lambda: {'amount': Decimal('0'), 'count': 0})
+        inflow_by_type = defaultdict(lambda: Decimal('0'))
+        outflow_by_partner = defaultdict(lambda: {'amount': Decimal('0'), 'count': 0})
+        outflow_by_category = defaultdict(lambda: {'amount': Decimal('0'), 'count': 0})
+        outflow_by_type = defaultdict(lambda: Decimal('0'))
+        inflow_total = Decimal('0')
+        outflow_total = Decimal('0')
+
+        for tx in qs:
+            if tx.transaction_type in INFLOW_TYPES:
+                inflow_total += tx.amount
+                inflow_by_type[tx.transaction_type] += tx.amount
+                key = tx.store_name if tx.store_name else (
+                    'Opening Balance' if tx.transaction_type == 'BALANCE' else 'Transfer/기타'
+                )
+                inflow_by_store[key]['amount'] += tx.amount
+                inflow_by_store[key]['count'] += 1
+            else:
+                outflow_total += tx.amount
+                outflow_by_type[tx.transaction_type] += tx.amount
+                if tx.transaction_type in ('PROFIT', 'INCENTIVE'):
+                    label = tx.store_name or 'Partner'
+                    outflow_by_partner[label]['amount'] += tx.amount
+                    outflow_by_partner[label]['count'] += 1
+
+        # CQExpense (CQ Expense entries, merged as outflows)
+        for exp in cq_expense_qs:
+            outflow_total += exp.amount
+            outflow_by_type['EXPENSE'] += exp.amount
+            cat_label = exp.get_category_display() if exp.category else (exp.category or 'EXPENSE')
+            outflow_by_category[cat_label]['amount'] += exp.amount
+            outflow_by_category[cat_label]['count'] += 1
+
+        def _sort_items(d, key='amount'):
+            return sorted(
+                [{'label': k, 'amount': float(v['amount']), 'count': v['count']} for k, v in d.items()],
+                key=lambda x: -x[key],
+            )
+
+        period_summary = {
+            'inflows': {
+                'total': float(inflow_total),
+                'by_store': _sort_items(inflow_by_store),
+                'by_type': {k: float(v) for k, v in inflow_by_type.items()},
+            },
+            'outflows': {
+                'total': float(outflow_total),
+                'by_partner': _sort_items(outflow_by_partner),
+                'by_category': _sort_items(outflow_by_category),
+                'by_type': {k: float(v) for k, v in outflow_by_type.items()},
+            },
+            'net': float(inflow_total - outflow_total),
+        }
+
         return Response({
             'account': account,
             'opening_balance': float(opening_balance),
@@ -2029,6 +2084,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
             'ledger': ledger,
             'monthly_summary': monthly_summary,
             'store_summary': store_summary,
+            'period_summary': period_summary,
         })
 
     @action(detail=False, methods=['get'], url_path='stores-list')
