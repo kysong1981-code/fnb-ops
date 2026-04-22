@@ -1923,9 +1923,13 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='stores-list')
     def stores_list(self, request):
-        """등록된 매장명 목록"""
-        qs = self.get_queryset()
-        stores = list(qs.exclude(store_name='').values_list('store_name', flat=True).distinct().order_by('store_name'))
+        """등록된 매장명 목록 — Organizations에 등록된 회사명만 반환"""
+        from users.models import Organization
+        # Only return names of actual registered Organizations (not arbitrary
+        # store_name strings that may appear in transactions like "환전 ← QT")
+        stores = list(
+            Organization.objects.values_list('name', flat=True).order_by('name')
+        )
         return Response({'stores': stores})
 
     @action(detail=False, methods=['get'], url_path='persons-list')
