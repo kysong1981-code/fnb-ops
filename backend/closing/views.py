@@ -1331,18 +1331,24 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         for k in totals:
             totals[k] = totals[k] or 0
 
-        # Per-store summary — always include ALL registered Organizations,
-        # even if they have no transactions in the period (show as $0).
-        # Match transactions to orgs case-insensitively so minor name
-        # variations (e.g. "T1" vs " T1") don't hide data.
+        # Per-store summary — roll up into TOP-LEVEL companies only.
+        # Orgs that have sub_stores are shown as the company; their
+        # sub_store transactions aggregate up into the parent.
+        # Stand-alone orgs (no parent, no sub_stores) appear as themselves.
         from users.models import Organization
-        registered_orgs = list(
-            Organization.objects.values_list('name', flat=True).order_by('name')
-        )
-        # Build lookup: lower(store_name) -> canonical org name
-        canonical = {name.strip().lower(): name for name in registered_orgs}
+        # Top-level orgs = parent is null. These are the "companies" shown.
+        top_orgs = list(Organization.objects.filter(parent__isnull=True).order_by('name'))
 
-        # Aggregate raw rows and remap to canonical names
+        # Build map: lower(store_name) -> canonical top-level org name
+        canonical = {}
+        for org in top_orgs:
+            # The parent's own name maps to itself
+            canonical[org.name.strip().lower()] = org.name
+            # All sub_stores roll up into the parent
+            for sub in org.sub_stores.all():
+                canonical[sub.name.strip().lower()] = org.name
+
+        # Aggregate raw rows and remap to top-level names
         raw_rows = qs.exclude(store_name='').values('store_name').annotate(
             cash_collection=Sum('amount', filter=Q(transaction_type='COLLECTION', profit_share__isnull=True)),
             owner_profit=Sum('amount', filter=Q(transaction_type='COLLECTION', profit_share__isnull=False)),
@@ -1352,10 +1358,10 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
             equity_share=Sum('amount', filter=Q(transaction_type='PROFIT')),
         )
 
-        # Seed every registered org with zeros
+        # Seed every top-level org with zeros
         by_store = {
-            name: {
-                'store_name': name,
+            org.name: {
+                'store_name': org.name,
                 'cash_collection': 0,
                 'owner_profit': 0,
                 'owner_profit_account': 0,
@@ -1363,7 +1369,7 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
                 'incentive': 0,
                 'equity': 0,
             }
-            for name in registered_orgs
+            for org in top_orgs
         }
         for row in raw_rows:
             key = (row['store_name'] or '').strip().lower()

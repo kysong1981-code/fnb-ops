@@ -2549,14 +2549,14 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
 
         if instance.is_locked:
             # Locking: create CQ transaction records for each partner
-            # Determine period label; transactions are dated as of the lock date
+            # Date transactions on the period end so Quarter Report filters
+            # them into the correct quarter, regardless of when lock happens.
             if instance.period_type == 'H1':
+                period_end_date = date(instance.year, 9, 30)
                 period_label = f"{instance.year}-Oct"
             else:
+                period_end_date = date(instance.year + 1, 3, 31)
                 period_label = f"{instance.year + 1}-Apr"
-
-            # Use the lock date (today) so entries show on CQ report when locked
-            period_end_date = timezone.now().date()
 
             store_name = instance.organization.name if instance.organization else ''
             profile = request.user.profile
