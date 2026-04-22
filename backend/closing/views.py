@@ -1331,38 +1331,57 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         for k in totals:
             totals[k] = totals[k] or 0
 
-        # Per-store summary — only registered stores
+        # Per-store summary — always include ALL registered Organizations,
+        # even if they have no transactions in the period (show as $0).
+        # Match transactions to orgs case-insensitively so minor name
+        # variations (e.g. "T1" vs " T1") don't hide data.
         from users.models import Organization
-        registered_stores = set(Organization.objects.values_list('name', flat=True))
-        store_rows = qs.exclude(store_name='').filter(
-            store_name__in=registered_stores
-        ).values('store_name').annotate(
+        registered_orgs = list(
+            Organization.objects.values_list('name', flat=True).order_by('name')
+        )
+        # Build lookup: lower(store_name) -> canonical org name
+        canonical = {name.strip().lower(): name for name in registered_orgs}
+
+        # Aggregate raw rows and remap to canonical names
+        raw_rows = qs.exclude(store_name='').values('store_name').annotate(
             cash_collection=Sum('amount', filter=Q(transaction_type='COLLECTION', profit_share__isnull=True)),
             owner_profit=Sum('amount', filter=Q(transaction_type='COLLECTION', profit_share__isnull=False)),
             owner_profit_account=Sum('amount', filter=Q(transaction_type='COLLECTION', profit_share__isnull=False, account_type='ACCOUNT')),
             owner_profit_cash=Sum('amount', filter=Q(transaction_type='COLLECTION', profit_share__isnull=False, account_type='CASH')),
             incentive=Sum('amount', filter=Q(transaction_type='INCENTIVE')),
             equity_share=Sum('amount', filter=Q(transaction_type='PROFIT')),
-        ).order_by('store_name')
+        )
+
+        # Seed every registered org with zeros
+        by_store = {
+            name: {
+                'store_name': name,
+                'cash_collection': 0,
+                'owner_profit': 0,
+                'owner_profit_account': 0,
+                'owner_profit_cash': 0,
+                'incentive': 0,
+                'equity': 0,
+            }
+            for name in registered_orgs
+        }
+        for row in raw_rows:
+            key = (row['store_name'] or '').strip().lower()
+            canon = canonical.get(key)
+            if not canon:
+                continue  # unregistered store_name (e.g. exchange strings) — skip
+            entry = by_store[canon]
+            entry['cash_collection'] += float(row['cash_collection'] or 0)
+            entry['owner_profit'] += float(row['owner_profit'] or 0)
+            entry['owner_profit_account'] += float(row['owner_profit_account'] or 0)
+            entry['owner_profit_cash'] += float(row['owner_profit_cash'] or 0)
+            entry['incentive'] += float(row['incentive'] or 0)
+            entry['equity'] += float(row['equity_share'] or 0)
 
         store_summary = []
-        for row in store_rows:
-            cc = row['cash_collection'] or 0
-            op = row['owner_profit'] or 0
-            op_acct = row['owner_profit_account'] or 0
-            op_cash = row['owner_profit_cash'] or 0
-            i = row['incentive'] or 0
-            eq = row['equity_share'] or 0
-            store_summary.append({
-                'store_name': row['store_name'],
-                'cash_collection': cc,
-                'owner_profit': op,
-                'owner_profit_account': op_acct,
-                'owner_profit_cash': op_cash,
-                'incentive': i,
-                'equity': eq,
-                'total': float(cc) + float(op) + float(i) + float(eq),
-            })
+        for entry in by_store.values():
+            entry['total'] = entry['cash_collection'] + entry['owner_profit'] + entry['incentive'] + entry['equity']
+            store_summary.append(entry)
         store_summary.sort(key=lambda x: x['total'], reverse=True)
 
         # Per-person summary (grouped by person using annotate - guaranteed no duplicates)
