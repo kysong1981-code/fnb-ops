@@ -2602,35 +2602,39 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
                     )
 
                 # 2) Equity share — only EQUITY partners
-                if partner.partner_type == 'EQUITY':
-                    equity_account = partner.bank_account or Decimal('0')
-                    equity_cash = partner.bank_cash or Decimal('0')
+                if partner.partner_type != 'OWNER':
+                    # Distribution to any non-OWNER partner (EQUITY, NON_EQUITY,
+                    # or FIXED amount). Use total - incentive so percentage-
+                    # based, fixed-amount, and mixed partners are all covered.
+                    dist_account = (partner.total_account or Decimal('0')) - (partner.incentive_account or Decimal('0'))
+                    dist_cash = (partner.total_cash or Decimal('0')) - (partner.incentive_cash or Decimal('0'))
+                    label = 'Equity' if partner.partner_type == 'EQUITY' else 'Profit Share'
                     # 2a) Account portion — tracked under partner name
-                    if equity_account != Decimal('0'):
+                    if dist_account != Decimal('0'):
                         CQTransaction.objects.create(
                             organization=instance.organization,
                             date=period_end_date,
                             store_name=store_name,
                             transaction_type='PROFIT',
                             person=partner.name,
-                            amount=equity_account,
+                            amount=dist_account,
                             account_type='ACCOUNT',
-                            note=f"Equity Share (Account) {instance.year} {instance.get_period_type_display()} - {partner.name}",
+                            note=f"{label} (Account) {instance.year} {instance.get_period_type_display()} - {partner.name}",
                             period=period_label,
                             profit_share=instance,
                             created_by=profile,
                         )
                     # 2b) Cash portion — outflow from QT/ChCh
-                    if equity_cash != Decimal('0'):
+                    if dist_cash != Decimal('0'):
                         CQTransaction.objects.create(
                             organization=instance.organization,
                             date=period_end_date,
                             store_name=store_name,
                             transaction_type='PROFIT',
                             person=partner.name,
-                            amount=equity_cash,
+                            amount=dist_cash,
                             account_type='CASH',
-                            note=f"{partner.name} Equity (Cash) {instance.year} {instance.get_period_type_display()}",
+                            note=f"{partner.name} {label} (Cash) {instance.year} {instance.get_period_type_display()}",
                             period=period_label,
                             profit_share=instance,
                             created_by=profile,
