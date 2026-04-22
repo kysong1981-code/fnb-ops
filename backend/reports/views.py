@@ -2640,79 +2640,9 @@ class ProfitShareViewSet(viewsets.ModelViewSet):
                             created_by=profile,
                         )
 
-                # 3) Owner — split into ACCOUNT and CASH portions
-                if partner.partner_type == 'OWNER':
-                    owner_account = partner.bank_account or Decimal('0')
-                    owner_cash = partner.bank_cash or Decimal('0')
-                    if owner_account != Decimal('0'):
-                        CQTransaction.objects.create(
-                            organization=instance.organization,
-                            date=period_end_date,
-                            store_name=store_name,
-                            transaction_type='COLLECTION',
-                            person='Owner',
-                            amount=owner_account,
-                            account_type='ACCOUNT',
-                            note=f"Owner Profit (Account) {instance.year} {instance.get_period_type_display()}",
-                            period=period_label,
-                            profit_share=instance,
-                            created_by=profile,
-                        )
-                    if owner_cash != Decimal('0'):
-                        CQTransaction.objects.create(
-                            organization=instance.organization,
-                            date=period_end_date,
-                            store_name=store_name,
-                            transaction_type='COLLECTION',
-                            person='Owner',
-                            amount=owner_cash,
-                            account_type='CASH',
-                            note=f"Owner Profit (Cash) {instance.year} {instance.get_period_type_display()}",
-                            period=period_label,
-                            profit_share=instance,
-                            created_by=profile,
-                        )
+                # Owner profit intentionally not recorded — it's the remainder
+                # left in QT/ChCh after partner distributions.
 
-            # 4) Auto-calculate Owner remainder if no OWNER partner exists
-            has_owner = instance.partners.filter(partner_type='OWNER').exists()
-            if not has_owner:
-                total_partner_account = sum(
-                    (p.total_account or Decimal('0')) for p in instance.partners.all()
-                )
-                total_partner_cash = sum(
-                    (p.total_cash or Decimal('0')) for p in instance.partners.all()
-                )
-                owner_remainder_account = (instance.net_profit_account or Decimal('0')) - total_partner_account
-                owner_remainder_cash = (instance.net_profit_cash or Decimal('0')) - total_partner_cash
-
-                if owner_remainder_account != Decimal('0'):
-                    CQTransaction.objects.create(
-                        organization=instance.organization,
-                        date=period_end_date,
-                        store_name=store_name,
-                        transaction_type='COLLECTION',
-                        person='Owner',
-                        amount=owner_remainder_account,
-                        account_type='ACCOUNT',
-                        note=f"Owner Profit (Account) {instance.year} {instance.get_period_type_display()}",
-                        period=period_label,
-                        profit_share=instance,
-                        created_by=profile,
-                    )
-                if owner_remainder_cash != Decimal('0'):
-                    CQTransaction.objects.create(
-                        organization=instance.organization,
-                        date=period_end_date,
-                        store_name=store_name,
-                        transaction_type='COLLECTION',
-                        person='Owner',
-                        amount=owner_remainder_cash,
-                        account_type='CASH',
-                        note=f"Owner Profit (Cash) {instance.year} {instance.get_period_type_display()}",
-                        period=period_label,
-                        profit_share=instance,
-                        created_by=profile,
-                    )
             # Calculate carry-over: available cash - total distributions
             total_distributed = sum(
                 (p.total or Decimal('0')) for p in instance.partners.all()
