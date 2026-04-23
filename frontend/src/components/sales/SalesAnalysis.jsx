@@ -46,11 +46,14 @@ export default function SalesAnalysis() {
   const role = user?.role || 'MANAGER'
 
   // State
-  const [activeTab, setActiveTab] = useState('store') // 'store' | 'compare'
+  const [activeTab, setActiveTab] = useState('store') // 'store' | 'compare' | 'sky'
   const [dateMode, setDateMode] = useState('month')
   const [date, setDate] = useState(getTodayNZ())
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
+  // Sky Reports uses its own month picker (YYYY-MM)
+  const today = getTodayNZ()
+  const [skyMonth, setSkyMonth] = useState(today.slice(0, 7))
 
   // Store selector
   const [stores, setStores] = useState([])
@@ -129,27 +132,68 @@ export default function SalesAnalysis() {
             )}
           </div>
 
-          {/* Date mode */}
-          <div className="flex items-center gap-3">
-            <div className="bg-gray-100 rounded-xl p-1 flex gap-1">
-              {DATE_MODES.map((dm) => (
-                <button
-                  key={dm.key}
-                  onClick={() => setDateMode(dm.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                    dateMode === dm.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-                  }`}
-                >
-                  {dm.label}
-                </button>
-              ))}
+          {/* Date mode (hidden on Sky Reports tab — it uses month picker only) */}
+          {activeTab !== 'sky' && (
+            <div className="flex items-center gap-3">
+              <div className="bg-gray-100 rounded-xl p-1 flex gap-1">
+                {DATE_MODES.map((dm) => (
+                  <button
+                    key={dm.key}
+                    onClick={() => setDateMode(dm.key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                      dateMode === dm.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                    }`}
+                  >
+                    {dm.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Date inputs + Store selector */}
         <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-3">
-          {dateMode === 'custom' ? (
+          {activeTab === 'sky' ? (
+            <div className="flex items-center gap-3 flex-wrap">
+              <input
+                type="month"
+                value={skyMonth}
+                onChange={(e) => setSkyMonth(e.target.value)}
+                className={inputCls}
+              />
+              <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
+                {(() => {
+                  if (!skyMonth) return ''
+                  const [y, m] = skyMonth.split('-').map(Number)
+                  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+                })()}
+              </span>
+              {/* Quick month shortcuts */}
+              <div className="flex gap-1">
+                {[0, 1, 2].map((offset) => {
+                  const d = new Date()
+                  d.setDate(1)
+                  d.setMonth(d.getMonth() - offset)
+                  const y = d.getFullYear()
+                  const m = String(d.getMonth() + 1).padStart(2, '0')
+                  const val = `${y}-${m}`
+                  const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+                  return (
+                    <button
+                      key={val}
+                      onClick={() => setSkyMonth(val)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                        skyMonth === val ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ) : dateMode === 'custom' ? (
             <div className="flex items-center gap-2">
               <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className={inputCls} />
               <span className="text-gray-400 text-sm">to</span>
@@ -181,9 +225,8 @@ export default function SalesAnalysis() {
       {/* Content */}
       {activeTab === 'sky' ? (
         (() => {
-          const d = new Date((dateMode === 'custom' ? customStart : date) + 'T00:00:00')
-          const y = d.getFullYear()
-          const m = d.getMonth() + 1
+          if (!skyMonth) return null
+          const [y, m] = skyMonth.split('-').map(Number)
           return <SkyReportsGrid year={y} month={m} />
         })()
       ) : startDate && endDate && (
