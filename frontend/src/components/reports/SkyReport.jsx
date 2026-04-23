@@ -145,14 +145,14 @@ export default function SkyReport() {
     }
     setEditing(true)
 
-    // Auto-fill Total Sales and HQ Cash from DailyClosing data
+    // Auto-fill from DailyClosing data — only fill empty fields so manual input is preserved
     try {
       const res = await skyReportAPI.autoFill(year, selectedMonth)
       const auto = res.data
       setForm(prev => ({
         ...prev,
-        total_sales_garage: auto.total_sales_garage ? String(auto.total_sales_garage) : prev.total_sales_garage,
-        hq_cash_garage: auto.hq_cash_garage ? String(auto.hq_cash_garage) : prev.hq_cash_garage,
+        total_sales_garage: (parseFloat(prev.total_sales_garage) > 0) ? prev.total_sales_garage : (auto.total_sales_garage ? String(auto.total_sales_garage) : prev.total_sales_garage),
+        hq_cash_garage: (parseFloat(prev.hq_cash_garage) > 0) ? prev.hq_cash_garage : (auto.hq_cash_garage ? String(auto.hq_cash_garage) : prev.hq_cash_garage),
         number_of_days: auto.number_of_days ? String(auto.number_of_days) : prev.number_of_days,
         tab_allowance_sales: auto.opening_hours_per_day ? String(auto.opening_hours_per_day) : prev.tab_allowance_sales,
       }))
@@ -1181,8 +1181,8 @@ function ReportDetail({ report }) {
       <Card className="p-5">
         <h3 className="text-sm font-bold text-gray-900 mb-4">Input Data</h3>
         <div className="space-y-1">
-          <DetailRow label="Auto" labelEn="Total Sales" value={`$${fmt(r.total_sales_garage)}`} />
-          <DetailRow label="Auto" labelEn="HQ CASH" value={`$${fmt(r.hq_cash_garage)}`} />
+          <DetailRow label="Input" labelEn="Total Sales" value={`$${fmt(r.total_sales_garage)}`} />
+          <DetailRow label="Input" labelEn="HQ CASH" value={`$${fmt(r.hq_cash_garage)}`} />
           <div className="border-t border-gray-100 my-2" />
           <DetailRow label="Input" labelEn="COGS (excl.GST)" value={`$${fmt(r.total_cogs_xero)}`} />
           <DetailRow label="Input" labelEn="Total Expense" value={`$${fmt(r.total_expense_xero)}`} />
@@ -1248,18 +1248,8 @@ function ReportForm({ form, updateField, handleSave, cancelEditing, saving, edit
         <h3 className="text-sm font-bold text-gray-900 mb-1">Auto Data (DailyClosing)</h3>
         <p className="text-xs text-gray-400 mb-4">Auto-calculated from CSV upload data</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div>
-            <label className={labelCls}>Total Sales (Auto)</label>
-            <div className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm text-right text-blue-700 font-medium">
-              ${parseFloat(form.total_sales_garage || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2 })}
-            </div>
-          </div>
-          <div>
-            <label className={labelCls}>HQ CASH (Auto)</label>
-            <div className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm text-right text-blue-700 font-medium">
-              ${parseFloat(form.hq_cash_garage || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2 })}
-            </div>
-          </div>
+          <NumField label="Total Sales" value={form.total_sales_garage} onChange={v => updateField('total_sales_garage', v)} prefix="$" />
+          <NumField label="HQ CASH" value={form.hq_cash_garage} onChange={v => updateField('hq_cash_garage', v)} prefix="$" />
           <div>
             <label className={labelCls}>Trading Days (Auto)</label>
             <div className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm text-right text-blue-700 font-medium">
