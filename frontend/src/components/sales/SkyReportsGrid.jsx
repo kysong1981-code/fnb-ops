@@ -84,11 +84,18 @@ export default function SkyReportsGrid({ year, month }) {
             <p className="text-xs text-gray-400">{reports.length} store{reports.length !== 1 ? 's' : ''} reporting · ranked by Operating Profit</p>
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <Stat label="Total Sales (incl. GST)" value={fmt(totals.total_sales)} color="text-gray-900" />
-          <Stat label="COGS" value={fmtPct(totals.cogs_ratio)} sub={fmt(totals.cogs)} color="text-amber-700" />
-          <Stat label="Wages" value={fmtPct(totals.wage_ratio)} sub={fmt(totals.wages)} color="text-blue-700" />
-          <Stat label="Operating Profit" value={fmtPct(totals.profit_ratio)} sub={fmt(totals.op_profit)} color="text-emerald-700" />
+          <Stat label="Excl. GST Sales" value={fmt(totals.excl_gst)} color="text-gray-700" />
+          <Stat label="COGS" value={fmt(totals.cogs)} sub={fmtPct(totals.cogs_ratio)} color="text-amber-700" />
+          <Stat label="Wages" value={fmt(totals.wages)} sub={fmtPct(totals.wage_ratio)} color="text-blue-700" />
+          <Stat label="Operating Exp." value={fmt(totals.op_exp)} color="text-gray-700" />
+          <Stat
+            label="Operating Profit"
+            value={fmt(totals.op_profit)}
+            sub={fmtPct(totals.profit_ratio)}
+            color={totals.op_profit >= 0 ? 'text-emerald-700' : 'text-red-600'}
+          />
         </div>
       </Card>
 
