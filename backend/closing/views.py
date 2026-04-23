@@ -106,11 +106,19 @@ class DailyClosingViewSet(viewsets.ModelViewSet):
         if closing_date:
             queryset = queryset.filter(closing_date=closing_date)
 
+        date_start = self.request.query_params.get('date_start')
+        if date_start:
+            queryset = queryset.filter(closing_date__gte=date_start)
+
+        date_end = self.request.query_params.get('date_end')
+        if date_end:
+            queryset = queryset.filter(closing_date__lte=date_end)
+
         status_filter = self.request.query_params.get('status')
         if status_filter:
             queryset = queryset.filter(status=status_filter)
 
-        return queryset.select_related('organization', 'created_by', 'approved_by')
+        return queryset.select_related('organization', 'created_by', 'approved_by').order_by('-closing_date')
 
     def create(self, request, *args, **kwargs):
         """신규 클로징 생성 (DRAFT 상태)"""
@@ -529,8 +537,19 @@ class ClosingCashExpenseViewSet(mixins.CreateModelMixin,
             import logging
             logging.getLogger(__name__).error(f"CQ auto-create failed: {e}")  # Log errors for debugging
 
+    def perform_update(self, serializer):
+        """Approved 상태면 수정 불가"""
+        instance = self.get_object()
+        if instance.daily_closing and instance.daily_closing.status == 'APPROVED':
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Approved 상태의 지출은 수정할 수 없습니다.')
+        serializer.save()
+
     def perform_destroy(self, instance):
-        """삭제 시 연결된 CQ Transaction도 삭제"""
+        """삭제 시 연결된 CQ Transaction도 삭제. Approved 상태면 삭제 불가."""
+        if instance.daily_closing and instance.daily_closing.status == 'APPROVED':
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Approved 상태의 지출은 삭제할 수 없습니다.')
         try:
             closing = instance.daily_closing
             cq = CQTransaction.objects.filter(

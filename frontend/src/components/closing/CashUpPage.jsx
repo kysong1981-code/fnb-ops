@@ -51,6 +51,9 @@ export default function CashUpPage() {
   // Missing days
   const [missingDays, setMissingDays] = useState([])
 
+  // Recent approved closings (last 365 days)
+  const [recentClosings, setRecentClosings] = useState([])
+
   // HR Cash monthly
   const today = new Date()
   const [hrMonth, setHrMonth] = useState(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`)
@@ -145,7 +148,21 @@ export default function CashUpPage() {
 
   useEffect(() => {
     loadHrCashBalance()
+    loadRecentClosings()
   }, [])
+
+  // Load last 365 days of approved closings for history section
+  const loadRecentClosings = async () => {
+    try {
+      const today = new Date()
+      const y = today.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
+      const start = new Date(today); start.setDate(today.getDate() - 365)
+      const s = start.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
+      const res = await closingAPI.list({ date_start: s, date_end: y, status: 'APPROVED' })
+      const data = res.data.results || res.data || []
+      setRecentClosings(data)
+    } catch { /* ignore */ }
+  }
 
   // Load closing for selected date
   useEffect(() => {
@@ -345,7 +362,36 @@ export default function CashUpPage() {
     } catch { setError('Failed to delete') }
   }
 
-  // HR Cash tab: Save expense + approve + return to HR Cash Management
+  // HR Cash tab: Save expense only (no approve — still editable)
+  const handleHrSave = async () => {
+    const c = await ensureClosing()
+    if (!c) return
+    setSaving(true)
+    setError('')
+    try {
+      if (expForm.amount && expForm.reason) {
+        const fd = new FormData()
+        fd.append('daily_closing', c.id)
+        fd.append('category', expForm.category)
+        fd.append('reason', expForm.reason)
+        fd.append('amount', expForm.amount)
+        if (expForm.notes) fd.append('notes', expForm.notes)
+        if (expForm.attachment) fd.append('attachment', expForm.attachment)
+        await cashExpenseAPI.create(fd)
+      }
+      setExpForm({ category: 'SUPPLIES', reason: '', amount: '', notes: '', attachment: null })
+      loadHrCashBalance()
+      loadHrMonthData()
+      loadExpenses(c.id)
+      showMsg('Saved (not yet approved — still editable)')
+    } catch (err) {
+      setError(err.response?.data?.detail || err.response?.data?.error || 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // HR Cash tab: Save expense + approve (locks) + return to HR Cash Management
   const handleHrSaveApprove = async () => {
     const c = await ensureClosing()
     if (!c) return
@@ -369,9 +415,9 @@ export default function CashUpPage() {
       setExpForm({ category: 'SUPPLIES', reason: '', amount: '', notes: '', attachment: null })
       loadHrCashBalance()
       loadExpenses(c.id)
-      showMsg('Saved & Approved')
-      // Switch back to show updated state
-      setActiveTab('hr')
+      loadHrMonthData()
+      loadRecentClosings()
+      showMsg('Submitted & Approved')
     } catch (err) {
       setError(err.response?.data?.detail || err.response?.data?.error || 'Failed to save')
     } finally {
@@ -704,34 +750,80 @@ export default function CashUpPage() {
             </form>
           </Card>
 
-          {/* Expense List */}
+          {/* Expense List (editable if parent closing not approved) */}
           {hrMonthExpenses.length > 0 && (
             <Card className="p-5">
-              <SectionLabel>Expense History</SectionLabel>
+              <SectionLabel>Expense History — {hrMonth}</SectionLabel>
               <div className="space-y-2">
-                {hrMonthExpenses.map(exp => (
-                  <div key={exp.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <div>
-                      <span className="text-sm font-medium text-gray-800">{exp.reason || exp.category}</span>
-                      <span className="text-xs text-gray-400 ml-2">{exp.created_at?.split('T')[0]}</span>
-                      {exp.notes && <p className="text-xs text-gray-500 mt-0.5">{exp.notes}</p>}
+                {hrMonthExpenses.map(exp => {
+                  const locked = exp.closing_status === 'APPROVED'
+                  return (
+                    <div key={exp.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-800">{exp.reason || exp.category}</span>
+                          <span className="text-xs text-gray-400">{exp.created_at?.split('T')[0]}</span>
+                          {locked && <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full">✓ Approved</span>}
+                        </div>
+                        {exp.notes && <p className="text-xs text-gray-500 mt-0.5 truncate">{exp.notes}</p>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-red-600">-{fmt(exp.amount)}</span>
+                        {!locked && (
+                          <button onClick={() => handleDeleteExpense(exp.id)}
+                            className="p-1 text-gray-300 hover:text-red-500 rounded">
+                            <TrashIcon size={14} />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-sm font-bold text-red-600">-{fmt(exp.amount)}</span>
+                  )
+                })}
+              </div>
+            </Card>
+          )}
+
+          {/* Save / Submit buttons */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={handleHrSave}
+              disabled={saving}
+              className="flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-sm font-semibold hover:bg-blue-100 disabled:opacity-50 transition"
+            >
+              {saving ? 'Saving…' : 'Save (수정 가능)'}
+            </button>
+            <button
+              onClick={handleHrSaveApprove}
+              disabled={saving}
+              className="flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition"
+            >
+              <CheckCircleIcon size={18} />
+              {saving ? '...' : 'Submit (승인/잠금)'}
+            </button>
+          </div>
+
+          {/* Recent approved closings (last 365 days) */}
+          {recentClosings.length > 0 && (
+            <Card className="p-5">
+              <SectionLabel>Recent Approved (최근 1년)</SectionLabel>
+              <div className="space-y-1 max-h-96 overflow-y-auto">
+                {recentClosings.map(c => (
+                  <div key={c.id}
+                    className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 rounded-lg cursor-pointer"
+                    onClick={() => { setSelectedDate(c.closing_date); setActiveTab('cashup') }}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700">{c.closing_date}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full">✓</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                      <span>Cash: <span className="font-semibold text-gray-700">{fmt(c.actual_cash)}</span></span>
+                      <span>Dep: <span className="font-semibold text-gray-700">{fmt(c.bank_deposit)}</span></span>
+                    </div>
                   </div>
                 ))}
               </div>
             </Card>
           )}
-
-          {/* Save & Approve */}
-          <button
-            onClick={handleHrSaveApprove}
-            disabled={saving}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition"
-          >
-            <CheckCircleIcon size={18} />
-            {saving ? 'Saving...' : 'Save & Approve'}
-          </button>
         </>
       )}
     </div>

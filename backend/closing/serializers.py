@@ -85,15 +85,18 @@ class ClosingCashExpenseSerializer(serializers.ModelSerializer):
     """현금 지출 시리얼라이저 (파일 업로드 포함)"""
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     category_display = serializers.CharField(source='get_category_display', read_only=True)
+    closing_status = serializers.CharField(source='daily_closing.status', read_only=True)
+    closing_date = serializers.DateField(source='daily_closing.closing_date', read_only=True)
 
     class Meta:
         model = ClosingCashExpense
         fields = [
             'id', 'daily_closing', 'category', 'category_display', 'reason',
             'amount', 'notes', 'attachment', 'created_by', 'created_by_name',
+            'closing_status', 'closing_date',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'created_by_name', 'category_display']
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'created_by_name', 'category_display', 'closing_status', 'closing_date']
         extra_kwargs = {
             'attachment': {'required': False, 'allow_null': True}
         }

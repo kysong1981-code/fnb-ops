@@ -1314,7 +1314,7 @@ export default function CQCashFlow() {
                           }
                           return true
                         }).map(item => {
-                          const canEdit = isCEO && !item.is_locked
+                          const canEdit = isCEO && !item.is_locked && item.source !== 'cash_management'
                           const isEditing = editingTx?.id === item.id
                           const isDetail = detailTx?.id === item.id && !isEditing
                           const colSpan = isKRW ? (isCEO ? 4 : 3) : (isCEO ? 6 : 5)
