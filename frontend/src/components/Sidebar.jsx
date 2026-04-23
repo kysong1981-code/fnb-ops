@@ -33,7 +33,7 @@ export default function Sidebar() {
         { label: 'Daily Closing', path: '/closing', roles: managerRoles },
         { label: 'Cash Management', path: '/cashup', roles: managerRoles },
         { label: 'Reports', path: '/reports', roles: managerRoles },
-        { label: 'Sales Analysis', path: '/sales', roles: managerRoles },
+        { label: 'Sales Analysis', path: '/sales', roles: ['REGIONAL_MANAGER', 'HQ', 'CEO', 'ADMIN'] },
         { label: 'Roster Management', path: '/manager/roster', roles: managerRoles },
         { label: 'Timesheet Review', path: '/manager/timesheet-review', roles: managerRoles },
         { label: 'HR Management', path: '/hr', roles: managerRoles },

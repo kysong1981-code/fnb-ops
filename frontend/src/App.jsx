@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import { StoreProvider } from './context/StoreContext'
 import LoginPage from './components/auth/LoginPage'
 import ProtectedRoute from './components/auth/ProtectedRoute'
@@ -84,6 +84,15 @@ function ManagerWithLayout({ children }) {
       </ManagerRoute>
     </ProtectedRoute>
   )
+}
+
+// Role-restricted route guard
+function RoleGuard({ roles, children }) {
+  const { user } = useAuth()
+  if (!user || !roles.includes(user.role)) {
+    return <Navigate to="/dashboard" replace />
+  }
+  return children
 }
 
 function App() {
@@ -197,12 +206,14 @@ function App() {
             }
           />
 
-          {/* Sales Analysis (with sidebar) */}
+          {/* Sales Analysis (Regional Manager / HQ / CEO / Admin only) */}
           <Route
             path="/sales"
             element={
               <ProtectedWithLayout>
-                <SalesAnalysis />
+                <RoleGuard roles={['REGIONAL_MANAGER', 'HQ', 'CEO', 'ADMIN']}>
+                  <SalesAnalysis />
+                </RoleGuard>
               </ProtectedWithLayout>
             }
           />
