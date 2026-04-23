@@ -1584,7 +1584,10 @@ class SkyReportViewSet(viewsets.ModelViewSet):
         year = self.request.query_params.get('year')
         if year:
             qs = qs.filter(year=year)
-        return qs
+        month = self.request.query_params.get('month')
+        if month:
+            qs = qs.filter(month=month)
+        return qs.select_related('organization')
 
     def _auto_calculate(self, instance):
         """Auto-calculate P&L fields from input fields."""

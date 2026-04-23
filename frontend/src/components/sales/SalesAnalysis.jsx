@@ -5,6 +5,7 @@ import { getTodayNZ } from '../../utils/date'
 import Card from '../ui/Card'
 import StoreAnalysis from './StoreAnalysis'
 import CompareView from './CompareView'
+import SkyReportsGrid from './SkyReportsGrid'
 
 /* ── Date helpers ─────────────────────────────────────────── */
 
@@ -116,6 +117,16 @@ export default function SalesAnalysis() {
                 Compare Stores
               </button>
             )}
+            {stores.length > 1 && (
+              <button
+                onClick={() => setActiveTab('sky')}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                  activeTab === 'sky' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                }`}
+              >
+                Sky Reports
+              </button>
+            )}
           </div>
 
           {/* Date mode */}
@@ -168,7 +179,14 @@ export default function SalesAnalysis() {
       </Card>
 
       {/* Content */}
-      {startDate && endDate && (
+      {activeTab === 'sky' ? (
+        (() => {
+          const d = new Date((dateMode === 'custom' ? customStart : date) + 'T00:00:00')
+          const y = d.getFullYear()
+          const m = d.getMonth() + 1
+          return <SkyReportsGrid year={y} month={m} />
+        })()
+      ) : startDate && endDate && (
         activeTab === 'compare' ? (
           <CompareView
             startDate={startDate}

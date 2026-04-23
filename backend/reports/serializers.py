@@ -42,6 +42,8 @@ class GeneratedReportSerializer(serializers.ModelSerializer):
 
 class SkyReportSerializer(serializers.ModelSerializer):
     month_display = serializers.CharField(source='get_month_display', read_only=True)
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    organization_id = serializers.IntegerField(source='organization.id', read_only=True)
     excl_gst_sales = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     cogs_ratio = serializers.DecimalField(max_digits=5, decimal_places=1, read_only=True)
     wage_ratio = serializers.DecimalField(max_digits=5, decimal_places=1, read_only=True)
@@ -54,7 +56,8 @@ class SkyReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = SkyReport
         fields = [
-            'id', 'year', 'month', 'month_display',
+            'id', 'organization_id', 'organization_name',
+            'year', 'month', 'month_display',
             # Main financial
             'total_sales_inc_gst', 'hq_cash', 'pos_sales', 'other_sales',
             'cogs', 'operating_expenses', 'wages',
