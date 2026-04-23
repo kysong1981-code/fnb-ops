@@ -1531,6 +1531,83 @@ class CQTransactionViewSet(viewsets.ModelViewSet):
         result.sort(key=lambda x: -x['total'])
         return Response({'persons': result})
 
+    @action(detail=False, methods=['get'], url_path='all-stores')
+    def all_stores(self, request):
+        """All stores' summary + ProfitShare period history for charts.
+
+        Mirrors all_persons: Cash/Account/Total per store for selected period
+        plus historical period totals (ProfitShare-only transactions).
+        """
+        qs = self.get_queryset()
+        date_start = request.query_params.get('date_start')
+        date_end = request.query_params.get('date_end')
+        if date_start:
+            qs = qs.filter(date__gte=date_start)
+        if date_end:
+            qs = qs.filter(date__lte=date_end)
+
+        qs = qs.filter(profit_share__isnull=False).exclude(store_name='')
+
+        from collections import defaultdict
+        INFLOW_TYPES = ('COLLECTION', 'INCENTIVE', 'PROFIT')
+
+        # Historical totals across ALL periods
+        all_qs_for_history = CQTransaction.objects.filter(
+            profit_share__isnull=False
+        ).exclude(store_name='')
+        history_by_store = defaultdict(lambda: defaultdict(lambda: Decimal('0')))
+        for tx in all_qs_for_history.select_related('profit_share'):
+            if not tx.profit_share:
+                continue
+            key = (tx.profit_share.year, tx.profit_share.period_type)
+            if tx.transaction_type in INFLOW_TYPES:
+                history_by_store[tx.store_name][key] += tx.amount
+
+        stores = defaultdict(lambda: {
+            'cash': Decimal('0'),
+            'account': Decimal('0'),
+            'by_type': defaultdict(lambda: Decimal('0')),
+            'tx_count': 0,
+        })
+        for tx in qs:
+            s = stores[tx.store_name]
+            s['tx_count'] += 1
+            if tx.transaction_type in INFLOW_TYPES:
+                s['by_type'][tx.transaction_type] += tx.amount
+                if tx.account_type == 'ACCOUNT':
+                    s['account'] += tx.amount
+                else:
+                    s['cash'] += tx.amount
+
+        all_store_names = set(stores.keys()) | set(history_by_store.keys())
+        result = []
+        for name in all_store_names:
+            d = stores.get(name) or {
+                'cash': Decimal('0'), 'account': Decimal('0'),
+                'by_type': {}, 'tx_count': 0,
+            }
+            periods = sorted(history_by_store.get(name, {}).keys())
+            history = [
+                {
+                    'period': f"{y} {pt}",
+                    'year': y,
+                    'period_type': pt,
+                    'total': float(history_by_store[name][(y, pt)]),
+                }
+                for (y, pt) in periods
+            ]
+            result.append({
+                'store_name': name,
+                'cash': float(d['cash']),
+                'account': float(d['account']),
+                'total': float(d['cash'] + d['account']),
+                'tx_count': d['tx_count'],
+                'by_type': {k: float(v) for k, v in d['by_type'].items()},
+                'history': history,
+            })
+        result.sort(key=lambda x: -x['total'])
+        return Response({'stores': result})
+
     @action(detail=False, methods=['get'], url_path='personal-ledger')
     def personal_ledger(self, request):
         """개인 장부 - 특정 사람의 수입/지출 내역"""

@@ -105,6 +105,8 @@ export default function CQCashFlow() {
   const [personalLedger, setPersonalLedger] = useState(null)
   const [allPersons, setAllPersons] = useState([])
   const [expandedPerson, setExpandedPerson] = useState(null)
+  const [allStores, setAllStores] = useState([])
+  const [expandedStore, setExpandedStore] = useState(null)
   const [selectedStore, setSelectedStore] = useState('')
   const [selectedPerson, setSelectedPerson] = useState('')
   const [historyData, setHistoryData] = useState([])
@@ -179,6 +181,7 @@ export default function CQCashFlow() {
     if (view === 'stores' && selectedStore) loadStoreLedger()
     if (view === 'persons' && selectedPerson) loadPersonalLedger()
     if (view === 'persons') loadAllPersons()
+    if (view === 'stores') loadAllStores()
   }, [selectedStore, selectedPerson, year, period, customStart, customEnd, view])
 
   const loadHistoryData = async () => {
@@ -492,6 +495,15 @@ export default function CQCashFlow() {
         date_start: dateRange.start, date_end: dateRange.end,
       })
       setAllPersons(res.data?.persons || [])
+    } catch (e) { /* ignore */ }
+  }
+
+  const loadAllStores = async () => {
+    try {
+      const res = await cqTransactionAPI.allStores({
+        date_start: dateRange.start, date_end: dateRange.end,
+      })
+      setAllStores(res.data?.stores || [])
     } catch (e) { /* ignore */ }
   }
 
@@ -1431,15 +1443,42 @@ export default function CQCashFlow() {
       {/* ===== STORE VIEW ===== */}
       {view === 'stores' && (
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
+          {/* Period selector */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1">
+              <button onClick={() => setYear(y => y - 1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <span className="text-base font-bold text-gray-900 min-w-[3rem] text-center">{year}</span>
+              <button onClick={() => setYear(y => y + 1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+            </div>
+            <div className="flex bg-gray-100 rounded-xl p-1">
+              {[{ key: 'YEAR', label: 'Year' }, { key: 'H1', label: 'H1' }, { key: 'H2', label: 'H2' }, { key: 'CUSTOM', label: 'Custom' }].map(p => (
+                <button key={p.key} onClick={() => setPeriod(p.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    period === p.key ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}>{p.label}</button>
+              ))}
+            </div>
+            {period === 'CUSTOM' && (
+              <div className="flex items-center gap-2">
+                <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
+                  className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs" />
+                <span className="text-gray-400 text-xs">~</span>
+                <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
+                  className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs" />
+              </div>
+            )}
             <select value={selectedStore} onChange={e => setSelectedStore(e.target.value)}
-              className={inputCls + ' flex-1'}>
-              <option value="">Select store...</option>
+              className={inputCls + ' ml-auto text-xs'}>
+              <option value="">Manage store…</option>
               {storesList.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             {selectedStore && (
               <button onClick={handleToggleLock}
-                className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                   storeLockStatus.is_locked
                     ? 'bg-red-100 text-red-700 hover:bg-red-200'
                     : 'bg-green-100 text-green-700 hover:bg-green-200'
@@ -1538,118 +1577,116 @@ export default function CQCashFlow() {
             </div>
           )}
 
-          {storeLedger && selectedStore && (
-            <>
-              {/* Cash Summary Cards */}
-              {(() => {
-                const totalIn = storeLedger.ledger?.reduce((s, i) => s + i.income, 0) || 0
-                const totalOut = storeLedger.ledger?.reduce((s, i) => s + i.expense, 0) || 0
-                return (
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-green-50 rounded-2xl p-4 border border-green-100">
-                      <div className="text-xs text-gray-500 mb-1">총 수금</div>
-                      <div className="text-lg font-bold text-green-600">{fmt(totalIn)}</div>
-                    </div>
-                    <div className="bg-red-50 rounded-2xl p-4 border border-red-100">
-                      <div className="text-xs text-gray-500 mb-1">총 지출</div>
-                      <div className="text-lg font-bold text-red-600">{fmt(totalOut)}</div>
-                    </div>
-                    <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
-                      <div className="text-xs text-gray-500 mb-1">현재 잔액</div>
-                      <div className={`text-lg font-bold ${(storeLedger.balance || 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                        {fmt(storeLedger.balance || 0)}
+          {allStores.length === 0 && (
+            <div className="text-center py-12 text-gray-400">No data for this period</div>
+          )}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {allStores.map(s => {
+              const isOpen = expandedStore === s.store_name
+              const hist = s.history || []
+              const maxAmt = Math.max(1, ...hist.map(h => h.total))
+              return (
+                <Card key={s.store_name}>
+                  <div className="p-4">
+                    <button onClick={() => {
+                      setExpandedStore(isOpen ? null : s.store_name)
+                      if (!isOpen) { setSelectedStore(s.store_name); loadStoreLedger() }
+                    }}
+                      className="w-full text-left mb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold text-gray-800 flex items-center gap-2">
+                          <span>🏪</span>{s.store_name}
+                          <span className="text-[10px] text-gray-400 font-normal">({s.tx_count})</span>
+                        </div>
+                        <span className="text-gray-300">{isOpen ? '▲' : '▼'}</span>
                       </div>
-                    </div>
-                  </div>
-                )
-              })()}
-              {/* Carry-over + Current Balance */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100">
-                  <div className="text-xs text-gray-500 mb-1">이월 잔액</div>
-                  <div className={`text-lg font-bold ${(storeLedger.carry_over || 0) >= 0 ? 'text-amber-700' : 'text-red-600'}`}>
-                    {fmt(storeLedger.carry_over || 0)}
-                  </div>
-                </div>
-                <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
-                  <div className="text-xs text-gray-500 mb-1">현재 잔액</div>
-                  <div className={`text-lg font-bold ${(storeLedger.balance || 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                    {fmt(storeLedger.balance || 0)}
-                  </div>
-                </div>
-              </div>
+                      <div className="mt-2 grid grid-cols-3 gap-2">
+                        <div className="bg-green-50 rounded-xl p-2">
+                          <div className="text-[10px] text-gray-500">Cash</div>
+                          <div className="text-sm font-bold text-green-700">{fmt(s.cash)}</div>
+                        </div>
+                        <div className="bg-indigo-50 rounded-xl p-2">
+                          <div className="text-[10px] text-gray-500">Account</div>
+                          <div className="text-sm font-bold text-indigo-700">{fmt(s.account)}</div>
+                        </div>
+                        <div className="bg-gray-900 text-white rounded-xl p-2">
+                          <div className="text-[10px] text-gray-300">Total</div>
+                          <div className="text-sm font-bold">{fmt(s.total)}</div>
+                        </div>
+                      </div>
+                    </button>
 
-              <Card>
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-800 mb-3">{selectedStore} Ledger</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-gray-500 border-b">
-                          <th className="pb-2 pr-3">Date</th>
-                          <th className="pb-2 pr-3">Type</th>
-                          <th className="pb-2 pr-3">Person</th>
-                          <th className="pb-2 pr-3 text-right">In</th>
-                          <th className="pb-2 pr-3 text-right">Out</th>
-                          <th className="pb-2 text-right">Balance</th>
-                          <th className="pb-2 w-8"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {storeLedger.ledger?.map(item => {
-                          const txType = getTxType(item.transaction_type)
+                    {/* History bar chart */}
+                    {hist.length > 0 && (
+                      <div className="flex items-end gap-1.5 h-20 mb-1 mt-2">
+                        {hist.map(h => {
+                          const pct = (h.total / maxAmt) * 100
+                          const isCurrent = h.year === year && h.period_type === period
                           return (
-                            <tr key={item.id} className="border-b border-gray-50">
-                              <td className="py-2 pr-3 text-gray-600">{item.date}</td>
-                              <td className="py-2 pr-3">
-                                <span className={`px-2 py-0.5 rounded-full text-xs ${txType.bg} ${txType.color}`}>
-                                  {txType.label}
-                                </span>
-                              </td>
-                              <td className="py-2 pr-3 text-gray-800">{item.person}</td>
-                              <td className="py-2 pr-3 text-right text-green-600">
-                                {item.income > 0 ? fmt(item.income) : ''}
-                              </td>
-                              <td className="py-2 pr-3 text-right text-red-600">
-                                {item.expense > 0 ? fmt(item.expense) : ''}
-                              </td>
-                              <td className="py-2 text-right font-medium text-gray-800">{fmt(item.balance)}</td>
-                              <td className="py-2 pl-2">
-                                {!storeLockStatus.is_locked && !item.is_locked ? (
-                                  <button onClick={() => handleDelete(item.id)}
-                                    className="text-gray-300 hover:text-red-500">
-                                    <TrashIcon className="w-4 h-4" />
-                                  </button>
-                                ) : (
-                                  <span className="text-gray-300 text-xs">🔒</span>
-                                )}
-                              </td>
-                            </tr>
+                            <div key={h.period} className="flex-1 flex flex-col items-center gap-1" title={`${h.period}: ${fmt(h.total)}`}>
+                              <div className="text-[9px] text-gray-500 font-semibold">{fmt(h.total)}</div>
+                              <div className="w-full flex items-end justify-center h-full">
+                                <div className={`w-full rounded-t ${isCurrent ? 'bg-blue-600' : 'bg-blue-300'}`}
+                                  style={{ height: `${pct}%`, minHeight: h.total > 0 ? '3px' : '0' }}></div>
+                              </div>
+                              <div className="text-[9px] text-gray-400">{h.period.replace(' ', '·')}</div>
+                            </div>
                           )
                         })}
-                        {(storeLedger.carry_over || 0) !== 0 && (
-                          <tr className="border-t-2 border-amber-200 bg-amber-50/50">
-                            <td className="py-2 pr-3 text-amber-700 font-medium" colSpan={3}>이월 잔액 (Carry-over)</td>
-                            <td className="py-2 pr-3 text-right text-amber-700 font-medium">
-                              {storeLedger.carry_over > 0 ? fmt(storeLedger.carry_over) : ''}
-                            </td>
-                            <td className="py-2 pr-3 text-right text-amber-700 font-medium">
-                              {storeLedger.carry_over < 0 ? fmt(Math.abs(storeLedger.carry_over)) : ''}
-                            </td>
-                            <td className="py-2 text-right font-bold text-amber-800">{fmt(storeLedger.carry_over)}</td>
-                            <td></td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
+                      </div>
+                    )}
+
+                    {/* By-type breakdown chips */}
+                    {Object.keys(s.by_type || {}).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {Object.entries(s.by_type).map(([t, amt]) => {
+                          const tt = getTxType(t)
+                          return (
+                            <span key={t} className={`px-2 py-0.5 rounded-full text-[10px] ${tt.bg} ${tt.color}`}>
+                              {tt.label} {fmt(amt)}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* Expanded ledger */}
+                    {isOpen && storeLedger && selectedStore === s.store_name && (
+                      <div className="mt-3 overflow-x-auto border-t pt-3">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-left text-gray-500 border-b">
+                              <th className="pb-2 pr-2">Date</th>
+                              <th className="pb-2 pr-2">Type</th>
+                              <th className="pb-2 pr-2">Person</th>
+                              <th className="pb-2 pr-2 text-right">In</th>
+                              <th className="pb-2 pr-2 text-right">Out</th>
+                              <th className="pb-2 text-right">Bal</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {storeLedger.ledger?.map(item => {
+                              const txType = getTxType(item.transaction_type)
+                              return (
+                                <tr key={item.id} className="border-b border-gray-50">
+                                  <td className="py-1.5 pr-2 text-gray-600">{item.date}</td>
+                                  <td className="py-1.5 pr-2"><span className={`px-1.5 py-0.5 rounded text-[10px] ${txType.bg} ${txType.color}`}>{txType.label}</span></td>
+                                  <td className="py-1.5 pr-2 text-gray-800">{item.person}</td>
+                                  <td className="py-1.5 pr-2 text-right text-green-600">{item.income > 0 ? fmt(item.income) : ''}</td>
+                                  <td className="py-1.5 pr-2 text-right text-red-600">{item.expense > 0 ? fmt(item.expense) : ''}</td>
+                                  <td className="py-1.5 text-right font-medium text-gray-800">{fmt(item.balance)}</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </Card>
-            </>
-          )}
-          {!selectedStore && (
-            <div className="text-center py-12 text-gray-400">Select a store to view ledger</div>
-          )}
+                </Card>
+              )
+            })}
+          </div>
         </div>
       )}
 
